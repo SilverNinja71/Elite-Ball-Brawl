@@ -1133,6 +1133,9 @@ const flashTex = canvasTex(128, 128, (g) => {
 });
 const flashes = [], flashPool = [];
 function impactFlash(pos, color, big) {
+  // a hit within a couple of units of the lens (camera pulled in against a wall or tree, first person) would put
+  // a sprite up to 2.4 units wide right in front of the camera: skip the flash there, the sparks still show it
+  if (camera.position.distanceToSquared(pos) < 2.5 * 2.5) return;
   let sp = flashPool.pop();
   if (!sp) { sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTex, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false, toneMapped: false })); sp.renderOrder = 5; scene.add(sp); }
   if (flashes.length >= FLASH_MAX) { const old = flashes.shift(); old.sp.visible = false; flashPool.push(old.sp); }
