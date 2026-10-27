@@ -1131,7 +1131,7 @@ const flashTex = canvasTex(128, 128, (g) => {
     g.save(); g.rotate(i * PI / 4); g.beginPath(); g.moveTo(0, -L); g.lineTo(w, 0); g.lineTo(0, L); g.lineTo(-w, 0); g.closePath(); g.fill(); g.restore();
   }
 });
-const flashes = [], flashPool = [];
+const flashes = [], flashPool = [], _flashOff = new V3();
 function impactFlash(pos, color, big) {
   // a hit within a couple of units of the lens (camera pulled in against a wall or tree, first person) would put
   // a sprite up to 2.4 units wide right in front of the camera: skip the flash there, the sparks still show it
@@ -1139,8 +1139,10 @@ function impactFlash(pos, color, big) {
   let sp = flashPool.pop();
   if (!sp) { sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTex, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false, toneMapped: false })); sp.renderOrder = 5; scene.add(sp); }
   if (flashes.length >= FLASH_MAX) { const old = flashes.shift(); old.sp.visible = false; flashPool.push(old.sp); }
-  tA.copy(camera.position).sub(pos); const d = tA.length(); tA.multiplyScalar(Math.min(0.9, d * 0.5) / (d || 1));
-  sp.position.copy(pos).add(tA); sp.material.color.set(color).lerp(_white, 0.15); sp.material.rotation = frand(0, TAU); sp.visible = true;
+  // own scratch vector: this runs inside hit() during the simulation, where the shared tA may be holding a
+  // caller's knockback / aim direction
+  const off = _flashOff.copy(camera.position).sub(pos), d = off.length(); off.multiplyScalar(Math.min(0.9, d * 0.5) / (d || 1));
+  sp.position.copy(pos).add(off); sp.material.color.set(color).lerp(_white, 0.15); sp.material.rotation = frand(0, TAU); sp.visible = true;
   flashes.push({ sp, t: 0, dur: big ? 0.16 : 0.12, size: big ? 2.0 : 1.3 });
 }
 const _white = new THREE.Color(1, 1, 1);
