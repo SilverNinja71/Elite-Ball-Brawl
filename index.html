@@ -601,15 +601,17 @@ function applyGfx(level) {
 }
 // Auto only: after a warm-up, a 3 s window averaging under ~40 fps lowers the resolution a step, and at
 // pixel ratio 1 drops a level. It never raises quality again in a session, so it cannot oscillate.
-const GFXW = { t: 0, n: 0, sum: 0, warm: 5 };
+// A steady 30 fps is usually a frame-rate cap (iOS Low Power Mode, browser battery saver, 30 Hz screens),
+// not a GPU that is out of breath, so a window where most frames sit right at 30 fps does not count as slow.
+const GFXW = { t: 0, n: 0, sum: 0, cap: 0, warm: 5 };
 function gfxWatch(fdt) {
   if (GFX.pick !== 'auto' || document.hidden) return;
   if (GFXW.warm > 0) { GFXW.warm -= fdt; return; }
-  if (fdt >= 0.25) { GFXW.t = GFXW.n = GFXW.sum = 0; return; }   // a stall, not a slow device
-  GFXW.t += fdt; GFXW.n++; GFXW.sum += fdt;
+  if (fdt >= 0.25) { GFXW.t = GFXW.n = GFXW.sum = GFXW.cap = 0; return; }   // a stall, not a slow device
+  GFXW.t += fdt; GFXW.n++; GFXW.sum += fdt; if (fdt > 0.030 && fdt < 0.0365) GFXW.cap++;
   if (GFXW.t < 3) return;
-  const avg = GFXW.sum / GFXW.n; GFXW.t = GFXW.n = GFXW.sum = 0;
-  if (avg < 1 / 40) return;
+  const avg = GFXW.sum / GFXW.n, capped = GFXW.cap > GFXW.n * 0.8; GFXW.t = GFXW.n = GFXW.sum = GFXW.cap = 0;
+  if (avg < 1 / 40 || capped) return;
   if (renderer.getPixelRatio() > 1.01) { GFX.prScale = Math.max(0.5, GFX.prScale - 0.2); resize(); }
   else if (GFX.level !== 'low') applyGfx(GFX.level === 'high' ? 'medium' : 'low');
   GFXW.warm = 1;
