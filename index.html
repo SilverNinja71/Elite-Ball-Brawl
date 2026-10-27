@@ -647,6 +647,37 @@ function scenery(geo, mat, x, y, z, sx = 1, sy = 1, sz = 1, ry = 0, color = null
   const key = geo.uuid + mat.uuid; let b = BATCH.get(key);
   if (!b) { b = { geo, mat, list: [], cast: !(o && o.cast === false), recv: !(o && o.recv === false) }; BATCH.set(key, b); }
   b.list.push(x, y, z, sx, sy, sz, ry, color);
+  // boxes standing on the ground inside the park also get a baked contact shadow (see buildAO)
+  if (geo.type === 'BoxGeometry' && Math.abs(y - sy / 2) < 0.06 && !(o && o.cast === false) && Math.abs(x) < AO_HALF && Math.abs(z) < AO_HALF) AO.push(['r', x, z, sx, sz, ry, 0.5]);
+}
+// Baked ambient occlusion: soft dark footprints under every prop (and wide, faint ones under tree crowns),
+// painted once into a canvas and laid over the park ground as one multiply-blended plane. It grounds the
+// scenery for one cheap draw call, and is the only contact shading on Low where real shadows are off.
+const AO = [], AO_HALF = 62;
+function buildAO() {
+  const N = 1024, k = N / (AO_HALF * 2), OFF = 4 * N;
+  const tex = canvasTex(N, N, (g) => {
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, N, N);
+    g.shadowOffsetX = OFF; g.fillStyle = '#000';
+    for (const a of AO) {
+      const cx = (a[1] + AO_HALF) * k - OFF, cy = (a[2] + AO_HALF) * k;
+      g.setTransform(1, 0, 0, 1, cx, cy);
+      if (a[0] === 'r') {   // box footprint, a little wider than the box, blurred by ~0.6 units
+        const w = (a[3] + 0.25) * k, d = (a[4] + 0.25) * k;
+        g.rotate(-a[5]); g.shadowColor = `rgba(0,0,0,${a[6]})`; g.shadowBlur = Math.max(4, 0.7 * k);
+        g.fillRect(-w / 2, -d / 2, w, d);
+      } else {              // round, very soft: sky blocked by a crown overhead
+        g.shadowColor = `rgba(0,0,0,${a[4]})`; g.shadowBlur = a[3] * k * 0.9;
+        g.beginPath(); g.arc(0, 0, a[3] * k * 0.75, 0, TAU); g.fill();
+      }
+    }
+  });
+  tex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(AO_HALF * 2, AO_HALF * 2).rotateX(-PI / 2), new THREE.MeshBasicMaterial({
+    map: tex, blending: THREE.MultiplyBlending, transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -6,
+  }));
+  m.position.y = 0.016; m.renderOrder = 1; m.matrixAutoUpdate = false; m.updateMatrix(); scene.add(m);
+  AO.length = 0;
 }
 function buildScenery() {
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new V3(), s = new V3(), c = new THREE.Color(), up = new V3(0, 1, 0), out = [];
@@ -1013,6 +1044,38 @@ function updateParts(dt) {
   }
 }
 
+// Contact shadows: a soft dark blob under every fighter (one instanced draw call, multiply-blended), so feet
+// read as planted even where the shadow map is coarse or off. It shrinks and fades as the fighter rises,
+// and stretches out under a body lying on the ground. Instance colour .r carries the strength.
+const CONTACT_MAX = 24;
+const contactIM = (() => {
+  const tex = canvasTex(64, 64, (g) => {
+    const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgb(70,72,78)'); gr.addColorStop(0.35, 'rgb(120,122,128)'); gr.addColorStop(0.7, 'rgb(200,201,204)'); gr.addColorStop(1, 'rgb(255,255,255)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  });
+  const mat = shared(new THREE.MeshBasicMaterial({ map: tex, blending: THREE.MultiplyBlending, transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8 }));
+  mat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', '#ifdef USE_INSTANCING_COLOR\n  diffuseColor.rgb = mix(vec3(1.0), diffuseColor.rgb, vColor.r);\n#endif'); };
+  const im = new THREE.InstancedMesh(shared(new THREE.PlaneGeometry(1, 1).rotateX(-PI / 2)), mat, CONTACT_MAX);
+  im.setColorAt(0, new THREE.Color(1, 1, 1)); im.count = 0; im.frustumCulled = false; im.renderOrder = 2; scene.add(im);
+  return im;
+})();
+const _cq = new THREE.Quaternion(), _cc = new THREE.Color(), _cy = new V3(0, 1, 0);
+function updateContacts() {
+  let n = 0;
+  for (const f of fighters) {
+    if (n >= CONTACT_MAX) break;
+    const R = f.root; if (!R.visible || !R.parent) continue;
+    const gy = f.onGround ? R.position.y : 0, h = Math.max(0, R.position.y - gy), k = clamp(1 - h / 5, 0, 1);
+    if (k <= 0.02) continue;
+    const lying = (f.ragdoll > 0 || f.dead) && f.onGround, s = (f.lantern ? 2.6 : 1.5) * (1 + h * 0.12) * (f.flatten > 0 ? 1.4 : 1);
+    _cq.setFromAxisAngle(_cy, R.rotation.y);
+    _pmx.compose(_pp.set(R.position.x, gy + 0.02, R.position.z), _cq, _ps.set(s, 1, lying ? s * 2 : s));
+    contactIM.setMatrixAt(n, _pmx); contactIM.setColorAt(n, _cc.setRGB(0.85 * k * k, 0, 0)); n++;
+  }
+  if (n || contactIM.count) { contactIM.count = n; contactIM.instanceMatrix.needsUpdate = true; contactIM.instanceColor.needsUpdate = true; }
+}
+
 // rings and flash spheres: pooled meshes, each with its own (reused) material for the fade
 const ringGeo = shared(new THREE.RingGeometry(0.86, 1, 56)); ringGeo.rotateX(-PI / 2);
 const sphGeo = shared(new THREE.SphereGeometry(1, 20, 14));
@@ -1293,6 +1356,7 @@ function buildMap() {
     if (isPine) {
       const h = rand(1.8, 2.4); scenery(G1, woodMat, x, h / 2, z, 0.7, h, 0.7, ry);
       for (let k = 0; k < 4; k++) { const w = 3.2 - k * 0.7; scenery(G1, tint, x, h + 0.5 + k * 1.05, z, w, 1.1, w, ry + k * 0.35, pine[k % 3]); }
+      AO.push(['c', x, z, 2.0, 0.38]);
       addStatic(x, 0, z, 0.7, h + 1, 0.7, woodMat);
     } else {
       const h = rand(2.6, 3.6), s = rand(0.9, 1.25);
@@ -1300,6 +1364,7 @@ function buildMap() {
       scenery(G1, tint, x, h + 0.9 * s, z, 3.2 * s, 2.0 * s, 3.2 * s, ry, oak[(i + 0) % 4]);
       scenery(G1, tint, x, h + 2.5 * s, z, 2.4 * s, 1.6 * s, 2.4 * s, ry + 0.4, oak[(i + 1) % 4]);
       scenery(G1, tint, x, h + 3.6 * s, z, 1.3 * s, 1.0 * s, 1.3 * s, ry + 0.8, oak[(i + 2) % 4]);
+      AO.push(['c', x, z, 2.3 * s, 0.36]);
       addStatic(x, 0, z, 0.9, h + 1, 0.9, woodMat);
     }
   });
@@ -1309,6 +1374,7 @@ function buildMap() {
     scenery(G1, woodMat, x, 0.48, z, 2, 0.12, 0.55, ry);
     scenery(G1, woodMat, x - fx * 0.3, 0.85, z - fz * 0.3, 2, 0.45, 0.1, ry);
     for (const s of [-0.85, 0.85]) scenery(G1, dark, x + fz * s, 0.22, z - fx * s, 0.1, 0.44, 0.5, ry);
+    AO.push(['r', x, z, 2, 0.6, ry, 0.3]);
     const along = Math.abs(fx) > 0.5; addStatic(x, 0, z, along ? 0.6 : 2, 0.9, along ? 2 : 0.6, woodMat);
   }
   // bushes between the ring path and the trees
@@ -2371,6 +2437,8 @@ function buildDuelRing() {
   for (let s = 0; s < 3; s++) { bx(B, 7, 0.45, 0.9, s % 2 ? '#cfd6de' : '#eef2f6', 0, 0.22 + s * 0.45, -s * 0.9).receiveShadow = true; bx(B, 7, 0.45 * (s + 1), 0.9, '#9aa3ad', 0, 0.225 * (s + 1), -s * 0.9 - 0.02); }
   mergeMeshes(G);
   G.traverse((m) => { if (m.isMesh && m.material === rigMat) { m.castShadow = true; m.receiveShadow = true; } });
+  { const c = Math.cos(B.rotation.y), sn = Math.sin(B.rotation.y);   // baked AO under the bleachers (local centre z = -0.9)
+    AO.push(['r', DUEL.x + B.position.x - 0.9 * sn, DUEL.z + B.position.z - 0.9 * c, 7, 2.7, B.rotation.y, 0.55]); }
   DUEL.wall = new THREE.Mesh(new THREE.CylinderGeometry(DUEL.r, DUEL.r, 2.6, 48, 1, true), wallMat);
   DUEL.wall.position.y = 1.3; DUEL.wall.visible = false; G.add(DUEL.wall);
   DUEL.mesh = ring;
@@ -4651,6 +4719,7 @@ function frame(t) {
     if (acc >= SIM_DT) acc = SIM_DT * 0.999;
     renderAlpha = acc / SIM_DT;
     for (const f of fighters) { if (f.remote) updatePuppet(f, fdt); else animateFighter(f, fdt); }
+    updateContacts();
     drawProjs(renderAlpha);
     updateParts(fdt); updateRings(fdt); updateTemps(fdt); updateDebris(fdt); updateAuras();
     if (cloudMesh) cloudMesh.rotation.y += fdt * 0.004;
@@ -4782,6 +4851,7 @@ function rumble(weak, strong, ms) {
 // =====================================================================
 buildMap();
 buildDuelRing();
+buildAO();
 for (const [x, z] of [[-26, -12], [-26, 12], [26, -12], [26, 12], [-12, -26], [12, -26], [-12, 26], [12, 26], [-18, 0], [18, 0]]) addCan(x, z);
 player = new Fighter('lion', { name: 'Player_' + ((Math.random() * 9000 + 1000) | 0), localKey: 'P', noTag: true });
 player.pos.set(0, 0, -14); player.yaw = 0; player.snap();
