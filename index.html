@@ -651,12 +651,12 @@ function scenery(geo, mat, x, y, z, sx = 1, sy = 1, sz = 1, ry = 0, color = null
   if (!b) { b = { geo, mat, list: [], cast: !(o && o.cast === false), recv: !(o && o.recv === false) }; BATCH.set(key, b); }
   b.list.push(x, y, z, sx, sy, sz, ry, color);
   // boxes standing on the ground inside the park also get a baked contact shadow (see buildAO)
-  if (geo.type === 'BoxGeometry' && Math.abs(y - sy / 2) < 0.06 && !(o && o.cast === false) && Math.abs(x) < AO_HALF && Math.abs(z) < AO_HALF) AO.push(['r', x, z, sx, sz, ry, 0.5]);
+  if (geo.type === 'BoxGeometry' && Math.abs(y - sy / 2) < 0.06 && !(o && o.cast === false) && Math.abs(x) < AO_HALF && Math.abs(z) < AO_HALF && Math.max(Math.abs(x), Math.abs(z)) > AO_HOLE - 1) AO.push(['r', x, z, sx, sz, ry, 0.5]);
 }
 // Baked ambient occlusion: soft dark footprints under every prop (and wide, faint ones under tree crowns),
 // painted once into a canvas and laid over the park ground as one multiply-blended plane. It grounds the
 // scenery for one cheap draw call, and is the only contact shading on Low where real shadows are off.
-const AO = [], AO_HALF = 62;
+const AO = [], AO_HALF = 62, AO_HOLE = 10;
 function buildAO() {
   const N = 1024, k = N / (AO_HALF * 2), OFF = 4 * N;
   const tex = canvasTex(N, N, (g) => {
@@ -685,7 +685,14 @@ function buildAO() {
     }
   });
   tex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(AO_HALF * 2, AO_HALF * 2).rotateX(-PI / 2), new THREE.MeshBasicMaterial({
+  // the middle of the plaza has nothing to occlude, so the plane has a hole there: most of the screen in a
+  // fight is then not covered by this extra blended layer at all
+  const H = AO_HALF, shape = new THREE.Shape([new THREE.Vector2(-H, -H), new THREE.Vector2(H, -H), new THREE.Vector2(H, H), new THREE.Vector2(-H, H)]);
+  shape.holes.push(new THREE.Path([new THREE.Vector2(-AO_HOLE, -AO_HOLE), new THREE.Vector2(-AO_HOLE, AO_HOLE), new THREE.Vector2(AO_HOLE, AO_HOLE), new THREE.Vector2(AO_HOLE, -AO_HOLE)]));
+  const geo = new THREE.ShapeGeometry(shape), uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, (uv.getX(i) + H) / (2 * H), (uv.getY(i) + H) / (2 * H));
+  geo.rotateX(-PI / 2);
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
     map: tex, blending: THREE.MultiplyBlending, transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -6,
   }));
   m.position.y = 0.016; m.renderOrder = 1; m.matrixAutoUpdate = false; m.updateMatrix(); scene.add(m);
@@ -1092,6 +1099,13 @@ function updateContacts() {
     _cq.setFromAxisAngle(_cy, R.rotation.y);
     _pmx.compose(_pp.set(R.position.x, gy + 0.02, R.position.z), _cq, _ps.set(s, 1, lying ? s * 2 : s));
     contactIM.setMatrixAt(n, _pmx); contactIM.setColorAt(n, _cc.setRGB(0.85 * k * k, 0, 0)); n++;
+  }
+  for (const c of cans) {   // trash cans too (they get knocked about, so they cannot be baked)
+    if (n >= CONTACT_MAX) break;
+    const P = c.m.position; if (!c.m.visible || c.state === 'held' || P.y > 3) continue;
+    const k = clamp(1 - P.y / 3, 0, 1);
+    _pmx.compose(_pp.set(P.x, 0.02, P.z), _cq.identity(), _ps.set(1.15, 1, 1.15));
+    contactIM.setMatrixAt(n, _pmx); contactIM.setColorAt(n, _cc.setRGB(0.7 * k, 0, 0)); n++;
   }
   if (n || contactIM.count) { contactIM.count = n; contactIM.instanceMatrix.needsUpdate = true; contactIM.instanceColor.needsUpdate = true; }
 }
@@ -2569,6 +2583,7 @@ function buildDuelRing() {
   for (let i = 0; i < 8; i++) {   // corner posts with glossy caps
     const a = (i / 8) * TAU, px = Math.cos(a) * (DUEL.r + 0.25), pz = Math.sin(a) * (DUEL.r + 0.25);
     bx(G, 0.22, 0.9, 0.22, '#e9ecef', px, 0.45, pz); bx(G, 0.3, 0.12, 0.3, '#ff5a4a', px, 0.94, pz);
+    AO.push(['r', DUEL.x + px, DUEL.z + pz, 0.22, 0.22, 0, 0.55]);
   }
   // bleachers: three white steps facing the ring from the corner of the park
   const B = piv(G, -Math.SQRT1_2 * (DUEL.r + 3.2), 0, Math.SQRT1_2 * (DUEL.r + 3.2)); B.rotation.y = PI * 0.75;
