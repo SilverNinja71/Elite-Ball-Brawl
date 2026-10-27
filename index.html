@@ -427,6 +427,14 @@ body.touch .mini{height:52px}
 'use strict';
 (function () {
 if (!window.THREE) { document.body.insertAdjacentHTML('beforeend', '<p style="position:fixed;inset:0;display:grid;place-items:center;margin:0;padding:24px;text-align:center">The 3D engine (Three.js) did not load. Check your connection and reload.</p>'); return; }
+// Colour management (what newer three.js does by default): every hex / CSS colour in this file is an sRGB
+// value, so it is turned into linear light once on the way in; canvas textures are tagged sRGB and the
+// renderer tone-maps (ACES) and encodes the lit result back to sRGB. setRGB stays linear (HDR colours).
+{
+  const C = THREE.Color.prototype, setHex = C.setHex, setStyle = C.setStyle; let inStyle = false;
+  C.setHex = function (h) { setHex.call(this, h); return inStyle ? this : this.convertSRGBToLinear(); };
+  C.setStyle = function (s) { inStyle = true; try { setStyle.call(this, s); } finally { inStyle = false; } return this.convertSRGBToLinear(); };
+}
 
 // =====================================================================
 // helpers
@@ -493,6 +501,14 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPrefere
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+// unlit materials (sky, effects, decals) skip tone mapping so their colours stay exactly as authored
+{
+  const MB = THREE.MeshBasicMaterial;
+  THREE.MeshBasicMaterial = class extends MB { constructor(p) { super(p); if (!p || p.toneMapped === undefined) this.toneMapped = false; } };
+}
 const scene = new THREE.Scene();
 const BASE_FOV = 70;
 const camera = new THREE.PerspectiveCamera(BASE_FOV, 1, 0.1, 700);
@@ -502,16 +518,19 @@ addEventListener('resize', resize); resize();
 function canvasTex(w, h, draw, nearest) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   draw(c.getContext('2d'), w, h);
-  const t = new THREE.CanvasTexture(c);
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
   if (nearest) { t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; }
   return t;
 }
 const SUN_DIR = new V3(-30, 60, 24);
 const HORIZON = '#d6e8f3';
 scene.fog = new THREE.Fog(HORIZON, 90, 330);
-scene.add(new THREE.HemisphereLight(0xe2efff, 0x6b7a55, 0.85));
-scene.add(new THREE.AmbientLight(0xffffff, 0.12));
-const sun = new THREE.DirectionalLight(0xfff3e0, 1.0);
+// lights retuned for the linear / ACES pipeline: a cool sky fill, a warm-tinted bounce from the grass and a
+// stronger warm sun, so lit and shaded faces read clearly apart
+const hemi = new THREE.HemisphereLight(0xd4e6ff, 0x5b6b45, 0.78);
+scene.add(hemi);
+scene.add(new THREE.AmbientLight(0xffffff, 0.06));
+const sun = new THREE.DirectionalLight(0xfff0d8, 1.45);
 sun.position.copy(SUN_DIR);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -608,7 +627,7 @@ function rigEnv() {
   pm.dispose(); g.dispose(); sunBall.geometry.dispose();
   return _rigEnv;
 }
-const rigMat = shared(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.25, metalness: 0.05, envMap: rigEnv(), envMapIntensity: 0.28 }));
+const rigMat = shared(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.25, metalness: 0.05, envMap: rigEnv(), envMapIntensity: 0.4 }));
 rigMat.onBeforeCompile = (sh) => {
   sh.uniforms.uStuds = RIG_U.uStuds; sh.uniforms.uTime = RIG_U.uTime;
   sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 stud;\nvarying vec4 vStud;')
@@ -1168,7 +1187,7 @@ function buildMap() {
   // ground: grass, plaza, rosette, walkways
   const grass = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshLambertMaterial({ map: grassTex }));
   grass.rotation.x = -PI / 2; grass.position.y = -0.02; grass.receiveShadow = true; scene.add(grass);
-  const plaza = new THREE.Mesh(new THREE.PlaneGeometry(PLAZA * 2 + 4, PLAZA * 2 + 4), new THREE.MeshLambertMaterial({ map: concreteTex, color: 0xa4a7aa }));
+  const plaza = new THREE.Mesh(new THREE.PlaneGeometry(PLAZA * 2 + 4, PLAZA * 2 + 4), new THREE.MeshLambertMaterial({ map: concreteTex, color: 0xc2c5c8 }));
   plaza.rotation.x = -PI / 2; plaza.receiveShadow = true; scene.add(plaza);
   const med = new THREE.Mesh(new THREE.CircleGeometry(5.2, 40), new THREE.MeshLambertMaterial({ map: medallionTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 }));
   med.rotation.x = -PI / 2; med.position.y = 0.012; med.receiveShadow = true; scene.add(med);
