@@ -413,6 +413,8 @@ body.touch .mini{height:52px}
     <label class="opt"><span>On your back</span><select id="optBack"></select></label>
     <label class="opt"><span>Face</span><select id="optFace"></select></label>
     <label class="opt"><input type="checkbox" id="optStuds"> Studs on blocks (classic look)</label>
+    <label class="opt"><span>Graphics</span><select id="optGfx"><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+    <p class="note" id="gfxNote"></p>
     <label class="opt"><span>Bot difficulty (hosted servers)</span><select id="optBots"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></label>
     <div class="k-only">
       <div class="ht"><h4>Keys</h4><button type="button" class="sbtn" id="keysReset">Reset</button></div>
@@ -496,11 +498,34 @@ let realClock = 0, gameTime = 0, renderAlpha = 1;   // realClock: render time; g
 // =====================================================================
 // renderer / scene (TSB-style bright day)
 // =====================================================================
+// Graphics quality (Settings > Graphics). Auto picks a level from the device and, if frames stay slow, first
+// lowers the resolution and then the level. pr: pixel-ratio cap; map / extent: sun shadow map size and the
+// half-width (units) of the shadow box that follows the camera; fx: effect detail (1 basic .. 3 full).
+const GFX_LEVELS = {
+  low: { pr: 1, shadows: false, map: 0, soft: false, extent: 0, fx: 1 },
+  medium: { pr: 1.5, shadows: true, map: 1024, soft: false, extent: 34, fx: 2 },
+  high: { pr: 2, shadows: true, map: 2048, soft: true, extent: 44, fx: 3 },
+};
+function autoGfxLevel() {
+  const n = navigator, mem = n.deviceMemory || 8, cores = n.hardwareConcurrency || 8;
+  const coarse = matchMedia('(pointer: coarse)').matches, small = Math.min(screen.width, screen.height) < 500;
+  if (mem <= 2 || cores <= 2) return 'low';
+  if (coarse || small || mem <= 4 || cores <= 4) return 'medium';
+  return 'high';
+}
+const GFX = (() => {
+  let pick = 'auto';
+  try { const v = (JSON.parse(localStorage.getItem('scbg.settings')) || {}).gfx; if (v === 'low' || v === 'medium' || v === 'high') pick = v; } catch (e) { /* no storage */ }
+  const level = pick === 'auto' ? autoGfxLevel() : pick;
+  return { pick, level, L: GFX_LEVELS[level], prScale: 1, fx: GFX_LEVELS[level].fx };
+})();
 const canvas = $('#game');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+// antialiasing is fixed when the context is made: Low starts without it (it changes on the next load)
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: GFX.level !== 'low', powerPreference: 'high-performance' });
+const pixelRatio = () => Math.max(1, Math.min(window.devicePixelRatio || 1, GFX.L.pr) * GFX.prScale);
+renderer.setPixelRatio(pixelRatio());
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = GFX.L.soft ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
@@ -512,7 +537,7 @@ renderer.toneMappingExposure = 1.0;
 const scene = new THREE.Scene();
 const BASE_FOV = 70;
 const camera = new THREE.PerspectiveCamera(BASE_FOV, 1, 0.1, 700);
-function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+function resize() { const w = innerWidth, h = innerHeight; renderer.setPixelRatio(pixelRatio()); renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
 
 function canvasTex(w, h, draw, nearest) {
@@ -532,11 +557,59 @@ scene.add(hemi);
 scene.add(new THREE.AmbientLight(0xffffff, 0.06));
 const sun = new THREE.DirectionalLight(0xfff0d8, 1.45);
 sun.position.copy(SUN_DIR);
-sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-Object.assign(sun.shadow.camera, { left: -62, right: 62, top: 62, bottom: -62, near: 1, far: 180 });
-sun.shadow.bias = -0.0008;
-scene.add(sun);
+sun.castShadow = GFX.L.shadows;
+sun.shadow.mapSize.set(GFX.L.map || 1024, GFX.L.map || 1024);
+Object.assign(sun.shadow.camera, { left: -62, right: 62, top: 62, bottom: -62, near: 1, far: 220 });
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.025;
+scene.add(sun); scene.add(sun.target);
+// The shadow box follows the camera: a square of 2 x extent units pushed ahead along the view, so the map's
+// texels are spent on what is on screen (about 3x sharper than one box over the whole park). Its centre is
+// snapped to whole shadow texels in light space so edges do not crawl as the camera moves.
+const SUN_N = SUN_DIR.clone().normalize();
+const _sx = new V3().crossVectors(new V3(0, 1, 0), SUN_N).normalize(), _sy = new V3().crossVectors(SUN_N, _sx);
+let _shExt = 0;
+function fitShadow() {
+  if (!sun.castShadow) return;
+  const e = GFX.L.extent, cam = sun.shadow.camera;
+  if (_shExt !== e) { _shExt = e; cam.left = cam.bottom = -e; cam.right = cam.top = e; cam.updateProjectionMatrix(); }
+  camera.getWorldDirection(tA); tA.y = 0;
+  if (tA.lengthSq() < 1e-4) tA.set(0, 0, 1);
+  tA.normalize().multiplyScalar(e * 0.7).add(camera.position); tA.y = 0;
+  const texel = (2 * e) / sun.shadow.mapSize.x;
+  const u = Math.round(tA.dot(_sx) / texel) * texel, v = Math.round(tA.dot(_sy) / texel) * texel, w = tA.dot(SUN_N);
+  tA.copy(_sx).multiplyScalar(u).addScaledVector(_sy, v).addScaledVector(SUN_N, w);
+  sun.target.position.copy(tA); sun.position.copy(tA).addScaledVector(SUN_N, 110);
+  sun.target.updateMatrixWorld();
+}
+// switch level at runtime (Settings or the Auto watchdog): resolution, shadow on / off / size / filter
+function applyGfx(level) {
+  GFX.level = level; GFX.L = GFX_LEVELS[level]; GFX.fx = GFX.L.fx;
+  const L = GFX.L, type = L.soft ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+  resize();
+  const recompile = sun.castShadow !== L.shadows || renderer.shadowMap.type !== type;
+  sun.castShadow = L.shadows; renderer.shadowMap.type = type;
+  if (L.shadows && sun.shadow.mapSize.x !== L.map) {
+    sun.shadow.mapSize.set(L.map, L.map);
+    if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+  }
+  if (recompile) scene.traverse((o) => { if (o.material) for (const m of [].concat(o.material)) m.needsUpdate = true; });
+  showGfx();
+}
+// Auto only: after a warm-up, a 3 s window averaging under ~40 fps lowers the resolution a step, and at
+// pixel ratio 1 drops a level. It never raises quality again in a session, so it cannot oscillate.
+const GFXW = { t: 0, n: 0, sum: 0, warm: 5 };
+function gfxWatch(fdt) {
+  if (GFX.pick !== 'auto' || document.hidden) return;
+  if (GFXW.warm > 0) { GFXW.warm -= fdt; return; }
+  if (fdt >= 0.25) { GFXW.t = GFXW.n = GFXW.sum = 0; return; }   // a stall, not a slow device
+  GFXW.t += fdt; GFXW.n++; GFXW.sum += fdt;
+  if (GFXW.t < 3) return;
+  const avg = GFXW.sum / GFXW.n; GFXW.t = GFXW.n = GFXW.sum = 0;
+  if (avg < 1 / 40) return;
+  if (renderer.getPixelRatio() > 1.01) { GFX.prScale = Math.max(0.5, GFX.prScale - 0.2); resize(); }
+  else if (GFX.level !== 'low') applyGfx(GFX.level === 'high' ? 'medium' : 'low');
+  GFXW.warm = 1;
+}
 // sky dome: one equirectangular canvas (gradient, sun glow, soft cloud bands) on a sphere that follows the camera
 const sky = (() => {
   const sd = SUN_DIR.clone().normalize();
@@ -4398,6 +4471,18 @@ for (const [id, list, key] of [['#optHat', HATS, 'hat'], ['#optBack', BACKS, 'ba
   sel.value = list[SETTINGS.avatar[key]] ? SETTINGS.avatar[key] : key === 'back' ? 'none' : 'auto';
   sel.addEventListener('change', (e) => { SETTINGS.avatar[key] = e.target.value; store.set('settings', SETTINGS); if (player) applyAvatar(player, avatarOf()); e.target.blur(); });
 }
+// graphics quality: Auto shows which level it settled on
+const GFX_NAMES = { low: 'Low', medium: 'Medium', high: 'High' };
+function showGfx() {
+  $('#optGfx').value = GFX.pick;
+  $('#optGfx').options[0].textContent = GFX.pick === 'auto' ? 'Auto (' + GFX_NAMES[GFX.level] + ')' : 'Auto';
+  $('#gfxNote').textContent = GFX.level === 'low' ? 'Low: no real-time shadows, lighter effects, native resolution capped.' : GFX.level === 'medium' ? 'Medium: sharp shadows near the action, most effects.' : 'High: soft high-resolution shadows and every effect.';
+}
+showGfx();
+$('#optGfx').addEventListener('change', (e) => {
+  const v = e.target.value; GFX.pick = v; SETTINGS.gfx = v; store.set('settings', SETTINGS);
+  GFX.prScale = 1; GFXW.warm = 5; applyGfx(v === 'auto' ? autoGfxLevel() : v); e.target.blur();
+});
 $('#optStuds').checked = !!SETTINGS.studs;
 $('#optStuds').addEventListener('change', (e) => { SETTINGS.studs = e.target.checked; RIG_U.uStuds.value = SETTINGS.studs ? 1 : 0; store.set('settings', SETTINGS); });
 $('#optBots').addEventListener('change', (e) => { SETTINGS.bots = e.target.value; store.set('settings', SETTINGS); updateBotUI(); e.target.blur(); });
@@ -4573,6 +4658,7 @@ function frame(t) {
     updateCamera(fdt); updateSpeedLines(fdt); updateHUD(fdt); updateEventChip(); updateDuelHud(fdt); updateNums(fdt); updateTags();
     netTick(fdt);
     RIG_U.uTime.value = realClock % 1000;
+    fitShadow(); gfxWatch(fdt);
     renderer.render(scene, camera);
   } catch (err) {
     NET.cap = false;
@@ -4714,6 +4800,6 @@ toggleHelp(innerWidth >= 980 && innerHeight >= 700 && !TOUCH.on);
 }
 requestAnimationFrame(frame);
 // ?dev=1 exposes internals for automated testing in the browser console
-if (/[?&]dev=1/.test(location.search)) window.__scbg = { SFX, fighters, get player() { return player; }, get gameTime() { return gameTime; }, CHARS, hit, press, held, BUF, SETTINGS, BIND, KOTH, NET, addBot, removeBot, useAbility, doM1, cycleLock, lock, toggleFpv, get fpv() { return fpv; }, renderer, M1, GUARD, PARRY, COMBO, scene, camera, updateTags, updateHUD, animateFighter, updateParts, updateRings, updateTemps, updateDebris, updateAuras, updateLock, updateCamera, updateNums, updateEventChip, drawProjs, simStep };
+if (/[?&]dev=1/.test(location.search)) window.__scbg = { SFX, fighters, get player() { return player; }, get gameTime() { return gameTime; }, CHARS, hit, press, held, BUF, SETTINGS, BIND, KOTH, NET, addBot, removeBot, useAbility, doM1, cycleLock, lock, toggleFpv, get fpv() { return fpv; }, renderer, M1, GUARD, PARRY, COMBO, scene, camera, updateTags, updateHUD, animateFighter, updateParts, updateRings, updateTemps, updateDebris, updateAuras, updateLock, updateCamera, updateNums, updateEventChip, drawProjs, simStep, fitShadow, GFX, applyGfx };
 })();
 </script>
