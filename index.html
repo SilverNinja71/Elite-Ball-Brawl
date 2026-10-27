@@ -661,6 +661,15 @@ function buildAO() {
   const N = 1024, k = N / (AO_HALF * 2), OFF = 4 * N;
   const tex = canvasTex(N, N, (g) => {
     g.fillStyle = '#ffffff'; g.fillRect(0, 0, N, N);
+    // large, faint patches on the lawn break up the grass texture's tiling (macro variation for free)
+    let seed = 7; const rnd = (a, b) => { seed = (seed * 16807) % 2147483647; return a + (seed / 2147483647) * (b - a); };   // own stream: leaves Math.random alone
+    for (let i = 0; i < 70; i++) {
+      const x = rnd(-AO_HALF, AO_HALF), z = rnd(-AO_HALF, AO_HALF);
+      if (Math.max(Math.abs(x), Math.abs(z)) < PLAZA + 4) continue;
+      const r = rnd(5, 13) * k, cx = (x + AO_HALF) * k, cy = (z + AO_HALF) * k, gr = g.createRadialGradient(cx, cy, 0, cx, cy, r);
+      gr.addColorStop(0, `rgba(40,60,20,${rnd(0.05, 0.11).toFixed(3)})`); gr.addColorStop(1, 'rgba(40,60,20,0)');
+      g.fillStyle = gr; g.fillRect(cx - r, cy - r, r * 2, r * 2);
+    }
     g.shadowOffsetX = OFF; g.fillStyle = '#000';
     for (const a of AO) {
       const cx = (a[1] + AO_HALF) * k - OFF, cy = (a[2] + AO_HALF) * k;
