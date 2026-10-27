@@ -591,8 +591,9 @@ function applyGfx(level) {
   resize();
   const recompile = sun.castShadow !== L.shadows || renderer.shadowMap.type !== type;
   sun.castShadow = L.shadows; renderer.shadowMap.type = type;
-  if (L.shadows && sun.shadow.mapSize.x !== L.map) {
-    sun.shadow.mapSize.set(L.map, L.map);
+  // a new map size, or shadows switched off, frees the old shadow map (16 MB at 2048) instead of keeping it
+  if (!L.shadows || sun.shadow.mapSize.x !== L.map) {
+    if (L.shadows) sun.shadow.mapSize.set(L.map, L.map);
     if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
   }
   if (recompile) scene.traverse((o) => { if (o.material) for (const m of [].concat(o.material)) m.needsUpdate = true; });
@@ -4700,7 +4701,9 @@ const GFX_NAMES = { low: 'Low', medium: 'Medium', high: 'High' };
 function showGfx() {
   $('#optGfx').value = GFX.pick;
   $('#optGfx').options[0].textContent = GFX.pick === 'auto' ? 'Auto (' + GFX_NAMES[GFX.level] + ')' : 'Auto';
-  $('#gfxNote').textContent = GFX.level === 'low' ? 'Low: no real-time shadows, lighter effects, native resolution capped.' : GFX.level === 'medium' ? 'Medium: sharp shadows near the action, most effects.' : 'High: soft high-resolution shadows and every effect.';
+  $('#gfxNote').textContent = GFX.level === 'low' ? 'Low: no real-time shadows, lighter effects, native resolution capped.' : GFX.level === 'medium' ? 'Medium: sharp shadows near the action, most effects.' : 'High: soft high-resolution shadows and every effect.'
+  // antialiasing is fixed when the WebGL context is made, so say so when it no longer matches the level
+  if (renderer.getContextAttributes().antialias !== (GFX.level !== 'low')) $('#gfxNote').textContent += ' Antialiasing changes after a reload.';
 }
 showGfx();
 $('#optGfx').addEventListener('change', (e) => {
