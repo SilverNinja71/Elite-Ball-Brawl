@@ -1873,7 +1873,7 @@ function arcRing(parent, R, tube, arc, spec, y, z = 0, o = {}) {
 }
 // a pivot that swings like cloth: k spring, amt how much motion drives it, leg 'F' / 'B' / 'L' / 'R' follows the legs
 function clothPiv(parent, x, y, z, o = {}) {
-  const p = piv(parent, x, y, z); if (o.ry) p.rotation.y = o.ry;
+  const p = piv(parent, x, y, z); if (o.ry) p.rotation.y = o.ry; p.userData.anim = true;
   MYTH.cloth.push({ o: p, bx: o.bx || 0, bz: o.bz || 0, amt: o.amt === undefined ? 1 : o.amt, side: o.side === undefined ? 1 : o.side, leg: o.leg || null, k: o.k || 140, sway: o.sway === undefined ? 0.05 : o.sway, ph: Math.random() * TAU, ax: o.bx || 0, az: o.bz || 0, vx: 0, vz: 0, flip: o.flip || 1, yaw: !!o.yaw });
   return p;
 }
@@ -2077,7 +2077,18 @@ function furPart(parent, key, geo, spec, x, y, z, o, len) {
 const SKIN_CACHE = new Map();   // look key -> baked geometry, shared by every fighter that looks the same
 const SKIN_CACHE_MAX = 48;
 const _bm = new THREE.Matrix3(), _bv3 = new V3();
-function bakeGeometry(parts, holders) {
+// a pivot's matrix in body space with every animated pivot at rest (only its position counts), so baked shading
+// that depends on height does not depend on the pose a fighter happened to be in when it was baked
+const _rm = new THREE.Matrix4(), _rl = new THREE.Matrix4();
+function restMatrix(o, body, out) {
+  out.identity();
+  for (; o && o !== body; o = o.parent) {
+    if (o.userData.anim) _rl.makeTranslation(o.position.x, o.position.y, o.position.z); else { o.updateMatrix(); _rl.copy(o.matrix); }
+    out.premultiply(_rl);
+  }
+  return out;
+}
+function bakeGeometry(parts, holders, body) {
   // parts: [mesh, boneIndex]; the mesh's own matrix maps it into its pivot (= bone) space
   let nv = 0, ni = 0, nd = 0;
   for (const [m] of parts) { const g = m.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
@@ -2090,6 +2101,7 @@ function bakeGeometry(parts, holders) {
   for (const [m, bi] of order) {
     if (m.userData.detail && !nd) { lodCount = io; nd = 1; }
     m.updateMatrix(); _bm.getNormalMatrix(m.matrix);
+    const rest = restMatrix(holders[bi], body, _rm).multiply(m.matrix), rn = new THREE.Matrix3().getNormalMatrix(rest), bp = new V3(), bn = new V3();
     const g = m.geometry, Pp = g.attributes.position, N = g.attributes.normal, s = m.userData.spec, c = s.c, flip = m.matrix.determinant() < 0;
     for (let i = 0; i < Pp.count; i++) {
       const k = (vo + i) * 3, k4 = (vo + i) * 4;
@@ -2097,7 +2109,10 @@ function bakeGeometry(parts, holders) {
       // a whisper of per-vertex colour noise so big surfaces never look flat-filled
       const j = 1 + (Math.sin(_bv3.x * 37.1 + _bv3.y * 91.7 + _bv3.z * 53.3 + bi) * 0.5) * 0.07;
       _bv3.fromBufferAttribute(N, i).applyMatrix3(_bm).normalize(); nor[k] = _bv3.x; nor[k + 1] = _bv3.y; nor[k + 2] = _bv3.z;
-      col[k] = c.r * j; col[k + 1] = c.g * j; col[k + 2] = c.b * j;
+      // baked occlusion: darker towards the feet and on faces that look down
+      bp.fromBufferAttribute(Pp, i).applyMatrix4(rest); bn.fromBufferAttribute(N, i).applyMatrix3(rn).normalize();
+      const ao = lerp(0.62, 1, clamp(bp.y / 0.95, 0, 1)) * (0.86 + 0.14 * (bn.y * 0.5 + 0.5));
+      col[k] = c.r * j * ao; col[k + 1] = c.g * j * ao; col[k + 2] = c.b * j * ao;
       mat[k4] = s.r; mat[k4 + 1] = s.m; mat[k4 + 2] = s.p; mat[k4 + 3] = s.n; emi[vo + i] = s.e;
       si[k4] = bi; sw[k4] = 1;
     }
@@ -2141,7 +2156,7 @@ function skinBake(f) {
   const key = f.lookKey ? f.lookKey + '|' + (f.lodf || 1) : null;
   let geo = key && SKIN_CACHE.get(key);
   if (!geo) {
-    geo = bakeGeometry(parts, holders);
+    geo = bakeGeometry(parts, holders, f.body);
     if (key && SKIN_CACHE.size < SKIN_CACHE_MAX) { shared(geo); SKIN_CACHE.set(key, geo); }
   }
   // the bones: one identity child per pivot, so hiding a pivot can collapse just its own vertices
@@ -2880,6 +2895,8 @@ class Fighter {
     BEVEL = !this.lantern; LOWB = this.lowb = GFX.level === 'low'; LODF = this.lodf = LOD_F[GFX.level]; MYTH = null;
     this.rig = this.def.build(this.body, this);
     BEVEL = false; MYTH = null;
+    for (const k of PARTS) if (this.rig[k]) this.rig[k].userData.anim = true;
+    if (this.rig.ribbons) this.rig.ribbons.userData.anim = true;
     if (this.rig.hood) applyAvatar(this, o.av || (this.localKey === 'P' ? avatarOf() : this.ai ? botAvatar() : 'auto|none|auto'));
     if (this.rig.mythic) { if (!this.lookKey) this.lookKey = key + '|auto|none'; skinBake(this); if (GFX.level === 'low') for (const m of this.rig.fur) m.visible = false; }
     else mergeMeshes(this.body);
