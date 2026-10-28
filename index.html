@@ -725,13 +725,12 @@ function lam(color, opts) {
   if (opts) return new THREE.MeshLambertMaterial(Object.assign({ color }, opts));
   let m = _mc.get(color); if (!m) { m = shared(new THREE.MeshLambertMaterial({ color })); LAMC.add(m); _mc.set(color, m); } return m;
 }
-// Bake every plain-coloured box under each pivot into one vertex-coloured mesh, so a ~60-box character
-// costs ~12 draw calls instead of ~60 (and the same again in the shadow pass). Special meshes (emissive,
-// transparent, swapped or toggled one by one) keep their own material and stay separate.
-// ---- Roblox plastic ----
-// Fighters are drawn in glossy plastic (low roughness, a soft sky reflection) with studs on top faces and
-// inlets underneath. Studs come from a per-vertex grid (attribute `stud`: u, v, which face, neon) baked by
-// mergeChildren, so they cost no textures; SETTINGS.studs flips them. stud.w lights trim parts while awakened.
+// Bake every plain-coloured box under each pivot into one vertex-coloured mesh (one draw call per pivot).
+// Fighters no longer use this (see the mythic fighter kit: one skinned mesh each); the Golden Lantern prop
+// and the duel ring still do. Special meshes (emissive, transparent, toggled) keep their own material.
+// ---- glossy prop plastic ----
+// rigMat: glossy vertex-coloured plastic with a soft sky reflection. Its stud grid (attribute `stud`) is
+// switched off now that the Studs option is gone (uStuds = 0); stud.w would light trim while awakened.
 const STUD = 0.4;
 const RIG_U = { uStuds: { value: 1 }, uTime: { value: 0 } };
 let _rigEnv = null;
