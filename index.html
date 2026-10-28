@@ -927,7 +927,7 @@ const FACE = (() => {
   return { mat, geo };
 })();
 // awakened fighters' trim parts glow (a per-fighter uniform on the body material)
-function setNeon(f, on) { if (f.skinMat) f.skinMat.userData.uAwake.value = on ? 1 : 0; }
+function setNeon(f, on) { if (f.uAwake) f.uAwake.value = on ? 1 : 0; }
 const _mv = new V3(), _mn = new THREE.Matrix3();
 function mergeChildren(o) {
   const ms = o.children.filter((m) => m.isMesh && LAMC.has(m.material) && m.visible && !m.children.length);
@@ -1761,7 +1761,7 @@ function randBodyPoint(f) { return new V3(f.pos.x + rand(-0.55, 0.55), f.pos.y +
 let MYTH = null;      // build context: { cloth: [], fur: [] } while a fighter (or its avatar gear) is being built
 let LOWB = false;     // building the Low version: plain boxes, no bevels, no fur
 let LODF = 1;         // segment factor for the level being built (round shapes get coarser on Medium / Low)
-const LOD_F = { low: 0.5, medium: 0.7, high: 0.85 };
+const LOD_F = { low: 0.45, medium: 0.6, high: 0.85 };
 const sg = (n) => Math.max(4, Math.round(n * LODF));
 const GK = new Map();
 function gk(key, make) { let g = GK.get(key); if (!g) { g = make(); if (!g.boundingSphere) g.computeBoundingSphere(); shared(g); GK.set(key, g); } return g; }
@@ -1770,7 +1770,7 @@ const gSph = (r, ws, hs, p0 = 0, pl = TAU, t0 = 0, tl = PI) => { ws = sg(ws); hs
 const gCyl = (rt, rb, h, s, open = false, t0 = 0, tl = TAU) => { s = sg(s); return gk(['cyl', rk(rt), rk(rb), rk(h), s, open, rk(t0), rk(tl)].join(), () => new THREE.CylinderGeometry(rt, rb, h, s, 1, open, t0, tl)); };
 const gCone = (r, h, s) => { s = sg(s); return gk(['cone', rk(r), rk(h), s].join(), () => new THREE.ConeGeometry(r, h, s)); };
 const gTor = (R, r, rs, ts, arc = TAU) => { rs = sg(rs); ts = sg(ts); return gk(['tor', rk(R), rk(r), rs, ts, rk(arc)].join(), () => new THREE.TorusGeometry(R, r, rs, ts, arc)); };
-const gIco = (r, d = 1) => gk(['ico', rk(r), LODF < 0.8 ? 0 : d].join(), () => new THREE.IcosahedronGeometry(r, LODF < 0.8 ? 0 : d));
+const gIco = (r, d = 0) => gk(['ico', rk(r), LODF < 0.8 ? 0 : d].join(), () => new THREE.IcosahedronGeometry(r, LODF < 0.8 ? 0 : d));
 const gBox = (w, h, d, r = 0) => (LOWB || r <= 0 ? boxG(w, h, d) : bevelG(w, h, d, r));
 // lathe around y from (radius, y) pairs listed bottom to top
 const gLathe = (pts, s, p0 = 0, pl = TAU) => { s = sg(s); return gk('lat' + pts.map((p) => rk(p[0]) + ':' + rk(p[1])).join(',') + '|' + s + '|' + rk(p0) + '|' + rk(pl), () => new THREE.LatheGeometry(pts.map((p) => new THREE.Vector2(p[0], p[1])), s, p0, pl)); };
@@ -1959,7 +1959,7 @@ function mythEnv() {
 }
 // shared uniforms: detail on / off (Low), time, the warm rim light's direction (view space) and colour
 const MYTH_U = {
-  uDetailMap: { value: DETAIL.tex }, uDetail: { value: 1 }, uTime: RIG_U.uTime,
+  uDetailMap: { value: DETAIL.tex }, uDetail: { value: GFX.level === 'low' ? 0 : 1 }, uTime: RIG_U.uTime,
   uRimDir: { value: new V3(0, 1, 0) }, uRimCol: { value: new THREE.Color(1.0, 0.62, 0.32).multiplyScalar(0.55) },
 };
 // One onBeforeCompile for every fighter's body material (same source = one shader program for all of them);
@@ -2001,10 +2001,29 @@ vec3 mythBump(vec3 sp, vec3 sn, vec2 dh) {
     totalEmissiveRadiance += vColor * (vEmi * 1.4 + vMat.w * uAwake * (1.1 + 0.6 * sin(uTime * 7.0)));
   }`);
 }
-function mythMat() {
+function mythMat(uAwake) {
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, skinning: true, roughness: 1, metalness: 1, envMap: mythEnv(), envMapIntensity: 1 });
-  m.userData.uAwake = { value: 0 }; m.onBeforeCompile = mythOBC; m.extensions = { derivatives: true };
+  m.userData.uAwake = uAwake; m.onBeforeCompile = mythOBC; m.extensions = { derivatives: true };
   return m;
+}
+// Low: the same look lit per vertex (Lambert), no reflections or surface detail; metal is simply brighter
+function mythOBCLow(sh) {
+  sh.uniforms.uAwake = this.userData.uAwake; sh.uniforms.uTime = RIG_U.uTime;
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 mat;\nattribute float emi;\nvarying float vEmi;\nvarying float vNeon;')
+    .replace('#include <color_vertex>', '#include <color_vertex>\nvColor.xyz *= 1.0 + mat.y * 0.45; vEmi = emi; vNeon = mat.w;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uAwake;\nuniform float uTime;\nvarying float vEmi;\nvarying float vNeon;')
+    .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += vColor * (vEmi * 1.4 + vNeon * uAwake * (1.1 + 0.6 * sin(uTime * 7.0)));');
+}
+function mythMatLow(uAwake) {
+  const m = new THREE.MeshLambertMaterial({ vertexColors: true, skinning: true });
+  m.userData.uAwake = uAwake; m.onBeforeCompile = mythOBCLow;
+  return m;
+}
+// a fighter's body material for the current level (both share its awaken uniform)
+function fighterMat(f) {
+  if (!f.uAwake) f.uAwake = { value: 0 };
+  if (GFX.level === 'low') return f.matLow || (f.matLow = mythMatLow(f.uAwake));
+  return f.matStd || (f.matStd = mythMat(f.uAwake));
 }
 // fur shells: copies of a base surface pushed out along their normals, each cut away by the strand texture
 // a little more than the last; all shells are one geometry and one draw call, no shadow
@@ -2047,7 +2066,7 @@ function furShells(key, geo, mx, col, len, n) {
 function furPart(parent, key, geo, spec, x, y, z, o, len) {
   const base = P(parent, geo, spec, x, y, z, o);
   if (LOWB) return base;
-  const n = GFX.level === 'high' ? 10 : 6;
+  const n = GFX.level === 'high' ? 8 : 5;
   base.updateMatrix();
   const c = '#' + spec.c.clone().convertLinearToSRGB().getHexString();
   const m = new THREE.Mesh(furShells(key, geo, base.matrix, c, len, n), furMat);
@@ -2064,8 +2083,9 @@ function bakeGeometry(parts, holders) {
   for (const [m] of parts) { const g = m.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
   const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), col = new Float32Array(nv * 3), mat = new Float32Array(nv * 4), emi = new Float32Array(nv);
   const si = new Uint16Array(nv * 4), sw = new Float32Array(nv * 4), idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
-  // detail parts go last in the index buffer so Low can simply draw less of it
-  const order = parts.filter((p) => !p[0].userData.detail).concat(parts.filter((p) => p[0].userData.detail));
+  // detail parts go last in the index buffer so Low can simply draw less of it; within each group the parts
+  // built last (armour, trims: usually on top) are drawn first, so the body under them fails the depth test early
+  const order = parts.filter((p) => !p[0].userData.detail).reverse().concat(parts.filter((p) => p[0].userData.detail).reverse());
   let vo = 0, io = 0, lodCount = 0;
   for (const [m, bi] of order) {
     if (m.userData.detail && !nd) { lodCount = io; nd = 1; }
@@ -2108,7 +2128,10 @@ function skinBake(f) {
   const fresh = [];
   f.body.traverse((o) => { if (o.isMesh && o.userData.spec) fresh.push(o); });
   for (const m of fresh) { m.userData.holder = m.parent; m.parent.remove(m); }
-  rig.parts = (rig.parts || []).filter((m) => !m.userData.dead).concat(fresh);
+  // canonical order (body, then headgear, then back gear, each in build order) so that every fighter with the
+  // same look gets the same bone numbering, whichever way it got that look, and can share the cached geometry
+  const all = (rig.parts || []).concat(fresh), grp = (m) => (under(m.userData.holder, rig.hat) ? 1 : under(m.userData.holder, rig.back) ? 2 : 0);
+  rig.parts = [0, 1, 2].flatMap((g) => all.filter((m) => grp(m) === g));
   const holders = [], hIdx = new Map(), parts = [];
   for (const m of rig.parts) {
     const h = m.userData.holder; let i = hIdx.get(h);
@@ -2124,9 +2147,9 @@ function skinBake(f) {
   // the bones: one identity child per pivot, so hiding a pivot can collapse just its own vertices
   rig.bones = holders.map((h) => { const b = new THREE.Bone(); b.name = 'skin'; h.add(b); return { bone: b, holder: h, s: 1 }; });
   const sk = new THREE.Skeleton(rig.bones.map((b) => b.bone), rig.bones.map(() => new THREE.Matrix4()));
-  const mesh = new THREE.SkinnedMesh(geo, f.skinMat || (f.skinMat = mythMat()));
+  const mesh = new THREE.SkinnedMesh(geo, fighterMat(f));
   mesh.bind(sk, new THREE.Matrix4());
-  mesh.castShadow = true; mesh.receiveShadow = true; mesh.layers.mask = f.body.layers.mask;
+  mesh.castShadow = true; mesh.receiveShadow = GFX.level === 'high'; mesh.layers.mask = f.body.layers.mask;
   f.body.add(mesh); f.skin = mesh;
 }
 // every drawn frame: hide the bones of hidden pivots, swing the cloth, keep fur in step with the level
@@ -2171,6 +2194,7 @@ function mythGfx() {
   for (const g of SKIN_CACHE.values()) lodRange(g);
   for (const f of fighters) {
     if (f.skin && !SHARED.has(f.skin.geometry)) lodRange(f.skin.geometry);
+    if (f.skin) { f.skin.material = fighterMat(f); f.skin.receiveShadow = GFX.level === 'high'; }
     if (f.rig.fur) for (const m of f.rig.fur) m.visible = GFX.level !== 'low';
   }
 }
@@ -2922,6 +2946,7 @@ class Fighter {
     removeAura(this);
     scene.remove(this.root);
     if (this.skin) this.skin.skeleton.dispose();
+    for (const m of [this.matLow, this.matStd]) if (m) m.dispose();
     disposeTree(this.root);   // per-fighter materials (shield, ice, eyes, body...) and unshared rig geometry
     if (this.bliz) { scene.remove(this.bliz.grp); disposeTree(this.bliz.grp); this.bliz = null; }
     if (this.tagEl) this.tagEl.remove();
@@ -5213,7 +5238,7 @@ function noteClock(owner, ts) {
   else clockOff.set(owner, c + (sample - c) * 0.01);   // drift back up slowly if the path got slower
 }
 function applyState(e, ts) {
-  if (!e || ownerOf(e.i) === NET.me || !CHARS[e.c]) return;
+  if (!e || ownerOf(e.i) === NET.me || !own(CHARS, e.c)) return;
   let f = fighters.find((x) => x.id === e.i);
   if (f && f.key !== e.c) { f.dispose(); fighters.splice(fighters.indexOf(f), 1); f = null; }
   if (!f) { f = new Fighter(e.c, { id: e.i, name: e.n, remote: true, av: e.av }); f.pos.set(e.p[0], e.p[1], e.p[2]); f.yaw = e.y; f.snaps = []; fighters.push(f); }
@@ -5988,6 +6013,7 @@ toggleHelp(innerWidth >= 980 && innerHeight >= 700 && !TOUCH.on);
 requestAnimationFrame(frame);
 // ?dev=1 exposes internals for automated testing in the browser console
 if (/[?&]dev=1/.test(location.search)) window.__scbg = { SFX, fighters, get player() { return player; }, get gameTime() { return gameTime; }, CHARS, hit, press, held, BUF, SETTINGS, BIND, KOTH, NET, addBot, removeBot, useAbility, doM1, cycleLock, lock, toggleFpv, get fpv() { return fpv; }, renderer, M1, GUARD, PARRY, COMBO, scene, camera, updateTags, updateHUD, animateFighter, updateParts, updateRings, updateTemps, updateDebris, updateAuras, updateLock, updateCamera, updateNums, updateEventChip, drawProjs, simStep, fitShadow, GFX, applyGfx,
-  applyAvatar, avatarOf, avatarParts, HATS, BACKS, FACES_UI, FACE, EMOTES, playEmote, SKIN_CACHE, rigSync, mythGfx, own };
+  applyAvatar, avatarOf, avatarParts, HATS, BACKS, FACES_UI, FACE, EMOTES, playEmote, SKIN_CACHE, rigSync, mythGfx, own,
+  applyState, packF, netNow, PORTRAITS };
 })();
 </script>
