@@ -118,6 +118,7 @@ button:focus-visible,input:focus-visible{outline:2px solid #fff;outline-offset:2
 .kc.black i{background:linear-gradient(90deg,#160806,#7a1a08 55%,#ff7a2a)}
 .kc.trans{border-color:rgba(255,214,130,.85);box-shadow:0 0 8px rgba(255,190,90,.45)}
 .kc.trans i{background:linear-gradient(90deg,#7a4a10,#ffd27a 60%,#fff2c8)}
+.kc.trans b span+span{color:#3a1e06;text-shadow:0 0 3px rgba(255,240,200,.9)}
 #trans{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;opacity:0;transition:opacity .6s;z-index:8;
   background:radial-gradient(ellipse at 50% 45%,rgba(255,214,140,.0) 0,rgba(255,200,120,.08) 30%,rgba(20,10,4,.55) 75%,rgba(8,4,2,.85) 100%)}
 #trans.on{opacity:1}
@@ -1990,8 +1991,8 @@ const MYTH_U = {
 // metal, metal turns to molten gold, trims glow like embers and ember veins pulse through the lacquer.
 // uBlack is the fighter's own 0..1 uniform (it ramps during the transformation); 0 costs one uniform branch.
 const MYTH_BLACK_GLSL = `
-const vec3 BLACK_RIM = vec3(0.95, 0.24, 0.05);
-const vec3 BLACK_EMBER = vec3(1.0, 0.32, 0.06);
+const vec3 BLACK_RIM = vec3(0.08, 0.016, 0.004);   // a faint ember edge (a stronger rim browns the whole lacquer)
+const vec3 BLACK_EMBER = vec3(1.0, 0.24, 0.04);
 vec3 mythBlack(vec3 c, float metal) {
   float lum = dot(c, vec3(0.3, 0.59, 0.11));
   vec3 lacquer = vec3(0.009, 0.008, 0.01) + lum * vec3(0.035, 0.028, 0.028);
@@ -2006,10 +2007,10 @@ float bNoise(vec3 x) {
 }
 vec3 mythEmber(vec2 uv, vec3 rest, vec4 m) {
   // thin cracks: one contour line of a smooth noise in the part's own space, wandering like fissures in cooling lava
-  float v = bNoise(rest * 8.0) * 0.68 + bNoise(rest * 17.0 + 3.1) * 0.32;
-  float vein = (1.0 - smoothstep(0.0, 0.028, abs(v - 0.5))) * (1.0 - m.y);
-  float pulse = 0.55 + 0.45 * sin(uTime * 2.6 + rest.y * 9.0 + rest.x * 5.0);
-  return BLACK_EMBER * vein * pulse * 1.6 + vec3(1.0, 0.55, 0.15) * m.w * (0.9 + 0.3 * sin(uTime * 2.4)) * 1.2;
+  float v = bNoise(rest * 6.0) * 0.7 + bNoise(rest * 15.0 + 3.1) * 0.3;
+  float vein = (1.0 - smoothstep(0.0, 0.018, abs(v - 0.5))) * (1.0 - m.y);
+  float pulse = 0.45 + 0.55 * sin(uTime * 2.6 + rest.y * 9.0 + rest.x * 5.0);
+  return BLACK_EMBER * vein * pulse * 1.1 + vec3(1.0, 0.5, 0.12) * m.w * (0.9 + 0.3 * sin(uTime * 2.4)) * 1.1;
 }`;
 // One onBeforeCompile for every fighter's body material (same source = one shader program for all of them);
 // `this` is the material, whose userData carries that fighter's own awaken uniform.
@@ -2042,6 +2043,8 @@ vec3 mythBump(vec3 sp, vec3 sn, vec2 dh) {
   }`)
     .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = clamp(mix(vMat.x, 0.34 + vMat.x * 0.2, uBlack) + (0.5 - mythH) * 0.3, 0.05, 1.0);')
     .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n  metalnessFactor = vMat.y;')
+    // Black form: lacquer keeps a dim sheen instead of mirroring the warm sky
+    .replace('#include <aomap_fragment>', 'reflectedLight.indirectSpecular *= 1.0 - uBlack * 0.65 * (1.0 - vMat.y);\n#include <aomap_fragment>')
     .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
   normal = mythBump(-vViewPosition, normal, vec2(dFdx(mythH), dFdy(mythH)) * (vMat.z < 0.5 ? 0.0 : (vMat.z > 3.5 ? 0.007 : (vMat.z > 2.5 ? 0.003 : (vMat.z > 1.5 ? 0.0015 : 0.004)))));   // bump heights in world units`)
     .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
@@ -2319,7 +2322,7 @@ function mythGfx() {
   for (const f of fighters) {
     if (f.skin && !SHARED.has(f.skin.geometry)) lodRange(f.skin.geometry);
     if (f.skin) { f.skin.material = fighterMat(f); f.skin.receiveShadow = GFX.level === 'high'; }
-    if (f.tro && f.tro.mesh) { f.tro.mesh.material = fighterMat(f); f.tro.mesh.receiveShadow = GFX.level === 'high'; }
+    if (f.tro && f.tro.mesh) { f.tro.mesh.material = trophyMat(f); f.tro.mesh.receiveShadow = GFX.level === 'high'; }
     if (f.rig.fur) for (const m of f.rig.fur) m.visible = GFX.level !== 'low';
   }
 }
@@ -3007,7 +3010,7 @@ function buildTrophies(rig, fit, list, ck) {
     skullAt(H, list, slot++, new V3(rad.x * R, cy + rad.y * R, cz - 0.012), new V3(0, 0, -1), rad, s, k ? BONE : GILT);
   }
   // ---- the Black form's own pieces: swept obsidian horns, shoulder spikes, a spine ridge (slot 49) ----
-  const OB = sp('#0d0b0d', 0.22, 0, 3), EM = NEON(SURF.glow('#ff7a2a', 0.6));
+  const OB = sp('#0b0a0c', 0.25, 0, 3), EM = SURF.glow('#ff6a1a', 1.2);
   if (fit.horns) for (const s of [1, -1]) {
     const hp = fit.horns.map((p) => [s * p[0], p[1], p[2]]);
     tPart(H, list, slot, gTube('trohorn' + ck + s, hp, 0.05, 0.006, 12, 6), OB);
@@ -3068,6 +3071,15 @@ function trophyGeo(full, ranges) {
   g.boundingSphere = new THREE.Sphere(new V3(0, 1, 0), 2.8);
   return g;
 }
+// the trophies' material: the body's shader for the level, sharing the awaken glow but never turned black, so the
+// skulls stay carved bone against the Black form's lacquer (its own horns and spikes are dark by themselves)
+const TRO_WHITE = { value: 0 };
+function trophyMat(f) {
+  if (!f.uAwake) f.uAwake = { value: 0 };
+  if (GFX.level === 'low') return f.troLow || (f.troLow = mythMatLow(f.uAwake, TRO_WHITE));
+  if (GFX.level === 'medium') return f.troMid || (f.troMid = mythMatMid(f.uAwake, TRO_WHITE));
+  return f.troStd || (f.troStd = mythMat(f.uAwake, TRO_WHITE));
+}
 // (re)build the fighter's trophy mesh for n skulls (+ the Black form's pieces)
 function trophyMesh(f) {
   const T = f.tro;
@@ -3078,7 +3090,7 @@ function trophyMesh(f) {
   const M = full.userData.marks, E = full.userData.end, ranges = [];
   if (T.n > 0) ranges.push([0, M[T.n][0], 0, M[T.n][1]]);
   if (T.black) ranges.push([M[KILL.skulls][0], E[0], M[KILL.skulls][1], E[1]]);
-  const mesh = new THREE.SkinnedMesh(trophyGeo(full, ranges), fighterMat(f));
+  const mesh = new THREE.SkinnedMesh(trophyGeo(full, ranges), trophyMat(f));
   mesh.bind(f.skin.skeleton, new THREE.Matrix4());
   mesh.castShadow = true; mesh.receiveShadow = GFX.level === 'high'; mesh.layers.mask = f.body.layers.mask;
   f.body.add(mesh); T.mesh = mesh;
@@ -3100,7 +3112,7 @@ function trophySet(f, kills, normal) {
 // ---- the Black form at runtime (all render-side: nothing here touches the simulation) ----
 let _furBlack = null, _faceBlack = null;
 function blackFurMat() {   // the same fur shader, its strands burnt dark with an ember undertone
-  if (!_furBlack) { _furBlack = shared(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0, envMap: null, color: '#3a302c', emissive: '#260700' })); _furBlack.extensions = furMat.extensions; _furBlack.onBeforeCompile = furMat.onBeforeCompile; }
+  if (!_furBlack) { _furBlack = shared(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0, envMap: null, color: '#221a18', emissive: '#1c0500' })); _furBlack.extensions = furMat.extensions; _furBlack.onBeforeCompile = furMat.onBeforeCompile; }
   return _furBlack;
 }
 function blackFaceMat() {   // painted face on a dark skin: the eyes burn
@@ -3134,11 +3146,12 @@ void main() {
   vec3 q = vec3(vP.x * 2.2, vP.y * 1.1 - uTime * 1.1, vP.z * 2.2);
   float n = bNoise(q) * 0.62 + bNoise(q * 2.3 + vec3(0.0, -uTime * 0.9, 1.7)) * 0.38;   // soft billows rising
   float facing = abs(dot(normalize(vN), normalize(-vV)));
-  float soft = smoothstep(0.08, 0.7, facing);   // thins out towards the silhouette: no hard outline
-  float fade = smoothstep(0.0, 0.1, h) * (1.0 - smoothstep(0.12, 0.7, h));
-  float a = smoothstep(0.45, 0.8, n) * fade * soft * uAmt;
-  float hot = smoothstep(0.78, 0.92, n) * (1.0 - smoothstep(0.0, 0.35, h)) * soft * uAmt;
-  gl_FragColor = vec4(mix(vec3(0.012, 0.008, 0.008), vec3(1.7, 0.5, 0.1), hot), clamp(a * 0.75 + hot * 0.45, 0.0, 0.85));
+  // densest a little inside the silhouette, thin at the outline (no hard edge) and over the body's middle
+  float band = smoothstep(0.05, 0.35, facing) * (1.0 - smoothstep(0.55, 0.92, facing));
+  float fade = smoothstep(0.0, 0.08, h) * (1.0 - smoothstep(0.1, 0.55, h));
+  float a = smoothstep(0.45, 0.8, n) * fade * band * uAmt;
+  float hot = smoothstep(0.82, 0.95, n) * (1.0 - smoothstep(0.0, 0.2, h)) * band * uAmt;
+  gl_FragColor = vec4(mix(vec3(0.012, 0.008, 0.008), vec3(1.7, 0.45, 0.08), hot), clamp(a * 0.8 + hot * 0.4, 0.0, 0.85));
 }`;
 // weapon trails: a ribbon between the forearm and the fist (or the blade / hammer head) over the last frames
 const TRAIL_N = 16, TRAIL = { life: 0.2 };   // samples kept, seconds a sample lives
@@ -3471,7 +3484,7 @@ class Fighter {
     blackDispose(this);
     scene.remove(this.root);
     if (this.skin) this.skin.skeleton.dispose();
-    for (const m of [this.matLow, this.matMid, this.matStd]) if (m) m.dispose();
+    for (const m of [this.matLow, this.matMid, this.matStd, this.troLow, this.troMid, this.troStd]) if (m) m.dispose();
     disposeTree(this.root);   // per-fighter materials (shield, ice, eyes, body...) and unshared rig geometry
     if (this.bliz) { scene.remove(this.bliz.grp); disposeTree(this.bliz.grp); this.bliz = null; }
     if (this.tagEl) this.tagEl.remove();
