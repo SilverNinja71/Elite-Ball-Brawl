@@ -1957,7 +1957,14 @@ const DETAIL = (() => {
   }
   const fur = new THREE.DataTexture(fd, F, F, THREE.RGBAFormat);
   fur.wrapS = fur.wrapT = THREE.RepeatWrapping; fur.magFilter = THREE.LinearFilter; fur.minFilter = THREE.LinearMipmapLinearFilter; fur.generateMipmaps = true; fur.needsUpdate = true;
-  return { tex: shared(t), fur: shared(fur) };
+  // smooth tiling noise (no fine grain), R and G two independent fields: the Black form's lava cracks (one
+  // contour line of R) and its smoke; a texture fetch is far cheaper than noise maths on phones
+  const S = 128, sd = new Uint8Array(S * S * 4);
+  const fbm2 = (x, y, s) => vnoise(x / 32, y / 32, 4, s) * 0.62 + vnoise(x / 16, y / 16, 8, s + 1) * 0.28 + vnoise(x / 8, y / 8, 16, s + 2) * 0.1;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const o = (y * S + x) * 4; sd[o] = clamp(fbm2(x, y, 31), 0, 1) * 255; sd[o + 1] = clamp(fbm2(x, y, 47), 0, 1) * 255; sd[o + 2] = 0; sd[o + 3] = 255; }
+  const smooth = new THREE.DataTexture(sd, S, S, THREE.RGBAFormat);
+  smooth.wrapS = smooth.wrapT = THREE.RepeatWrapping; smooth.magFilter = THREE.LinearFilter; smooth.minFilter = THREE.LinearMipmapLinearFilter; smooth.generateMipmaps = true; smooth.needsUpdate = true;
+  return { tex: shared(t), fur: shared(fur), smooth: shared(smooth) };
 })();
 // warm studio reflections for metal and lacquer (a dark earth floor, a warm horizon, the sun as a hot spot)
 let _mythEnv = null;
@@ -1984,7 +1991,7 @@ function mythEnv() {
 }
 // shared uniforms: detail on / off (Low), time, the warm rim light's direction (view space) and colour
 const MYTH_U = {
-  uDetailMap: { value: DETAIL.tex }, uDetail: { value: GFX.level === 'low' ? 0 : 1 }, uTime: RIG_U.uTime,
+  uDetailMap: { value: DETAIL.tex }, uNoiseMap: { value: DETAIL.smooth }, uDetail: { value: GFX.level === 'low' ? 0 : 1 }, uTime: RIG_U.uTime,
   uRimDir: { value: new V3(0, 1, 0) }, uRimCol: { value: new THREE.Color(1.0, 0.62, 0.32).multiplyScalar(0.55) },
 };
 // Black form (50 K.O.s), shared by the High and Medium body shaders: lacquer black over everything that is not
@@ -1999,15 +2006,10 @@ vec3 mythBlack(vec3 c, float metal) {
   vec3 gold = vec3(0.62, 0.3, 0.07) * (0.55 + lum * 0.8);
   return mix(c, metal > 0.5 ? gold : lacquer, uBlack);
 }
-float bHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
-float bNoise(vec3 x) {
-  vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(mix(bHash(i), bHash(i + vec3(1, 0, 0)), f.x), mix(bHash(i + vec3(0, 1, 0)), bHash(i + vec3(1, 1, 0)), f.x), f.y),
-             mix(mix(bHash(i + vec3(0, 0, 1)), bHash(i + vec3(1, 0, 1)), f.x), mix(bHash(i + vec3(0, 1, 1)), bHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
-}
 vec3 mythEmber(vec2 uv, vec3 rest, vec4 m) {
-  // thin cracks: one contour line of a smooth noise in the part's own space, wandering like fissures in cooling lava
-  float v = bNoise(rest * 6.0) * 0.7 + bNoise(rest * 15.0 + 3.1) * 0.3;
+  // thin cracks: one contour line of a smooth noise (box-projected in the part's own space), like fissures in cooling lava
+  vec2 nn = texture2D(uNoiseMap, uv * 1.4 + vec2(0.31, 0.17)).rg;
+  float v = nn.x * 0.8 + nn.y * 0.2;
   float vein = (1.0 - smoothstep(0.0, 0.018, abs(v - 0.5))) * (1.0 - m.y);
   float pulse = 0.45 + 0.55 * sin(uTime * 2.6 + rest.y * 9.0 + rest.x * 5.0);
   return BLACK_EMBER * vein * pulse * 1.1 + vec3(1.0, 0.5, 0.12) * m.w * (0.9 + 0.3 * sin(uTime * 2.4)) * 1.1;
@@ -2019,7 +2021,7 @@ function mythOBC(sh) {
   sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 mat;\nattribute float emi;\nvarying vec4 vMat;\nvarying float vEmi;\nvarying vec3 vRest;\nvarying vec3 vRestN;')
     .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMat = mat; vEmi = emi; vRest = position; vRestN = normal;');
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-uniform sampler2D uDetailMap; uniform float uDetail; uniform float uAwake; uniform float uTime; uniform vec3 uRimDir; uniform vec3 uRimCol; uniform float uBlack;
+uniform sampler2D uDetailMap; uniform sampler2D uNoiseMap; uniform float uDetail; uniform float uAwake; uniform float uTime; uniform vec3 uRimDir; uniform vec3 uRimCol; uniform float uBlack;
 varying vec4 vMat; varying float vEmi; varying vec3 vRest; varying vec3 vRestN;
 float mythH; vec2 mythUV;
 ${MYTH_BLACK_GLSL}
@@ -2088,7 +2090,7 @@ function mythOBCMid(sh) {
   sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 mat;\nattribute float emi;\nvarying vec4 vMat;\nvarying float vEmi;\nvarying vec3 vRest;\nvarying vec3 vRestN;')
     .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMat = mat; vEmi = emi; vRest = position; vRestN = normal;');
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-uniform sampler2D uDetailMap; uniform float uAwake; uniform float uTime; uniform vec3 uRimDir; uniform vec3 uRimCol; uniform float uBlack;
+uniform sampler2D uDetailMap; uniform sampler2D uNoiseMap; uniform float uAwake; uniform float uTime; uniform vec3 uRimDir; uniform vec3 uRimCol; uniform float uBlack;
 varying vec4 vMat; varying float vEmi; varying vec3 vRest; varying vec3 vRestN;
 float mythH; vec2 mythUV;
 ` + MYTH_BLACK_GLSL)
@@ -2322,7 +2324,7 @@ function mythGfx() {
   for (const f of fighters) {
     if (f.skin && !SHARED.has(f.skin.geometry)) lodRange(f.skin.geometry);
     if (f.skin) { f.skin.material = fighterMat(f); f.skin.receiveShadow = GFX.level === 'high'; }
-    if (f.tro && f.tro.mesh) { f.tro.mesh.material = trophyMat(f); f.tro.mesh.receiveShadow = GFX.level === 'high'; }
+    if (f.tro && f.tro.mesh) { f.tro.mesh.material = trophyMat(f); f.tro.mesh.castShadow = f.tro.mesh.receiveShadow = GFX.level === 'high'; }
     if (f.rig.fur) for (const m of f.rig.fur) m.visible = GFX.level !== 'low';
   }
 }
@@ -2943,14 +2945,15 @@ const TRO_CACHE = new Map();
 // one carved skull, unit size, facing +z: [geometry, surface key, matrix]
 function skullParts() {
   const B = (x, y, z, sx, sy, sz) => new THREE.Matrix4().makeScale(sx, sy, sz).setPosition(x, y, z);
+  const eye = LODF >= 0.8 ? gIco(1) : gk('oct1', () => new THREE.OctahedronGeometry(1));   // 8 triangles do at phone sizes
   const L = [
     [gSph(1, 8, 6), 'b', B(0, 0.1, -0.03, 0.48, 0.45, 0.5)],        // cranium
     [gSph(1, 6, 4), 'b', B(0, -0.12, 0.13, 0.36, 0.28, 0.34)],      // cheekbones
     [gSph(1, 6, 4), 'b', B(0, -0.33, 0.1, 0.27, 0.13, 0.28)],       // jaw
-    [gIco(1), 'd', B(0.16, -0.05, 0.41, 0.12, 0.11, 0.07)],         // eye sockets
-    [gIco(1), 'd', B(-0.16, -0.05, 0.41, 0.12, 0.11, 0.07)],
+    [eye, 'd', B(0.16, -0.05, 0.41, 0.12, 0.11, 0.07)],             // eye sockets
+    [eye, 'd', B(-0.16, -0.05, 0.41, 0.12, 0.11, 0.07)],
   ];
-  if (!LOWB) L.push([gIco(1), 'd', B(0, -0.19, 0.44, 0.055, 0.075, 0.05)], [gBox(1, 1, 1), 't', B(0, -0.27, 0.38, 0.3, 0.07, 0.05)]);   // nose, teeth
+  if (!LOWB && LODF >= 0.8) L.push([gIco(1), 'd', B(0, -0.19, 0.44, 0.055, 0.075, 0.05)], [gBox(1, 1, 1), 't', B(0, -0.27, 0.38, 0.3, 0.07, 0.05)]);   // nose, teeth (High)
   return L;
 }
 const _sm = new THREE.Matrix4(), _skx = new V3(), _sky = new V3(), _skz = new V3();
@@ -3092,7 +3095,7 @@ function trophyMesh(f) {
   if (T.black) ranges.push([M[KILL.skulls][0], E[0], M[KILL.skulls][1], E[1]]);
   const mesh = new THREE.SkinnedMesh(trophyGeo(full, ranges), trophyMat(f));
   mesh.bind(f.skin.skeleton, new THREE.Matrix4());
-  mesh.castShadow = true; mesh.receiveShadow = GFX.level === 'high'; mesh.layers.mask = f.body.layers.mask;
+  mesh.castShadow = mesh.receiveShadow = GFX.level === 'high'; mesh.layers.mask = f.body.layers.mask;   // skull-sized shadows only show on High
   f.body.add(mesh); T.mesh = mesh;
 }
 // a fighter's kill count and chosen look: skulls, Black form (50+, unless `normal`), name tag
@@ -3133,18 +3136,11 @@ function blackLook(f, on) {
 }
 // dark smoke rising round a Black-form fighter (Medium / High): one open cylinder, noise-cut, edges denser
 const smokeGeo = shared(new THREE.CylinderGeometry(0.55, 0.95, 2.5, 18, 1, true));
-const SMOKE_VS = 'varying vec2 vUv; varying vec3 vN; varying vec3 vV; varying vec3 vP;\nvoid main() { vUv = uv; vP = position; vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = mv.xyz; vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * mv; }';
-const SMOKE_FS = `uniform float uTime; uniform float uAmt; varying vec2 vUv; varying vec3 vN; varying vec3 vV; varying vec3 vP;
-float bHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
-float bNoise(vec3 x) {
-  vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(mix(bHash(i), bHash(i + vec3(1, 0, 0)), f.x), mix(bHash(i + vec3(0, 1, 0)), bHash(i + vec3(1, 1, 0)), f.x), f.y),
-             mix(mix(bHash(i + vec3(0, 0, 1)), bHash(i + vec3(1, 0, 1)), f.x), mix(bHash(i + vec3(0, 1, 1)), bHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
-}
+const SMOKE_VS = 'varying vec2 vUv; varying vec3 vN; varying vec3 vV;\nvoid main() { vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = mv.xyz; vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * mv; }';
+const SMOKE_FS = `uniform sampler2D uTex; uniform float uTime; uniform float uAmt; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
 void main() {
   float h = vUv.y;
-  vec3 q = vec3(vP.x * 2.2, vP.y * 1.1 - uTime * 1.1, vP.z * 2.2);
-  float n = bNoise(q) * 0.62 + bNoise(q * 2.3 + vec3(0.0, -uTime * 0.9, 1.7)) * 0.38;   // soft billows rising
+  float n = texture2D(uTex, vec2(vUv.x * 2.0, h * 0.9 - uTime * 0.42)).r * 0.62 + texture2D(uTex, vec2(vUv.x * 4.0 + 0.3, h * 1.6 - uTime * 0.7)).g * 0.38;   // soft billows rising
   float facing = abs(dot(normalize(vN), normalize(-vV)));
   // densest a little inside the silhouette, thin at the outline (no hard edge) and over the body's middle
   float band = smoothstep(0.05, 0.35, facing) * (1.0 - smoothstep(0.55, 0.92, facing));
@@ -3251,7 +3247,7 @@ function blackFrame(f, fdt) {
   // smoke shell (Medium / High)
   if (fx >= 2 && shown) {
     if (!f.smoke) {
-      f.smoke = new THREE.Mesh(smokeGeo, new THREE.ShaderMaterial({ uniforms: { uTime: RIG_U.uTime, uAmt: { value: 1 } }, vertexShader: SMOKE_VS, fragmentShader: SMOKE_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+      f.smoke = new THREE.Mesh(smokeGeo, new THREE.ShaderMaterial({ uniforms: { uTex: { value: DETAIL.smooth }, uTime: RIG_U.uTime, uAmt: { value: 1 } }, vertexShader: SMOKE_VS, fragmentShader: SMOKE_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
       f.smoke.position.y = 1.2; f.smoke.renderOrder = 2; f.smoke.userData.noShadow = true; f.smoke.layers.mask = f.body.layers.mask; f.root.add(f.smoke);
     }
     f.smoke.visible = true;
