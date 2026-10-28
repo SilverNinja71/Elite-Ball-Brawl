@@ -6639,6 +6639,36 @@ function aiIntent(b, dt) {
   if (!b.onGround && d < 3 && b.vel.y < 0 && now >= ai.nextClick) { I.m1 = true; ai.nextClick = now + rand(P.cadence[0], P.cadence[1]); }
   return I;
 }
+// Bots run straight at what they want; a static prop exactly on that line (a lamp post, a statue's pedestal, a
+// cauldron) would hold them against its face. When one stands in the next few units of the path, steer past it
+// on the side away from its centre (kept for a moment so the choice does not flicker). Movement only: what the
+// bot decides to do is unchanged.
+function botSteer(b, I) {
+  const m = I.move, len = Math.hypot(m.x, m.z), ai = b.ai;
+  if (!ai || b.dead || len < 0.05) return I;
+  const dx = m.x / len, dz = m.z / len, x0 = b.pos.x, z0 = b.pos.z, R = 0.6;
+  const tg = ai.target && fighters.includes(ai.target) ? Math.hypot(ai.target.pos.x - x0, ai.target.pos.z - z0) : 99;
+  let hit = null, best = Math.min(3.2, tg);
+  for (const k of blocks) {
+    if (!k.static || !k.alive || b.pos.y >= k.max.y - 0.4) continue;
+    const cx = (k.min.x + k.max.x) / 2 - x0, cz = (k.min.z + k.max.z) / 2 - z0;
+    if (dx * cx + dz * cz <= 0) continue;   // behind us, or we are moving away from it
+    let t0 = 0, t1 = best;
+    for (let a = 0; a < 2; a++) {   // slab test of the path against the box grown by R
+      const o = a ? z0 : x0, d = a ? dz : dx, lo = (a ? k.min.z : k.min.x) - R, hi = (a ? k.max.z : k.max.x) + R;
+      if (Math.abs(d) < 1e-6) { if (o < lo || o > hi) t1 = -1; continue; }
+      let u = (lo - o) / d, v = (hi - o) / d; if (u > v) { const w = u; u = v; v = w; }
+      t0 = Math.max(t0, u); t1 = Math.min(t1, v);
+    }
+    if (t0 <= t1 && t1 > 0) { best = t0; hit = k; }
+  }
+  if (!hit) { if (ai.navT > 0) ai.navT -= SIM_DT; return I; }
+  if (!(ai.navT > 0)) { const cx = (hit.min.x + hit.max.x) / 2 - x0, cz = (hit.min.z + hit.max.z) / 2 - z0; ai.navSide = dx * cz - dz * cx > 0 ? -1 : 1; }
+  ai.navT = 0.6;
+  const s = ai.navSide, nx = dx - dz * s * 1.6, nz = dz + dx * s * 1.6, nl = Math.hypot(nx, nz);
+  m.x = (nx / nl) * len; m.z = (nz / nl) * len;
+  return I;
+}
 // bots only live in a server you host (up to BOT_MAX); the public lobby has just the training dummy
 function botCount() { let n = 0; for (const f of fighters) if (f.ai && !f.remote) n++; return n; }
 function addBot() {
@@ -7338,7 +7368,7 @@ function selectArena(key, o) {
   const first = !ARENA;
   if (ARENA_SET) { if (ARENA_SET.out.cleanup) ARENA_SET.out.cleanup(); arenaFree(ARENA_SET.objs); dropColliders(ARENA_SET.cols); ARENA_SET = null; }
   ARENA_SET = arenaCapture(ARENAS[key].build); ARENA = key;   // the next simulation step pushes anyone out of a new collider
-  if (!first) { showBanner('Arena', ARENAS[key].name); addFeed(null, 'Arena: ' + ARENAS[key].name, ''); }
+  if (!first) { showBanner('Arena', ARENAS[key].name); addFeed(null, 'Arena: ' + ARENAS[key].name, ''); screenFlash('#fff0cc', 0.85); }   // the flash covers the swap
   if (NET.mode === 'host') broadcast({ t: 'ar', a: ARENA });
   showArena();
   return ARENA;
@@ -7484,7 +7514,7 @@ function simStep(dt) {
   for (const f of fighters) if (!f.remote) { stepList.push(f); f.prevPos.copy(f.pos); f.prevYaw = f.yaw; }
   for (const f of stepList) {
     if (f.lantern || !fighters.includes(f)) continue;
-    updateFighter(f, dt, f === player ? playerIntent() : aiIntent(f, dt));
+    updateFighter(f, dt, f === player ? playerIntent() : botSteer(f, aiIntent(f, dt)));
   }
   separateAll();
   audioAt(null);
