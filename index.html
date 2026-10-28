@@ -3141,13 +3141,14 @@ void main() {
   gl_FragColor = vec4(mix(vec3(0.012, 0.008, 0.008), vec3(1.7, 0.5, 0.1), hot), clamp(a * 0.75 + hot * 0.45, 0.0, 0.85));
 }`;
 // weapon trails: a ribbon between the forearm and the fist (or the blade / hammer head) over the last frames
-const TRAIL_N = 16, TRAIL_LIFE = 0.2;
+const TRAIL_N = 16, TRAIL = { life: 0.2 };   // samples kept, seconds a sample lives
 const trailIdx = (() => { const a = []; for (let i = 0; i < TRAIL_N - 1; i++) { const k = i * 2; a.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); } return a; })();
 const TRAIL_VS = 'attribute float aA; attribute float aS; varying float vA; varying float vS;\nvoid main() { vA = aA; vS = aS; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
-const TRAIL_FS = 'varying float vA; varying float vS;\nvoid main() { vec3 c = mix(vec3(0.9, 0.12, 0.02), vec3(1.6, 1.05, 0.45), vS * vS); gl_FragColor = vec4(c * vA, 1.0); }';
+const TRAIL_FS = 'varying float vA; varying float vS;\nvoid main() { vec3 c = mix(vec3(0.75, 0.1, 0.02), vec3(1.0, 0.82, 0.42), vS * vS); gl_FragColor = vec4(c, clamp(vA, 0.0, 1.0) * 0.9); }';
 let _trailMat = null;
 function makeTrail() {
-  if (!_trailMat) _trailMat = shared(new THREE.ShaderMaterial({ vertexShader: TRAIL_VS, fragmentShader: TRAIL_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false }));
+  // normal blending, not additive: the ribbon must read on a bright day as well as at night
+  if (!_trailMat) _trailMat = shared(new THREE.ShaderMaterial({ vertexShader: TRAIL_VS, fragmentShader: TRAIL_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 6), 3).setUsage(THREE.DynamicDrawUsage));
   g.setAttribute('aA', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 2), 1).setUsage(THREE.DynamicDrawUsage));
@@ -3159,11 +3160,11 @@ function makeTrail() {
 const _ta = new V3(), _tb = new V3(), _tr = new V3();
 function trailTick(f, tr, pivot, inner, outer, active, fdt, min) {
   for (const q of tr.s) q.age += fdt;
-  while (tr.s.length && tr.s[tr.s.length - 1].age > TRAIL_LIFE) tr.s.pop();
+  while (tr.s.length && tr.s[tr.s.length - 1].age > TRAIL.life) tr.s.pop();
   pivot.localToWorld(_ta.copy(inner)); outer.obj.localToWorld(_tb.copy(outer.v));
   _tr.copy(_tb).sub(f.root.position);
   const sp = tr.hasPrev && fdt > 0 ? _tr.distanceTo(tr.prev) / fdt : 0; tr.prev.copy(_tr); tr.hasPrev = true;
-  const w = active ? clamp((sp - min) / 7, 0, 1) : 0;
+  const w = active ? clamp((sp - min) / 5, 0, 1) : 0;
   if (w > 0 || (tr.s.length && tr.s[0].w > 0)) {
     const q = tr.s.length >= TRAIL_N ? tr.s.pop() : { a: new V3(), b: new V3(), age: 0, w: 0 };
     q.a.copy(_ta); q.b.copy(_tb); q.age = 0; q.w = w; tr.s.unshift(q);
@@ -3173,7 +3174,7 @@ function trailTick(f, tr, pivot, inner, outer, active, fdt, min) {
   if (n < 2) { tr.m.visible = false; return; }
   const P = g.attributes.position.array, A = g.attributes.aA.array;
   for (let i = 0; i < n; i++) {
-    const q = tr.s[i], k = (1 - q.age / TRAIL_LIFE) * q.w;
+    const q = tr.s[i], k = (1 - q.age / TRAIL.life) * q.w;
     P.set([q.a.x, q.a.y, q.a.z, q.b.x, q.b.y, q.b.z], i * 6); A[i * 2] = k * 0.15; A[i * 2 + 1] = k;
   }
   g.attributes.position.needsUpdate = true; g.attributes.aA.needsUpdate = true; g.setDrawRange(0, (n - 1) * 6);
@@ -3251,21 +3252,21 @@ function blackFrame(f, fdt) {
   }
   // trails on the fists (or Steve's blade and hammer head) whenever they swing fast during a move
   if (!f.trails) f.trails = [makeTrail(), makeTrail()];
-  const local = !f.remote, act = shown && (local ? !!(f.action || f.anim) : true), min = local ? 5 : 10;   // peers: only clearly faster than a running arm swing
+  const local = !f.remote, act = shown && (local ? !!(f.action || f.anim) : true), min = local ? 1.5 : 9;   // peers: only clearly faster than a running arm swing
   if (act || f.trails[0].s.length || f.trails[1].s.length) {
     f.root.updateMatrixWorld(true);
     const rig = f.rig;
     T_FIST.obj = rig.armL; trailTick(f, f.trails[0], rig.armL, T_IN, T_FIST, act, fdt, min);
     const ro = rig.sword && rig.sword.visible ? { obj: rig.sword, v: T_SWORD } : rig.mace && rig.mace.visible ? { obj: rig.mace, v: T_MACE } : (T_FIST.obj = rig.armR, T_FIST);
     trailTick(f, f.trails[1], rig.armR, T_IN, ro, act, fdt, min);
-  }
+  } else f.trails[0].hasPrev = f.trails[1].hasPrev = false;
   // entrance / flourish effects
   if (b && b.k === 'enter') {
     if (b.s === 0) {
       b.s = 1; audioAt(R);
       emit('ember', _ta.set(R.x, R.y + 0.3, R.z), { n: fx >= 2 ? 26 : 10, speed: 1.6, up: 7, life: 1.0 });
       if (fx >= 2) spawnPuffs(_ta.set(R.x, R.y + 0.2, R.z), SMOKE_DARK, fx >= 3 ? 12 : 6, 0.55, 1.4);
-      ringFx(_ta.set(R.x, R.y, R.z), '#5a0e06', 2.6, 0.5);
+      ringFx(_ta.set(R.x, R.y, R.z), '#c2280a', 2.6, 0.5);
     }
     if (b.s === 1 && b.t >= 0.4) {
       b.s = 2; audioAt(R); SFX.awaken();
@@ -6686,6 +6687,6 @@ if (/[?&]dev=1/.test(location.search)) window.__scbg = { SFX, fighters, get play
   applyAvatar, avatarOf, avatarParts, HATS, BACKS, FACES_UI, FACE, EMOTES, playEmote, SKIN_CACHE, rigSync, mythGfx, own,
   applyState, packF, netNow, PORTRAITS,
   KILLS, KILL, setKills, creditKill, trophySet, trophyFull, TRO_CACHE, blackEnter, blackFlourish, transcend, TRANS, selectArena, ARENAS, get ARENA() { return ARENA; },
-  koSeen, kCredit, kHit, applyNetHit, applyHitReply, applyFx, onData, pendingHits, botKills, souls, KO, respawn, switchCharacter };
+  koSeen, kCredit, kHit, TRAIL, applyNetHit, applyHitReply, applyFx, onData, pendingHits, botKills, souls, KO, respawn, switchCharacter };
 })();
 </script>
