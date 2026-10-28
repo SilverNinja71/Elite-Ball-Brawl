@@ -3293,7 +3293,7 @@ function blackFrame(f, fdt) {
 }
 // render-side rings that are never mirrored to peers (they draw their own)
 function ringFx(pos, color, r, dur) { const c = NET.cap; NET.cap = false; ring(pos, color, r, dur); NET.cap = c; }
-// a fighter's spirit flying from the fallen to whoever knocked them out; it adds the skull when it lands
+// a fighter's spirit flying from the fallen to whoever knocked them out, bursting into embers (or bone dust) on arrival
 const souls = [];
 function soulFly(from, to, black, onLand) {
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTex, color: black ? '#ff7a2a' : '#f2e4c0', blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false, toneMapped: false }));
