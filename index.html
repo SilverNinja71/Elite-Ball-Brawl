@@ -3074,14 +3074,15 @@ function trophyGeo(full, ranges) {
   g.boundingSphere = new THREE.Sphere(new V3(0, 1, 0), 2.8);
   return g;
 }
-// the trophies' material: the body's shader for the level, sharing the awaken glow but never turned black, so the
-// skulls stay carved bone against the Black form's lacquer (its own horns and spikes are dark by themselves)
+// the trophies' material: the body's shader for the level, never turned black, so the skulls stay carved bone
+// against the Black form's lacquer (its own horns and spikes are dark by themselves). Its gold trim (the
+// aureole, its flames) glows while awakened and, for good, once a fighter has transcended (1000 K.O.s).
 const TRO_WHITE = { value: 0 };
 function trophyMat(f) {
-  if (!f.uAwake) f.uAwake = { value: 0 };
-  if (GFX.level === 'low') return f.troLow || (f.troLow = mythMatLow(f.uAwake, TRO_WHITE));
-  if (GFX.level === 'medium') return f.troMid || (f.troMid = mythMatMid(f.uAwake, TRO_WHITE));
-  return f.troStd || (f.troStd = mythMat(f.uAwake, TRO_WHITE));
+  if (!f.uTroGlow) f.uTroGlow = { value: 0 };
+  if (GFX.level === 'low') return f.troLow || (f.troLow = mythMatLow(f.uTroGlow, TRO_WHITE));
+  if (GFX.level === 'medium') return f.troMid || (f.troMid = mythMatMid(f.uTroGlow, TRO_WHITE));
+  return f.troStd || (f.troStd = mythMat(f.uTroGlow, TRO_WHITE));
 }
 // (re)build the fighter's trophy mesh for n skulls (+ the Black form's pieces)
 function trophyMesh(f) {
@@ -5077,6 +5078,7 @@ function applyVisual(f, fdt) {
     if (rg.faceNow !== fk) { rg.faceNow = fk; rg.face.geometry = own(FACE.geo, fk) ? FACE.geo[fk] : FACE.geo[rg.baseFace] || FACE.geo.smile; }
     const nOn = f.awaken > 0;
     if (f.neonOn !== nOn) { f.neonOn = nOn; setNeon(f, nOn); }
+    if (f.uTroGlow) f.uTroGlow.value = nOn || f.kills >= KILL.trans ? 1 : 0;
   }
   rigSync(f, fdt);
   if (f.tro) blackFrame(f, fdt);
