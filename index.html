@@ -2291,6 +2291,11 @@ function rigSync(f, fdt) {
     while (o && o !== f.body) { if (!o.visible) { v = false; break; } o = o.parent; }
     const s = v ? 1 : 1e-4; if (b.s !== s) { b.s = s; b.bone.scale.setScalar(s); }
   }
+  if (rig.jawDamp) { const j = rig.jaw.rotation.x; rig.jawDamp.rotation.x = (j > 0 ? 0.55 * (1 - Math.exp(-j / 0.55)) : j) - j; }   // shown angle eases to ~0.55
+  if (rig.mouth) {   // a lion-dance head's lower jaw: gapes while the fighter attacks, breathes otherwise (render-side only)
+    const tg = f.anim || f.action ? 0.42 : 0.05 + 0.04 * Math.sin(realClock * 2.3 + rig.mouthPh);
+    rig.mouthA += (tg - rig.mouthA) * Math.min(1, fdt * 12); rig.mouth.rotation.x = rig.mouthA;
+  }
   const cl = rig.cloth, ca = rig.clothAv;
   if (!cl.length && !(ca && ca.length)) return;
   const dt = Math.min(fdt, 0.05), R = f.root.position;
@@ -2432,6 +2437,141 @@ function concatGeo(key, list) {   // small static merges for separate (non-skinn
 }
 const M4 = (x, y, z, s = 1) => new THREE.Matrix4().makeScale(s, s, s).setPosition(x, y, z);
 
+// ---- lion-dance heads (every warrior but the lion general wears one) ----
+// Several fur parts as ONE shell mesh (one draw call): items are [geometry, spec, x, y, z, o, strand length];
+// each solid base still goes into the baked body, so Low (no shells) keeps the shapes.
+function furGroup(parent, key, items) {
+  const bases = items.map(([g, s, x, y, z, o]) => P(parent, g, s, x, y, z, o));
+  if (LOWB) return bases;
+  const n = GFX.level === 'high' ? 6 : 3;   // sparser than a single fur part: these cover big areas (fill rate on phones)
+  const geo = gk('furg' + key + '|' + n + '|' + LODF, () => {
+    const parts = items.map(([g, s, , , , , len], i) => { bases[i].updateMatrix(); return furShells(key + i, g, bases[i].matrix, '#' + s.c.clone().convertLinearToSRGB().getHexString(), len, n); });
+    let nv = 0, ni = 0; for (const g of parts) { nv += g.attributes.position.count; ni += g.index.count; }
+    const out = new THREE.BufferGeometry(), idx = new Uint32Array(ni);
+    for (const [a, sz] of [['position', 3], ['normal', 3], ['uv', 2], ['color', 3], ['fur', 3]]) {
+      const arr = new Float32Array(nv * sz); let o = 0;
+      for (const g of parts) { arr.set(g.attributes[a].array, o); o += g.attributes[a].array.length; }
+      out.setAttribute(a, new THREE.BufferAttribute(arr, sz));
+    }
+    let vo = 0, io = 0;
+    for (const g of parts) { const I = g.index.array; for (let i = 0; i < I.length; i++) idx[io++] = I[i] + vo; vo += g.attributes.position.count; }
+    out.setIndex(new THREE.BufferAttribute(idx, 1)); out.computeBoundingSphere(); out.boundingSphere.radius += 0.1;
+    return out;
+  });
+  const m = new THREE.Mesh(geo, furMat);
+  m.userData.noShadow = true; m.userData.fur = true; parent.add(m); MYTH.fur.push(m);
+  return bases;
+}
+// A southern lion-dance head worn over the warrior's own: a lacquered papier-mache dome with a forehead mirror
+// and a single horn, huge round eyes ringed in black under fluffy brows, a big furry upper lip, painted cheeks,
+// a fur fringe round the back, and a hinged lower jaw with a beard; the dancer looks out through the mouth.
+// c: palette { shell, paint, fur, brow, trim, beard, nose, iris, teeth }; o.jaw: the pivot for the lower jaw
+// (the shark's bite jaw), otherwise the jaw hangs on rig.mouth, opened render-side only (never sent).
+// Parts sit in head-pivot space (the head's centre is at HEAD.y = 0.28, its crown at 0.57).
+function lionDanceHead(rig, c, o = {}) {
+  const D = rig.hood, SH = SURF.lacq(c.shell), PT = SURF.lacq(c.paint), FU = SURF.fur(c.fur), BR = SURF.fur(c.brow);
+  const TR = c.trimS || SURF.gold(c.trim), TN = NEON(TR), WH = sp('#f4efe4', 0.25, 0, 0), INK = sp('#0d0b0c', 0.18, 0, 0), TE = SURF.bone(c.teeth || '#efe6cf');
+  const LN = SURF.cloth(c.lining || '#2a0c0c');
+  // the head is an ellipsoid (centre C, radii RX / RY / RZ); dome(th, ph, lift) is a point on it (th from the top,
+  // ph round from the front, positive to the warrior's left) pushed out along the normal by `lift`
+  const CY = 0.5, CZ = 0.05, RX = 0.42, RY = 0.37, RZ = 0.4;
+  const dome = (th, ph, lift = 0) => {
+    const nx = Math.sin(th) * Math.sin(ph), ny = Math.cos(th), nz = Math.sin(th) * Math.cos(ph);
+    const n = new V3(nx / RX, ny / RY, nz / RZ).normalize();
+    return [RX * nx + n.x * lift, CY + RY * ny + n.y * lift, CZ + RZ * nz + n.z * lift];
+  };
+  // dome over the crown, cheeks and nape down to the jaw line (open in front below the lip), lined in dark cloth
+  const top = gSph(1, 30, 12, 0, TAU, 0, 1.55), side = gSph(1, 30, 7, PI / 2 + 0.95, TAU - 1.9, 1.55, 1.0);
+  for (const g of [top, side]) { P(D, g, SH, 0, CY, CZ, { s: [RX, RY, RZ] }); P(D, gFlip(g), LN, 0, CY, CZ, { s: [RX * 0.97, RY * 0.97, RZ * 0.97] }); }
+  // a high forehead swelling forward over the eyes
+  P(D, gSph(1, 22, 12, 0, TAU, 0, 1.9), SH, 0, 0.66, 0.2, { s: [0.33, 0.2, 0.24] });
+  // painted flame swirls sweeping back over the dome from above each eye, and a gilt rim round the jaw line
+  for (const s of [1, -1]) {
+    P(D, gTube('ldsw' + s, [dome(0.55, s * 0.45, 0.012), dome(0.62, s * 0.95, 0.012), dome(0.85, s * 1.5, 0.012), dome(1.15, s * 2.1, 0.012), dome(1.45, s * 2.55, 0.012)], 0.024, 0.008, 18, 5), PT);
+    P(D, gTube('ldsw2' + s, [dome(1.05, s * 1.0, 0.01), dome(1.2, s * 1.35, 0.01), dome(1.45, s * 1.7, 0.01), dome(1.8, s * 1.9, 0.01)], 0.018, 0.006, 12, 5), TR, 0, 0, 0, { d: 1 });
+    for (let k = 0; k < 3; k++) P(D, gSph(0.022, 8, 6), k === 1 ? PT : TR, ...dome(0.95 + k * 0.22, s * (2.45 - k * 0.1), 0.01), { d: 1 });   // studs
+  }
+  // a painted ridge from the horn back over the crown to the nape, and a gilt band round the back of the dome
+  P(D, gTube('ldridge', [dome(0.35, 0, 0.01), dome(0.0001, PI, 0.012), dome(0.5, PI, 0.012), dome(1.0, PI, 0.012), dome(1.5, PI, 0.012), dome(1.95, PI, 0.01)], 0.03, 0.022, 24, 6), PT);
+  P(D, gTube('ldband', [...Array(9)].map((_, i) => dome(1.55, 1.25 + (TAU - 2.5) * i / 8, 0.006)), 0.014, 0.014, 30, 5), TR);
+  P(D, gTube('ldrim', [...Array(13)].map((_, i) => dome(2.5, 0.95 + (TAU - 1.9) * i / 12, 0.008)), 0.016, 0.016, 36, 5), TN);
+  // forehead mirror, a single horn, ears
+  P(D, gCyl(0.062, 0.062, 0.02, 20), sp('#d8dde2', 0.12, 1, 1), 0, 0.84, 0.25, { r: [PI / 2 - 0.85, 0, 0] });
+  P(D, gTor(0.066, 0.016, 6, 22), TN, 0, 0.84, 0.25, { r: [-0.85, 0, 0] });
+  P(D, gCone(0.045, 0.18, 10), TR, 0, 0.92, 0.12, { r: [0.5, 0, 0] });
+  for (const s of [1, -1]) {
+    P(D, gCone(0.075, 0.15, 10), SH, ...dome(0.75, s * 1.45, 0.03), { r: [0, 0, -s * 0.85] });
+    P(D, gSph(0.045, 8, 6), PT, ...dome(0.75, s * 1.45, 0.05), { s: [0.5, 1, 1], d: 1 });
+  }
+  // eyes: big white globes with a gilt rim, a black ring, a coloured iris and a glint, turned a little outward
+  const EX = 0.175, EY = 0.69, EZ = 0.315, ER = 0.112, ea = 0.34;
+  const eyeAt = (s, dx, dy, dz) => { const a = s * ea, x = dx * Math.cos(a) + dz * Math.sin(a), z = -dx * Math.sin(a) + dz * Math.cos(a); return [s * EX + x, EY + dy, EZ + z]; };
+  for (const s of [1, -1]) {
+    const r = [0, s * ea, 0];
+    P(D, gSph(ER, 20, 14), WH, ...eyeAt(s, 0, 0, 0), { s: [1, 1, 0.8], r });
+    P(D, gTor(ER * 1.02, 0.016, 6, 24), TN, ...eyeAt(s, 0, 0, 0.02), { r });
+    P(D, gTor(0.074, 0.014, 6, 22), INK, ...eyeAt(s, 0, 0, 0.068), { r });
+    if (!o.eyes) {
+      P(D, gSph(0.05, 14, 10), sp(c.iris, 0.2, 0, 0, 0.25), ...eyeAt(s, 0, 0, 0.056), { s: [1, 1, 0.6], r });
+      P(D, gSph(0.027, 10, 8), INK, ...eyeAt(s, 0, 0, 0.08), { s: [1, 1, 0.6], r });
+    }
+    P(D, gSph(0.013, 6, 5), SURF.glow('#fff8e8', 2), ...eyeAt(s, -0.025, 0.028, 0.092), { d: 1 });
+    // a painted cheek with a gilt spiral below each eye
+    P(D, gSph(0.12, 14, 10), PT, ...dome(1.25, s * 0.85, -0.04), { s: [0.75, 0.85, 0.75] });
+    P(D, gTor(0.05, 0.012, 5, 16, 1.6 * PI), TN, ...dome(1.25, s * 0.85, 0.045), { r: [0, s * 0.85, 0], d: 1 });
+    P(D, gSph(0.016, 6, 5), TR, ...dome(1.25, s * 0.85, 0.045), { d: 1 });
+  }
+  // a broad nose with round nostrils over the lip, and a row of teeth under it
+  P(D, gSph(0.09, 16, 12), c.noseS || PT, 0, 0.535, 0.43, { s: [1.4, 0.85, 0.85] });
+  P2(D, gSph(0.034, 10, 8), TR, 0.075, 0.51, 0.475);
+  for (let k = -4; k <= 4; k++) { const a = k * 0.2; P(D, gCone(0.02, 0.065, 5), TE, Math.sin(a) * 0.33, 0.37, CZ + Math.cos(a) * 0.33, { r: [PI, 0, 0], d: Math.abs(k) > 2 ? 1 : 0 }); }
+  // fur: the big upper lip, fluffy brows over the eyes, a fringe round the nape, pompoms along the crest
+  const brow = (s) => { const [x, y, z] = eyeAt(s, 0, 0.035, 0.035); return [gTor(0.12, 0.036, 5, 12, PI * 1.05), BR, x, y, z, { r: [0, s * ea, PI / 2 - PI * 0.525 + s * 0.12], ord: 'YXZ' }, 0.05]; };
+  const POM = c.pom || [c.brow, c.fur, c.brow];
+  furGroup(D, 'ld' + c.key, [
+    [gTor(0.355, 0.085, 7, 22, 3.1), FU, 0, 0.45, CZ, { r: [PI / 2, 0, PI / 2 - 1.55] }, 0.065],
+    brow(1), brow(-1),
+    [gTor(0.3, 0.07, 6, 22, TAU - 2.2), FU, 0, 0.19, CZ - 0.02, { r: [PI / 2, 0, PI / 2 + 1.1], s: [1.12, 1, 1.05] }, 0.07],
+    // fluffy tufts cap the ends of the lip and of the nape fringe
+    [gSph(0.11, 9, 6), BR, 0.35, 0.44, 0.06, { s: [0.8, 1, 1] }, 0.055], [gSph(0.11, 9, 6), BR, -0.35, 0.44, 0.06, { s: [0.8, 1, 1] }, 0.055],
+    [gSph(0.085, 9, 6), FU, 0.3, 0.2, 0.17, null, 0.06], [gSph(0.085, 9, 6), FU, -0.3, 0.2, 0.17, null, 0.06],
+    [gSph(0.065, 9, 6), SURF.fur(POM[0]), ...dome(0.25, PI, 0.03), null, 0.05],
+    [gSph(0.06, 9, 6), SURF.fur(POM[1]), ...dome(0.6, PI, 0.03), null, 0.05],
+    [gSph(0.055, 9, 6), SURF.fur(POM[2]), ...dome(0.95, PI, 0.03), null, 0.05],
+  ]);
+  // the lower jaw, hinged at the cheeks: a painted bowl with a gilt lip, a tongue, teeth and a swinging beard
+  // a networked bite jaw (o.jaw) swings the jaw through an inner pivot that takes back part of each angle
+  // (render-side: the shown angle eases towards 0.55 rad), so a wide bite gapes instead of burying the jaw in the chest
+  const J = o.jaw ? (rig.jawDamp = piv(o.jaw)) : (rig.mouth = piv(D, 0, 0.22, -0.05));
+  J.userData.anim = true; rig.mouthA = 0; rig.mouthPh = Math.random() * TAU; rig.ldEye = eyeAt;
+  const JP = o.jaw || J, jy = 0.22 - JP.position.y, jz = -0.05 - JP.position.z;   // the parts below sit as if the hinge were at (0, 0.22, -0.05)
+  const bowl = gSph(1, 24, 8, PI / 2 - 1.3, 2.6, PI / 2, 1.1), BY = jy - 0.06, BZ = jz + 0.1;
+  P(J, bowl, PT, 0, BY, BZ, { s: [0.34, 0.15, 0.33] });
+  P(J, gFlip(bowl), sp('#5a1014', 0.6, 0, 0), 0, BY + 0.003, BZ, { s: [0.33, 0.14, 0.32] });
+  P(J, gTor(1, 0.1, 6, 26, 2.6), TN, 0, BY, BZ, { r: [PI / 2, 0, PI / 2 - 1.3], s: [0.34, 0.33, 0.35] });
+  P(J, gTor(1, 0.12, 6, 26, 2.6), PT, 0, BY - 0.035, BZ, { r: [PI / 2, 0, PI / 2 - 1.3], s: [0.345, 0.335, 0.3] });
+  P(J, gSph(1, 12, 8), sp('#b0242a', 0.35, 0, 0), 0, BY - 0.01, BZ + 0.17, { s: [0.13, 0.03, 0.11] });
+  for (let k = -3; k <= 3; k++) { const a = k * 0.3; P(J, gCone(0.019, 0.06, 5), TE, Math.sin(a) * 0.32, BY + 0.03, BZ + Math.cos(a) * 0.31, { d: Math.abs(k) > 1 ? 1 : 0 }); }
+  const beard = clothPiv(J, 0, BY - 0.07, BZ + 0.3, { amt: 0.9, k: 90, sway: 0.06 });
+  const BD = SURF.fur(c.beard);
+  P(beard, gPlate(0.34, 0.16, 0.04, 1.3, 0.75, true, 6, 2), BD, 0, 0.02, 0);
+  for (let k = -2; k <= 2; k++) P(beard, gPlate(0.08, 0.22 + (2 - Math.abs(k)) * 0.05, 0.03, 0.8, 0.3, true, 3, 3), BD, k * 0.062, -0.12, 0.012 - Math.abs(k) * 0.02, { r: [0.08, -k * 0.16, k * 0.07], d: Math.abs(k) === 2 ? 1 : 0 });   // flowing locks
+  // the lion's cloth body hanging from the nape, edged with a fur fringe; it swings on its own
+  if (o.body !== false) {
+    // (it hangs from the nape under the fringe and widens over the shoulders, so the head still shows from behind)
+    const bd = clothPiv(D, 0, 0.3, -0.36, { amt: 0.8, k: 95, sway: 0.04, ry: PI, bx: 0.1 });
+    const BC = SURF.lamel(c.body || c.fur), BW = 0.56;
+    P(bd, gPlate(BW, 0.62, 0.025, 1.5, 1.35, true, 10, 4), BC, 0, 0, 0, { r: [-0.22, 0, 0] });
+    const lx = (y, w) => [0, y, 0.012 - Math.sin(0.22) * y];
+    for (const [y, n, d] of [[-0.3, 4, 1], [-0.6, 5, 0]]) {   // rows of fur fringe, the last one at the hem
+      const w = BW * lerp(1, 1.35, -y / 0.62) / 2;
+      for (let k = -n; k <= n; k++) { const [, y0, z0] = lx(y); P(bd, gCone(0.034, 0.12, 5), FU, k * w / n, y0, z0 + 0.006 + Math.abs(k / n) * w * 0.25, { r: [PI - 0.22, 0, 0], d: d || Math.abs(k) === n ? 1 : 0 }); }
+    }
+    P(bd, gPlate(BW * 1.35 + 0.02, 0.04, 0.04, 1.5, 1), TN, ...lx(-0.6), { r: [-0.22, 0, 0] });
+  }
+  return D;
+}
+
 // ---- 阿娟: gilded guardian-lion general ----
 // A red-lacquer lamellar coat with two heart-guard mirrors, a gold guardian-lion helm with a shaggy mane, a
 // lip that flaps open on big hits (jaw) and the long war-cloth trailing from the helm (cape).
@@ -2535,9 +2675,9 @@ function buildLion(B) {
   return rig;
 }
 
-// ---- Penguin: hooded frost monk ----
+// ---- Penguin: frost monk lion dancer ----
 // Ink-black robes over a cream under-robe (the belly), a saffron sash, ice-jade prayer beads, bell sleeves,
-// a deep fur-trimmed hood with a lacquered beak visor; the counter swings a carved ice-jade koi.
+// an ink-blue lion-dance head with ice-blue fur; the counter swings a carved ice-jade koi.
 const fishIceMat = shared(new THREE.MeshStandardMaterial({ color: '#cdf3ff', emissive: '#2a6c88', roughness: 0.15, metalness: 0, transparent: true, opacity: 0.32, depthWrite: false }));
 function buildPenguin(B) {
   const K = SURF.cloth('#1a1e29'), KL = SURF.leather('#0f1118'), W = SURF.cloth('#d9cfb6'), A = SURF.cloth('#b5601b');
@@ -2575,20 +2715,8 @@ function buildPenguin(B) {
     P(A2, gLimb(0.09, 0.08, 0.18), KL, 0, -0.42, 0);
     pauldron(A2, s, K, [A], { n: 1, r: 0.18, w: 0.44 });
   }
-  // deep hood open at the front, with a fur-trimmed opening, a peak and a beak visor
-  const D = rig.hood, HC = [0, 0.3, -0.03], HS = [1, 1.1, 1.08];
-  const hood = gSph(0.34, 28, 18, PI / 2 + 0.85, TAU - 1.7, 0, 2.15);
-  P(D, hood, K, HC[0], HC[1], HC[2], { s: HS }); P(D, gFlip(hood), SURF.cloth('#0c0e14'), HC[0], HC[1], HC[2], { s: [HS[0] * 0.96, HS[1] * 0.96, HS[2] * 0.96] });
-  const edge = [];
-  for (const sd of [-1, 1]) for (let i = 0; i <= 8; i++) {
-    const th = sd < 0 ? 2.15 - i * 0.25 : 0.15 + i * 0.25, ph = PI / 2 + sd * 0.85;
-    if (sd > 0 && i === 0) continue;
-    edge.push([-0.34 * Math.cos(ph) * Math.sin(th) * HS[0] + HC[0], 0.34 * Math.cos(th) * HS[1] + HC[1], 0.34 * Math.sin(ph) * Math.sin(th) * HS[2] + HC[2]]);
-  }
-  furPart(D, 'penghood', gTube('penghood', edge, 0.032, 0.032, 30, 8), SURF.fur('#566070'), 0, 0, 0, null, 0.05);
-  P(D, gCone(0.1, 0.22, 10), K, 0, 0.67, -0.14, { r: [-0.55, 0, 0] });
-  P(D, gCone(0.075, 0.24, 10), OL, 0, 0.53, 0.33, { r: [PI / 2 + 0.38, 0, 0] });
-  P2(D, gSph(0.026, 10, 8), SURF.glow('#8fe0ff', 0.9), 0.105, 0.575, 0.285, { d: 1 });
+  // a frost lion-dance head: ink-blue lacquer, ice-blue fur, white brows and beard, silver trim, a beak-orange nose
+  lionDanceHead(rig, { key: 'penguin', shell: '#1d2a48', paint: '#e6ddc8', fur: '#4f86c8', brow: '#eef2f7', trimS: SURF.iron('#aeb8c6'), beard: '#eef2f6', iris: '#5fc4e0', lining: '#0c0e14', noseS: OL, body: '#8fa3c0' });
   // Fish Slap Counter: a carved ice-jade koi in a cold glow
   const F = rig.fish = piv(rig.armR, 0, -0.72, 0.1); F.visible = false;
   const KOI = SURF.scale('#8cc8e2'), KOIB = SURF.glow('#d8f4ff', 0.25);
@@ -2603,7 +2731,7 @@ function buildPenguin(B) {
 
 // ---- Steve: wandering pilgrim ----
 // A faded jade travelling robe with a crossed collar and rope belt, a wine gourd at the hip, a ringed pilgrim's
-// staff across the back, a bamboo rain hat over a topknot. His tools: a jian, a bronze spirit hammer, a bamboo
+// staff across the back, a jade-green lion-dance head over a topknot. His tools: a jian, a bronze spirit hammer, a bamboo
 // rod and a horn bow; awakened, dark-iron spirit armour with violet runes closes over him.
 const bladeMat = shared(new THREE.MeshStandardMaterial({ color: '#9fe8d8', emissive: '#1d7a6a', emissiveIntensity: 1, roughness: 0.18, metalness: 0.85 }));
 const bladeNeth = shared(new THREE.MeshStandardMaterial({ color: '#4a3f5a', emissive: '#6a20b0', emissiveIntensity: 1.2, roughness: 0.25, metalness: 0.8 }));
@@ -2659,9 +2787,8 @@ function buildSteve(B) {
   P(H, gSph(0.075, 12, 10), HR, 0, HEAD.y + 0.28, -0.07);
   P(H, gCyl(0.01, 0.01, 0.24, 6), BZ, 0, HEAD.y + 0.3, -0.07, { r: [0, 0, PI / 2], d: 1 });
   P(H, gCone(0.04, 0.09, 8), HR, 0, 0.04, 0.19, { r: [PI - 0.35, 0, 0] });
-  // bamboo rain hat as the hood
-  P(rig.hood, gLathe([[0.004, 0.065], [0.47, 0.0], [0.485, 0.012], [0.3, 0.1], [0.0, 0.21]], 26), ST, 0, 0.47, -0.01, { r: [-0.12, 0, 0] });
-  P(rig.hood, gCyl(0.16, 0.2, 0.05, 20), SURF.cloth('#7a1c1a'), 0, 0.55, -0.02, { r: [-0.12, 0, 0], d: 1 });
+  // a jade-green lion-dance head (the bamboo rain hat is still there as a custom hat)
+  lionDanceHead(rig, { key: 'steve', shell: '#1e5e48', paint: '#d9b25a', fur: '#3b9460', brow: '#f2ead2', trim: '#b8862e', beard: '#1c140e', iris: '#c8302a', lining: '#13261f', body: '#c9a24a' });
   // ---- tools (hand pivots and their weapons) ----
   rig.hand = piv(rig.armR, 0, -0.66, 0.04);
   rig.sword = piv(rig.hand); rig.sword.visible = false;
@@ -2711,8 +2838,8 @@ function buildSteve(B) {
 
 // ---- Shark: river-demon brute ----
 // Slate scales and a pale ridged belly, a rusted bronze pauldron and chain, rope belt with bone charms and a
-// tattered loincloth, a dorsal fin; the head is a shark-skull demon helm with burning eyes and bone horns,
-// the lower jaw (jaw) snaps open for bites, and the finned tail (tail) swings behind.
+// tattered loincloth, a dorsal fin; the head is a black lion-dance head with burning eyes, bone fangs and horns,
+// its lower jaw (jaw) snaps open for bites, and the finned tail (tail) swings behind.
 const EYE = { c: '#ffc070', e: '#ff8a1a' };
 function buildShark(B) {
   const S = sp('#4b6273', 0.42, 0, 3), SD = sp('#34444f', 0.4, 0, 3), BL = SURF.lamel('#b4ad95'), BZ = SURF.bronze('#6e4c25'), BN = SURF.bone('#d4c6a2');
@@ -2752,35 +2879,18 @@ function buildShark(B) {
   P(tip, gLathe([[0, -0.02], [0.095, 0.04], [0.07, 0.3], [0.04, 0.4], [0, 0.42]], 12), S, 0, 0, 0, { r: [-PI / 2, 0, 0], s: [1, 1, 0.85] });
   P(tip, gExt('caudal', [[0, 0], [0.12, 0.12, 0.3, 0.36], [0.12, 0.04], [0.28, -0.2, 0.22, -0.24], [0, 0]], 0.03, 0.01), SD, 0, 0.02, -0.36, { r: [0, PI / 2, 0] });
   P(tip, gExt('tailfin', [[0, 0], [0.2, 0], [0.04, 0.14], [0, 0]], 0.02), SD, 0, 0.07, -0.05, { r: [0, PI / 2, 0], d: 1 });
-  // ---- shark-skull demon helm (rig.hood) ----
+  // ---- a black river-demon lion-dance head (rig.hood): slate lacquer, ink fur, white brows, blood-red paint,
+  // bone shark's teeth and two bone horns; its lower jaw is the bite jaw (rig.jaw) and its eyes burn ----
+  rig.jaw = piv(rig.hood, 0, 0.2, -0.05);
+  lionDanceHead(rig, { key: 'shark', shell: '#2b3a46', paint: '#8e1a1c', fur: '#1c2128', brow: '#e8e2d2', trimS: BZ, beard: '#121014', iris: EYE.c, lining: '#3a1214', teeth: '#e2d6b4' }, { jaw: rig.jaw, eyes: true, body: false });
   const D = rig.hood;
-  const sn = gSph(1, 26, 16, 0, TAU, 0, 1.75);
-  P(D, sn, S, 0, 0.42, 0.06, { s: [0.31, 0.26, 0.42] }); P(D, gFlip(sn), FL, 0, 0.42, 0.06, { s: [0.3, 0.25, 0.41] });
-  const bk = gSph(0.3, 22, 8, PI / 2 + 1.0, TAU - 2.0, 1.5, 0.85);
-  P(D, bk, S, 0, 0.34, -0.02, { s: [1.02, 1, 1.05] }); P(D, gFlip(bk), FL, 0, 0.34, -0.02, { s: [0.99, 0.97, 1.02] });
-  P(D, gSph(1, 16, 10), BL, 0, 0.395, 0.1, { s: [0.27, 0.035, 0.37] });   // pale underside of the snout
-  for (let i = -4; i <= 4; i++) {   // upper teeth along the snout's edge
-    const a = i * 0.17;
-    P(D, gCone(0.024, 0.08, 5), BN, Math.sin(a) * 0.27, 0.36, 0.06 + Math.cos(a) * 0.37, { r: [PI, 0, 0] });
-  }
-  for (const s of [1, -1]) {
-    for (let k = 0; k < 3; k++) P(D, gBox(0.012, 0.09, 0.016), CL, s * 0.3, 0.42, 0.02 - k * 0.05, { r: [0, s * 0.2, 0], d: 1 });   // gills
-    P(D, gTube('horn' + s, [[s * 0.12, 0.6, 0.02], [s * 0.2, 0.74, -0.06], [s * 0.3, 0.84, -0.22], [s * 0.36, 0.86, -0.36]], 0.045, 0.008, 10, 6), BN);
-    P(D, gBox(0.008, 0.012, 0.05), CL, s * 0.06, 0.46, 0.455, { r: [0.3, s * 0.5, 0], d: 1 });   // nostril slits
-  }
-  P(D, gExt('crest', [[0, 0], [0.35, 0], [0.02, 0.16, -0.04, 0.2], [0, 0]], 0.03), SD, 0, 0.64, 0.12, { r: [0, PI / 2, 0], d: 1 });
-  // burning eyes (own material: the ult turns them blood red)
+  for (const s of [1, -1]) P(D, gTube('ldhorn' + s, [[s * 0.2, 0.8, -0.02], [s * 0.27, 0.92, -0.1], [s * 0.34, 1.0, -0.24], [s * 0.37, 1.01, -0.36]], 0.04, 0.007, 10, 6), BN);
+  for (let i = -2; i <= 2; i++) { const a = i * 0.32; P(D, gCone(0.028, 0.11, 5), BN, Math.sin(a) * 0.32, 0.365, 0.05 + Math.cos(a) * 0.32, { r: [PI, 0, 0] }); }   // shark's fangs
+  // burning eyes (own material: the ult turns them blood red), set into the lion's eye rings
   const em = new THREE.MeshStandardMaterial({ color: EYE.c, emissive: EYE.e, emissiveIntensity: 1.6, roughness: 0.3 });
-  const eg = gSph(1, 10, 8);
-  const eyes = new THREE.Mesh(concatGeo('sharkeyes', [[eg, new THREE.Matrix4().makeScale(0.03, 0.036, 0.03).setPosition(0.262, 0.47, 0.25)], [eg, new THREE.Matrix4().makeScale(0.03, 0.036, 0.03).setPosition(-0.262, 0.47, 0.25)]]), em);
-  D.add(eyes); rig.eyes = [eyes];
-  rig.jaw = piv(D, 0, 0.02, -0.15);
-  const jw = gSph(1, 20, 10, 0, TAU, PI / 2, PI / 2);
-  P(rig.jaw, jw, S, 0, 0.04, 0.3, { s: [0.27, 0.11, 0.37] }); P(rig.jaw, gFlip(jw), FL, 0, 0.045, 0.3, { s: [0.26, 0.1, 0.36] });
-  for (let i = -3; i <= 3; i++) {
-    const a = i * 0.2;
-    P(rig.jaw, gCone(0.022, 0.07, 5), BN, Math.sin(a) * 0.24, 0.07, 0.3 + Math.cos(a) * 0.33);
-  }
+  const eg = gSph(1, 12, 8), eye = (s) => { const [x, y, z] = rig.ldEye(s, 0, 0, 0.046); return new THREE.Matrix4().makeRotationY(s * 0.32).scale(new V3(0.05, 0.05, 0.03)).setPosition(x, y, z); };
+  const eyes = new THREE.Mesh(concatGeo('ldsharkeyes', [[eg, eye(1)], [eg, eye(-1)]]), em);
+  eyes.userData.noShadow = true; D.add(eyes); rig.eyes = [eyes];
   return rig;
 }
 
@@ -2794,6 +2904,8 @@ function buildDummy(B) {
   P(T, gSph(1, 14, 10), RP, 0, 0.5, 0.11, { s: [0.24, 0.22, 0.14] });
   P(T, gPlate(0.2, 0.26, 0.012, 0.6, 1), PA, 0, 0.5, 0.26); P(T, gCyl(0.06, 0.06, 0.012, 16), RD, 0, 0.52, 0.268, { r: [PI / 2, 0, 0] });
   for (const L of [rig.legL, rig.legR]) P(L, gTor(0.12, 0.018, 5, 14), RP, 0, -0.4, 0, { r: [PI / 2, 0, 0] });
+  // an unpainted practice lion head: raw paper over a bamboo frame, raffia fur, a red-lacquer nose
+  lionDanceHead(rig, { key: 'dummy', shell: '#d8c79c', paint: '#c9b483', fur: '#a88a52', brow: '#c8ae74', trimS: SURF.wood('#5d3f22'), beard: '#a88a52', iris: '#3a2a1a', lining: '#5d3f22', noseS: RD });
   return rig;
 }
 
@@ -2899,7 +3011,7 @@ function avatarParts(av) {
   return [own(HATS, h) ? h : 'auto', own(BACKS, b) ? b : 'none', own(FACES_UI, fc) ? fc : 'auto'];
 }
 function avatarOf() { const a = SETTINGS.avatar || {}; return [own(HATS, a.hat) ? a.hat : 'auto', own(BACKS, a.back) ? a.back : 'none', own(FACES_UI, a.face) ? a.face : 'auto'].join('|'); }
-const BOT_HATS = ['auto', 'auto', 'auto', 'auto', 'valk', 'ninja', 'crown', 'cap', 'tophat', 'horns'];
+const BOT_HATS = ['auto'];   // bots always wear their own headgear: the lion helm or their lion-dance head
 const BOT_BACKS = ['none', 'none', 'none', 'katana', 'flags', 'gourd', 'wings'];
 function botAvatar() { return BOT_HATS[(Math.random() * BOT_HATS.length) | 0] + '|' + BOT_BACKS[(Math.random() * BOT_BACKS.length) | 0] + '|auto'; }
 const under = (o, top) => { for (; o; o = o.parent) if (o === top) return true; return false; };
@@ -2937,8 +3049,8 @@ const kcOf = (v) => (typeof v === 'number' && Number.isInteger(v) && v > 0 ? Mat
 // the Black form's horns (a path for the left one; null: the character has its own)
 const TFIT = {
   lion: { belt: 0.17, sh: [0.205, 0.205], shy: 0.72, drop: 0.5, halo: [0.37, -0.5, 0.45], horns: [[0.17, 0.69, -0.17], [0.27, 0.88, -0.3], [0.31, 1.0, -0.5]] },
-  penguin: { belt: 0.2, sh: [0.19, 0.19], shy: 0.72, drop: 0.48, halo: [0.36, -0.52, 0.45], horns: [[0.25, 0.48, 0.0], [0.36, 0.64, -0.1], [0.37, 0.8, -0.3]] },
-  steve: { belt: 0.19, sh: [0.165, 0.165], shy: 0.85, drop: 0.5, halo: [0.38, -0.58, 0.46], horns: [[0.22, 0.6, -0.05], [0.33, 0.78, -0.13], [0.35, 0.92, -0.32]] },
+  penguin: { belt: 0.2, sh: [0.19, 0.19], shy: 0.72, drop: 0.48, halo: [0.36, -0.52, 0.45], horns: [[0.22, 0.78, -0.05], [0.33, 0.95, -0.15], [0.38, 1.08, -0.35]] },
+  steve: { belt: 0.19, sh: [0.165, 0.165], shy: 0.85, drop: 0.5, halo: [0.38, -0.58, 0.46], horns: [[0.22, 0.78, -0.05], [0.33, 0.95, -0.15], [0.38, 1.08, -0.35]] },
   shark: { belt: 0.2, sh: [0.235, 0.18], shy: 0.75, drop: 0.52, halo: [0.4, -0.5, 0.47], horns: null },
 };
 const TRO_CACHE = new Map();
