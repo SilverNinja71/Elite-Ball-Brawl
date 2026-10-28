@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- fonts load without blocking the first paint; Ma Shan Zheng only ships the two glyphs the game uses (阿娟) -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&text=%E9%98%BF%E5%A8%9F&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&text=%E9%98%BF%E5%A8%9F%E8%B6%85%E5%87%A1%E9%BB%91&display=swap" media="print" onload="this.media='all'">
 <style>
 /* Layout: full-bleed live arena. Roblox-style glass buttons top-left, room panel top-right, TSB hotbar stack bottom-center. Single dark-glass look by design. */
 :root{
@@ -110,6 +110,24 @@ button:focus-visible,input:focus-visible{outline:2px solid #fff;outline-offset:2
 .bar.guard.broke{border-color:#ff6a5a}
 .bar.evade i{background:linear-gradient(90deg,#8a5cff,#e3d6ff)}
 .bar.evade.ready{border-color:rgba(227,214,255,.85);box-shadow:0 0 6px rgba(160,120,255,.6)}
+.kc{position:relative;height:13px;border-radius:3px;overflow:hidden;background:rgba(0,0,0,.55);border:1px solid var(--line)}
+.kc i{position:absolute;inset:0;transform-origin:left center;transform:scaleX(0);background:linear-gradient(90deg,#4a2a18,#b88a4a 70%,#e8d4a4)}
+.kc b{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;padding:0 6px;font-size:9px;font-weight:800;letter-spacing:.06em;text-shadow:0 1px 2px #000;font-variant-numeric:tabular-nums}
+.kc b span+span{color:#e6dccb;font-weight:700}
+.kc.black{border-color:rgba(255,120,50,.55)}
+.kc.black i{background:linear-gradient(90deg,#160806,#7a1a08 55%,#ff7a2a)}
+.kc.trans{border-color:rgba(255,214,130,.85);box-shadow:0 0 8px rgba(255,190,90,.45)}
+.kc.trans i{background:linear-gradient(90deg,#7a4a10,#ffd27a 60%,#fff2c8)}
+#trans{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;opacity:0;transition:opacity .6s;z-index:8;
+  background:radial-gradient(ellipse at 50% 45%,rgba(255,214,140,.0) 0,rgba(255,200,120,.08) 30%,rgba(20,10,4,.55) 75%,rgba(8,4,2,.85) 100%)}
+#trans.on{opacity:1}
+#trans .tc{display:grid;justify-items:center;gap:6px;text-align:center;padding:0 16px;transform:scale(.92);transition:transform 1.4s cubic-bezier(.2,.8,.2,1)}
+#trans.on .tc{transform:scale(1)}
+#trans .tg{font-family:var(--brush);font-size:min(150px,30vw);line-height:1;color:#ffe2a6;text-shadow:0 0 18px rgba(255,170,60,.85),0 0 60px rgba(255,120,30,.55),0 4px 0 #3a1a06}
+#trans strong{font-size:min(44px,9vw);font-weight:800;letter-spacing:.32em;text-transform:uppercase;color:#fff4dc;text-shadow:0 0 14px rgba(255,180,80,.8),0 3px 0 #000;padding-left:.32em}
+#trans small{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#f0d8a8;text-shadow:0 1px 3px #000}
+#trans .sbtn{margin-top:14px;pointer-events:auto}
+@media (prefers-reduced-motion:reduce){#trans .tc{transition:none;transform:none}}
 .hp{position:relative;height:22px;border-radius:4px;overflow:hidden;background:rgba(0,0,0,.55);border:1px solid var(--line)}
 .hp i{position:absolute;inset:0;transform-origin:left center}
 .hp .lag{background:#fff;opacity:.4}
@@ -370,6 +388,10 @@ body.touch .mini{height:52px}
     </div>
   </div>
 
+  <div id="trans" role="dialog" aria-label="Transcended" hidden>
+    <div class="tc"><span class="tg" lang="zh">超凡</span><strong>Transcended</strong><small>1000 K.O.s · a realm beyond the park awaits</small>
+      <button type="button" class="sbtn pri" id="transGo">Continue</button></div>
+  </div>
   <div id="speedFx" aria-hidden="true"></div>
   <div id="hitFlash" aria-hidden="true"></div>
   <div id="emoteWheel" role="menu" aria-label="Emotes" hidden><div class="mid">Emotes<br>B / tap</div></div>
@@ -390,6 +412,7 @@ body.touch .mini{height:52px}
       <div class="mini" id="qMini" title="Front dash: a gap closer"><i class="cd"></i><span class="k">Q</span><span class="l">FRONT</span><span class="t"></span></div>
       <div class="mini" id="sMini" title="Side / back dash"><i class="cd"></i><span class="k">Q</span><span class="l">SIDE</span><span class="t"></span></div>
       <div class="hpcol">
+        <div class="kc" id="killBar" title="Your K.O.s: each one adds a skull to your warrior; 50 unlock the Black form, 1000 transcend"><i id="killFill"></i><b><span id="killN">☠ 0 K.O.s</span><span id="killNext"></span></b></div>
         <div class="hp"><i class="lag" id="hpLag"></i><i class="fill" id="hpFill"></i><b><span class="nm" id="hpName">You</span><span id="hpTxt">100</span></b></div>
         <div class="bars">
           <div class="bar guard" id="guardBar" title="Guard: blocked M1 −20, blocked move −35, breaks at 0"><i id="guardFill"></i><b>GUARD</b></div>
@@ -415,6 +438,8 @@ body.touch .mini{height:52px}
     <label class="opt"><span>Hat</span><select id="optHat"></select></label>
     <label class="opt"><span>On your back</span><select id="optBack"></select></label>
     <label class="opt"><span>Face</span><select id="optFace"></select></label>
+    <label class="opt"><span>Form</span><select id="optForm"><option value="black">Black form</option><option value="normal">Normal</option></select></label>
+    <p class="note" id="formNote"></p>
     <label class="opt"><span>Graphics</span><select id="optGfx"><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
     <p class="note" id="gfxNote"></p>
     <label class="opt"><span>Bot difficulty (hosted servers)</span><select id="optBots"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></label>
@@ -1961,16 +1986,42 @@ const MYTH_U = {
   uDetailMap: { value: DETAIL.tex }, uDetail: { value: GFX.level === 'low' ? 0 : 1 }, uTime: RIG_U.uTime,
   uRimDir: { value: new V3(0, 1, 0) }, uRimCol: { value: new THREE.Color(1.0, 0.62, 0.32).multiplyScalar(0.55) },
 };
+// Black form (50 K.O.s), shared by the High and Medium body shaders: lacquer black over everything that is not
+// metal, metal turns to molten gold, trims glow like embers and ember veins pulse through the lacquer.
+// uBlack is the fighter's own 0..1 uniform (it ramps during the transformation); 0 costs one uniform branch.
+const MYTH_BLACK_GLSL = `
+const vec3 BLACK_RIM = vec3(0.95, 0.24, 0.05);
+const vec3 BLACK_EMBER = vec3(1.0, 0.32, 0.06);
+vec3 mythBlack(vec3 c, float metal) {
+  float lum = dot(c, vec3(0.3, 0.59, 0.11));
+  vec3 lacquer = vec3(0.009, 0.008, 0.01) + lum * vec3(0.035, 0.028, 0.028);
+  vec3 gold = vec3(0.62, 0.3, 0.07) * (0.55 + lum * 0.8);
+  return mix(c, metal > 0.5 ? gold : lacquer, uBlack);
+}
+float bHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float bNoise(vec3 x) {
+  vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(bHash(i), bHash(i + vec3(1, 0, 0)), f.x), mix(bHash(i + vec3(0, 1, 0)), bHash(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(bHash(i + vec3(0, 0, 1)), bHash(i + vec3(1, 0, 1)), f.x), mix(bHash(i + vec3(0, 1, 1)), bHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+vec3 mythEmber(vec2 uv, vec3 rest, vec4 m) {
+  // thin cracks: one contour line of a smooth noise in the part's own space, wandering like fissures in cooling lava
+  float v = bNoise(rest * 8.0) * 0.68 + bNoise(rest * 17.0 + 3.1) * 0.32;
+  float vein = (1.0 - smoothstep(0.0, 0.028, abs(v - 0.5))) * (1.0 - m.y);
+  float pulse = 0.55 + 0.45 * sin(uTime * 2.6 + rest.y * 9.0 + rest.x * 5.0);
+  return BLACK_EMBER * vein * pulse * 1.6 + vec3(1.0, 0.55, 0.15) * m.w * (0.9 + 0.3 * sin(uTime * 2.4)) * 1.2;
+}`;
 // One onBeforeCompile for every fighter's body material (same source = one shader program for all of them);
 // `this` is the material, whose userData carries that fighter's own awaken uniform.
 function mythOBC(sh) {
-  Object.assign(sh.uniforms, MYTH_U); sh.uniforms.uAwake = this.userData.uAwake;
+  Object.assign(sh.uniforms, MYTH_U); sh.uniforms.uAwake = this.userData.uAwake; sh.uniforms.uBlack = this.userData.uBlack;
   sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 mat;\nattribute float emi;\nvarying vec4 vMat;\nvarying float vEmi;\nvarying vec3 vRest;\nvarying vec3 vRestN;')
     .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMat = mat; vEmi = emi; vRest = position; vRestN = normal;');
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-uniform sampler2D uDetailMap; uniform float uDetail; uniform float uAwake; uniform float uTime; uniform vec3 uRimDir; uniform vec3 uRimCol;
+uniform sampler2D uDetailMap; uniform float uDetail; uniform float uAwake; uniform float uTime; uniform vec3 uRimDir; uniform vec3 uRimCol; uniform float uBlack;
 varying vec4 vMat; varying float vEmi; varying vec3 vRest; varying vec3 vRestN;
-float mythH;
+float mythH; vec2 mythUV;
+${MYTH_BLACK_GLSL}
 vec3 mythBump(vec3 sp, vec3 sn, vec2 dh) {
   vec3 sx = dFdx(sp), sy = dFdy(sp), r1 = cross(sy, sn), r2 = cross(sn, sx);
   float det = dot(sx, r1);
@@ -1985,10 +2036,11 @@ vec3 mythBump(vec3 sp, vec3 sn, vec2 dh) {
     float sc = p < 1.5 ? 1.8 : (p < 2.5 ? 4.0 : (p < 3.5 ? 2.2 : 1.7));
     vec4 t = texture2D(uDetailMap, uv * sc);
     float h = p < 0.5 ? 0.5 : (p < 1.5 ? t.r : (p < 2.5 ? t.g : (p < 3.5 ? t.b : t.a)));
-    mythH = mix(0.5, h, uDetail);
+    mythH = mix(0.5, h, uDetail); mythUV = uv;
     diffuseColor.rgb *= 1.0 + (mythH - 0.5) * (p > 3.5 ? 0.55 : (p > 2.5 ? 0.3 : (p > 1.5 ? 0.16 : 0.22)));
+    if (uBlack > 0.0) diffuseColor.rgb = mythBlack(diffuseColor.rgb, vMat.y);
   }`)
-    .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = clamp(vMat.x + (0.5 - mythH) * 0.3, 0.05, 1.0);')
+    .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = clamp(mix(vMat.x, 0.34 + vMat.x * 0.2, uBlack) + (0.5 - mythH) * 0.3, 0.05, 1.0);')
     .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n  metalnessFactor = vMat.y;')
     .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
   normal = mythBump(-vViewPosition, normal, vec2(dFdx(mythH), dFdy(mythH)) * (vMat.z < 0.5 ? 0.0 : (vMat.z > 3.5 ? 0.007 : (vMat.z > 2.5 ? 0.003 : (vMat.z > 1.5 ? 0.0015 : 0.004)))));   // bump heights in world units`)
@@ -1996,51 +2048,60 @@ vec3 mythBump(vec3 sp, vec3 sn, vec2 dh) {
   {
     float fres = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);
     float side = clamp(dot(normal, uRimDir) * 0.7 + 0.45, 0.0, 1.0);
-    totalEmissiveRadiance += uRimCol * fres * side * (1.0 - 0.45 * vMat.y);
-    totalEmissiveRadiance += vColor * (vEmi * 1.4 + vMat.w * uAwake * (1.1 + 0.6 * sin(uTime * 7.0)));
+    totalEmissiveRadiance += mix(uRimCol, BLACK_RIM, uBlack) * fres * side * (1.0 - 0.45 * vMat.y);
+    totalEmissiveRadiance += mix(vColor, BLACK_EMBER, uBlack) * (vEmi * 1.4 + vMat.w * uAwake * (1.1 + 0.6 * sin(uTime * 7.0)));
+    if (uBlack > 0.0) totalEmissiveRadiance += mythEmber(mythUV, vRest, vMat) * uBlack;
   }`);
 }
-function mythMat(uAwake) {
+function mythMat(uAwake, uBlack) {
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, skinning: true, roughness: 1, metalness: 1, envMap: mythEnv(), envMapIntensity: 1 });
-  m.userData.uAwake = uAwake; m.onBeforeCompile = mythOBC; m.extensions = { derivatives: true };
+  m.userData.uAwake = uAwake; m.userData.uBlack = uBlack; m.onBeforeCompile = mythOBC; m.extensions = { derivatives: true };
   return m;
 }
 // Low: the same look lit per vertex (Lambert), no reflections or surface detail; metal is simply brighter
 function mythOBCLow(sh) {
-  sh.uniforms.uAwake = this.userData.uAwake; sh.uniforms.uTime = RIG_U.uTime;
-  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 mat;\nattribute float emi;\nvarying float vEmi;\nvarying float vNeon;')
-    .replace('#include <color_vertex>', '#include <color_vertex>\nvColor.xyz *= 1.0 + mat.y * 0.45; vEmi = emi; vNeon = mat.w;');
-  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uAwake;\nuniform float uTime;\nvarying float vEmi;\nvarying float vNeon;')
-    .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += vColor * (vEmi * 1.4 + vNeon * uAwake * (1.1 + 0.6 * sin(uTime * 7.0)));');
+  sh.uniforms.uAwake = this.userData.uAwake; sh.uniforms.uTime = RIG_U.uTime; sh.uniforms.uBlack = this.userData.uBlack;
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 mat;\nattribute float emi;\nuniform float uBlack;\nvarying float vEmi;\nvarying float vNeon;\nvarying vec3 vEmc;')
+    .replace('#include <color_vertex>', `#include <color_vertex>
+vColor.xyz *= 1.0 + mat.y * 0.45; vEmi = emi; vNeon = mat.w; vEmc = vColor.xyz;
+if (uBlack > 0.0) {   // Black form, per vertex: lacquer black, molten-gold metal, ember glow on trim and glowing parts
+  float lum = dot(vColor.xyz, vec3(0.3, 0.59, 0.11));
+  vColor.xyz = mix(vColor.xyz, mat.y > 0.5 ? vec3(0.5, 0.24, 0.05) * (0.5 + lum * 0.7) : vec3(0.02, 0.018, 0.02) + lum * vec3(0.06, 0.045, 0.045), uBlack);
+  vEmc = mix(vEmc, vec3(1.0, 0.3, 0.05), uBlack);
+}`);
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uAwake;\nuniform float uTime;\nuniform float uBlack;\nvarying float vEmi;\nvarying float vNeon;\nvarying vec3 vEmc;')
+    .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += vEmc * (vEmi * 1.4 + vNeon * (uAwake * (1.1 + 0.6 * sin(uTime * 7.0)) + uBlack * (0.9 + 0.3 * sin(uTime * 2.4))));');
 }
-function mythMatLow(uAwake) {
+function mythMatLow(uAwake, uBlack) {
   const m = new THREE.MeshLambertMaterial({ vertexColors: true, skinning: true });
-  m.userData.uAwake = uAwake; m.onBeforeCompile = mythOBCLow;
+  m.userData.uAwake = uAwake; m.userData.uBlack = uBlack; m.onBeforeCompile = mythOBCLow;
   return m;
 }
 // Medium (phones by default): per-pixel Blinn-Phong instead of PBR. Roughness and metalness still come from the
 // vertices (shininess and specular colour), metal gets a cheap sky / ground sheen in place of reflections, and
 // the detail patterns and the warm rim stay. About as cheap to shade as Lambert, far cheaper than the PBR + env.
 function mythOBCMid(sh) {
-  Object.assign(sh.uniforms, MYTH_U); sh.uniforms.uAwake = this.userData.uAwake;
+  Object.assign(sh.uniforms, MYTH_U); sh.uniforms.uAwake = this.userData.uAwake; sh.uniforms.uBlack = this.userData.uBlack;
   sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 mat;\nattribute float emi;\nvarying vec4 vMat;\nvarying float vEmi;\nvarying vec3 vRest;\nvarying vec3 vRestN;')
     .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMat = mat; vEmi = emi; vRest = position; vRestN = normal;');
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-uniform sampler2D uDetailMap; uniform float uAwake; uniform float uTime; uniform vec3 uRimDir; uniform vec3 uRimCol;
+uniform sampler2D uDetailMap; uniform float uAwake; uniform float uTime; uniform vec3 uRimDir; uniform vec3 uRimCol; uniform float uBlack;
 varying vec4 vMat; varying float vEmi; varying vec3 vRest; varying vec3 vRestN;
-float mythH;`)
+float mythH; vec2 mythUV;
+` + MYTH_BLACK_GLSL)
     .replace('#include <color_fragment>', `#include <color_fragment>
   {
     vec3 an = abs(vRestN); float p = vMat.z;
     vec2 uv = an.x > an.y && an.x > an.z ? vRest.zy : (an.y > an.z ? vRest.xz : vRest.xy);
     float sc = p < 1.5 ? 1.8 : (p < 2.5 ? 4.0 : (p < 3.5 ? 2.2 : 1.7));
     vec4 t = texture2D(uDetailMap, uv * sc);
-    mythH = p < 0.5 ? 0.5 : (p < 1.5 ? t.r : (p < 2.5 ? t.g : (p < 3.5 ? t.b : t.a)));
+    mythH = p < 0.5 ? 0.5 : (p < 1.5 ? t.r : (p < 2.5 ? t.g : (p < 3.5 ? t.b : t.a))); mythUV = uv;
     diffuseColor.rgb *= 1.0 + (mythH - 0.5) * (p > 3.5 ? 0.55 : (p > 2.5 ? 0.3 : (p > 1.5 ? 0.16 : 0.22)));
+    if (uBlack > 0.0) diffuseColor.rgb = mythBlack(diffuseColor.rgb, vMat.y);
   }`)
     .replace('#include <lights_phong_fragment>', `#include <lights_phong_fragment>
   {
-    float rough = clamp(vMat.x + (0.5 - mythH) * 0.3, 0.05, 1.0), metal = vMat.y;
+    float rough = clamp(mix(vMat.x, 0.34 + vMat.x * 0.2, uBlack) + (0.5 - mythH) * 0.3, 0.05, 1.0), metal = vMat.y;
     material.diffuseColor = diffuseColor.rgb * (1.0 - metal * 0.75);
     material.specularColor = mix(vec3(0.04), diffuseColor.rgb * 1.6, metal) * (1.0 - rough * 0.7);
     material.specularShininess = mix(90.0, 6.0, rough);
@@ -2049,22 +2110,24 @@ float mythH;`)
   {
     float fres = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);
     float side = clamp(dot(normal, uRimDir) * 0.7 + 0.45, 0.0, 1.0);
-    totalEmissiveRadiance += uRimCol * fres * side * (1.0 - 0.45 * vMat.y);
+    totalEmissiveRadiance += mix(uRimCol, BLACK_RIM, uBlack) * fres * side * (1.0 - 0.45 * vMat.y);
     totalEmissiveRadiance += diffuseColor.rgb * vMat.y * (0.22 + 0.2 * normal.y) * (1.0 - vMat.x * 0.5);
-    totalEmissiveRadiance += vColor * (vEmi * 1.4 + vMat.w * uAwake * (1.1 + 0.6 * sin(uTime * 7.0)));
+    totalEmissiveRadiance += mix(vColor, BLACK_EMBER, uBlack) * (vEmi * 1.4 + vMat.w * uAwake * (1.1 + 0.6 * sin(uTime * 7.0)));
+    if (uBlack > 0.0) totalEmissiveRadiance += mythEmber(mythUV, vRest, vMat) * uBlack;
   }`);
 }
-function mythMatMid(uAwake) {
+function mythMatMid(uAwake, uBlack) {
   const m = new THREE.MeshPhongMaterial({ vertexColors: true, skinning: true });
-  m.userData.uAwake = uAwake; m.onBeforeCompile = mythOBCMid;
+  m.userData.uAwake = uAwake; m.userData.uBlack = uBlack; m.onBeforeCompile = mythOBCMid;
   return m;
 }
 // a fighter's body material for the current level (all three share its awaken uniform)
 function fighterMat(f) {
   if (!f.uAwake) f.uAwake = { value: 0 };
-  if (GFX.level === 'low') return f.matLow || (f.matLow = mythMatLow(f.uAwake));
-  if (GFX.level === 'medium') return f.matMid || (f.matMid = mythMatMid(f.uAwake));
-  return f.matStd || (f.matStd = mythMat(f.uAwake));
+  if (!f.uBlack) f.uBlack = { value: 0 };
+  if (GFX.level === 'low') return f.matLow || (f.matLow = mythMatLow(f.uAwake, f.uBlack));
+  if (GFX.level === 'medium') return f.matMid || (f.matMid = mythMatMid(f.uAwake, f.uBlack));
+  return f.matStd || (f.matStd = mythMat(f.uAwake, f.uBlack));
 }
 // fur shells: copies of a base surface pushed out along their normals, each cut away by the strand texture
 // a little more than the last; all shells are one geometry and one draw call, no shadow
@@ -2129,18 +2192,21 @@ function restMatrix(o, body, out) {
   }
   return out;
 }
-function bakeGeometry(parts, holders, body) {
+function bakeGeometry(parts, holders, body, keep) {
   // parts: [mesh, boneIndex]; the mesh's own matrix maps it into its pivot (= bone) space
+  // keep: bake in the given order and record where each part's userData.slot starts (kill trophies)
   let nv = 0, ni = 0, nd = 0;
+  const marks = [];
   for (const [m] of parts) { const g = m.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
   const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), col = new Float32Array(nv * 3), mat = new Float32Array(nv * 4), emi = new Float32Array(nv);
   const si = new Uint16Array(nv * 4), sw = new Float32Array(nv * 4), idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
   // detail parts go last in the index buffer so Low can simply draw less of it; within each group the parts
   // built last (armour, trims: usually on top) are drawn first, so the body under them fails the depth test early
-  const order = parts.filter((p) => !p[0].userData.detail).reverse().concat(parts.filter((p) => p[0].userData.detail).reverse());
+  const order = keep ? parts : parts.filter((p) => !p[0].userData.detail).reverse().concat(parts.filter((p) => p[0].userData.detail).reverse());
   let vo = 0, io = 0, lodCount = 0;
   for (const [m, bi] of order) {
-    if (m.userData.detail && !nd) { lodCount = io; nd = 1; }
+    if (keep) { const s = m.userData.slot; if (s !== undefined && !marks[s]) marks[s] = [vo, io]; }
+    else if (m.userData.detail && !nd) { lodCount = io; nd = 1; }
     m.updateMatrix(); _bm.getNormalMatrix(m.matrix);
     const rest = restMatrix(holders[bi], body, _rm).multiply(m.matrix), rn = new THREE.Matrix3().getNormalMatrix(rest), bp = new V3(), bn = new V3();
     const g = m.geometry, Pp = g.attributes.position, N = g.attributes.normal, s = m.userData.spec, c = s.c, flip = m.matrix.determinant() < 0;
@@ -2173,6 +2239,7 @@ function bakeGeometry(parts, holders, body) {
   // vertices are in pivot space, so the real bounds are only known per pose: a generous sphere round the body
   geo.boundingSphere = new THREE.Sphere(new V3(0, 1, 0), 2.8);
   geo.userData.lodCount = lodCount; geo.userData.full = io;
+  if (keep) { geo.userData.marks = marks; geo.userData.end = [vo, io]; return geo; }
   lodRange(geo);
   return geo;
 }
@@ -2207,6 +2274,7 @@ function skinBake(f) {
   mesh.bind(sk, new THREE.Matrix4());
   mesh.castShadow = true; mesh.receiveShadow = GFX.level === 'high'; mesh.layers.mask = f.body.layers.mask;
   f.body.add(mesh); f.skin = mesh;
+  if (f.tro) trophyMesh(f);   // a new skeleton: the trophies follow it
 }
 // every drawn frame: hide the bones of hidden pivots, swing the cloth, keep fur in step with the level
 const _cv = new V3();
@@ -2251,6 +2319,7 @@ function mythGfx() {
   for (const f of fighters) {
     if (f.skin && !SHARED.has(f.skin.geometry)) lodRange(f.skin.geometry);
     if (f.skin) { f.skin.material = fighterMat(f); f.skin.receiveShadow = GFX.level === 'high'; }
+    if (f.tro && f.tro.mesh) { f.tro.mesh.material = fighterMat(f); f.tro.mesh.receiveShadow = GFX.level === 'high'; }
     if (f.rig.fur) for (const m of f.rig.fur) m.visible = GFX.level !== 'low';
   }
 }
@@ -2283,6 +2352,8 @@ function mythBody(B, o) {
     for (let i = 1; i < p.length; i++) if (y <= p[i][1]) { r = lerp(p[i - 1][0], p[i][0], (y - p[i - 1][1]) / (p[i][1] - p[i - 1][1])); break; }
     const rx = r * (o.tw || 1); return (o.td || 0.64) * r * Math.sqrt(Math.max(0, 1 - (x / rx) ** 2));
   };
+  // the torso's half-width (x) and half-depth (z) at height y (kill trophies hang round it)
+  rig.trad = (y) => { const z = rig.tz(y, 0); return [z / (o.td || 0.64) * (o.tw || 1), z]; };
   // a path over the torso: [x, y, side (1 front, -1 back, 0 = explicit z), z] -> points just proud of the surface and their normals
   rig.tpath = (list, lift = 0.012) => {
     const td = o.td || 0.64, tw = o.tw || 1, pts = [], nrm = [];
@@ -2845,6 +2916,395 @@ function applyAvatar(f, av) {
   if (f.skin) skinBake(f);
 }
 
+// =====================================================================
+// kill trophies: carved skulls that pile up with every K.O. (cosmetic only)
+// =====================================================================
+// 1-12 a prayer-bead necklace, 13-24 skulls hung round the belt, 25-36 gilded skulls on the shoulders,
+// 37-49 a gold aureole of skulls behind the head. 50 K.O.s unlock the Black form (obsidian lacquer, molten
+// gold, ember veins), 1000 transcend. Every skull of a fighter is ONE skinned mesh on the fighter's own
+// skeleton (the same bones as its body), so ragdolls and every animation carry them for one draw call.
+// The full set is baked once per character / detail level into plain arrays (never drawn itself); each
+// fighter draws a copy of the first n skulls (plus the Black form's horns and spikes when it wears it).
+const KILL = { black: 50, trans: 1000, max: 100000, skulls: 49 };
+const kcOf = (v) => (typeof v === 'number' && Number.isInteger(v) && v > 0 ? Math.min(v, KILL.max) : 0);
+// where the trophies sit on each warrior (torso / arm / head pivot space): belt height, shoulder-guard radii
+// (left, right) and their height squash, the necklace's lowest point, the aureole (centre y, z, radius) and
+// the Black form's horns (a path for the left one; null: the character has its own)
+const TFIT = {
+  lion: { belt: 0.17, sh: [0.205, 0.205], shy: 0.72, drop: 0.5, halo: [0.37, -0.5, 0.45], horns: [[0.17, 0.69, -0.17], [0.27, 0.88, -0.3], [0.31, 1.0, -0.5]] },
+  penguin: { belt: 0.2, sh: [0.19, 0.19], shy: 0.72, drop: 0.48, halo: [0.36, -0.52, 0.45], horns: [[0.25, 0.48, 0.0], [0.36, 0.64, -0.1], [0.37, 0.8, -0.3]] },
+  steve: { belt: 0.19, sh: [0.165, 0.165], shy: 0.85, drop: 0.5, halo: [0.38, -0.58, 0.46], horns: [[0.22, 0.6, -0.05], [0.33, 0.78, -0.13], [0.35, 0.92, -0.32]] },
+  shark: { belt: 0.2, sh: [0.235, 0.18], shy: 0.75, drop: 0.52, halo: [0.4, -0.5, 0.47], horns: null },
+};
+const TRO_CACHE = new Map();
+// one carved skull, unit size, facing +z: [geometry, surface key, matrix]
+function skullParts() {
+  const B = (x, y, z, sx, sy, sz) => new THREE.Matrix4().makeScale(sx, sy, sz).setPosition(x, y, z);
+  const L = [
+    [gSph(1, 8, 6), 'b', B(0, 0.1, -0.03, 0.48, 0.45, 0.5)],        // cranium
+    [gSph(1, 6, 4), 'b', B(0, -0.12, 0.13, 0.36, 0.28, 0.34)],      // cheekbones
+    [gSph(1, 6, 4), 'b', B(0, -0.33, 0.1, 0.27, 0.13, 0.28)],       // jaw
+    [gIco(1), 'd', B(0.16, -0.05, 0.41, 0.12, 0.11, 0.07)],         // eye sockets
+    [gIco(1), 'd', B(-0.16, -0.05, 0.41, 0.12, 0.11, 0.07)],
+  ];
+  if (!LOWB) L.push([gIco(1), 'd', B(0, -0.19, 0.44, 0.055, 0.075, 0.05)], [gBox(1, 1, 1), 't', B(0, -0.27, 0.38, 0.3, 0.07, 0.05)]);   // nose, teeth
+  return L;
+}
+const _sm = new THREE.Matrix4(), _skx = new V3(), _sky = new V3(), _skz = new V3();
+// place a skull on `holder` at p, its face looking along `face`, its crown towards `up`
+function skullAt(holder, list, slot, p, face, up, size, S) {
+  _skz.copy(face).normalize(); _skx.crossVectors(up, _skz); if (_skx.lengthSq() < 1e-6) _skx.set(1, 0, 0); _skx.normalize(); _sky.crossVectors(_skz, _skx);
+  _sm.makeBasis(_skx, _sky, _skz).scale(_sky.set(size, size, size)).setPosition(p);
+  for (const [g, k, m] of skullParts()) {
+    const mesh = P(holder, g, S[k]);
+    mesh.matrix.multiplyMatrices(_sm, m); mesh.matrix.decompose(mesh.position, mesh.quaternion, mesh.scale);
+    mesh.userData.slot = slot; list.push(mesh);
+  }
+}
+function tPart(holder, list, slot, geo, spec, x, y, z, o) { const m = P(holder, geo, spec, x, y, z, o); m.userData.slot = slot; list.push(m); return m; }
+function buildTrophies(rig, fit, list, ck) {
+  const BONE = { b: SURF.bone('#d9ccab'), d: sp('#160c08', 0.9, 0, 0, 0, 1), t: SURF.bone('#efe6cf') };
+  const OLD = { b: SURF.bone('#c4b28c'), d: BONE.d, t: BONE.t };
+  const GILT = { b: SURF.gold('#b08434'), d: BONE.d, t: SURF.gold('#d0a850') };   // the crowning skull of the aureole
+  const T = rig.torso, H = rig.head, UP = new V3(0, 1, 0);
+  let slot = 0;
+  // ---- 1-12: prayer-bead necklace (the cord and its red beads come with the first skull) ----
+  const [pp, nn] = rig.tpath([[0.17, 0.86, 0, -0.04], [0.21, 0.76, 1], [0.15, 0.62, 1], [0, fit.drop, 1], [-0.15, 0.62, 1], [-0.21, 0.76, 1], [-0.17, 0.86, 0, -0.04]], 0.014);
+  const cv = new THREE.CatmullRomCurve3(pp.map((p) => new V3(p[0], p[1], p[2]))), cn = new THREE.CatmullRomCurve3(nn.map((p) => new V3(p[0], p[1], p[2])));
+  tPart(T, list, 0, gTube('tronecklace' + ck, pp, 0.007, 0.007, 30, 4), SURF.leather('#2a1810'));
+  if (!LOWB) for (let i = 0; i <= 14; i++) { const p = cv.getPoint(0.12 + i * 0.054); tPart(T, list, 0, gIco(0.014), SURF.lacq(i % 3 ? '#8a1a14' : '#b8862e'), p.x, p.y, p.z); }
+  for (let k = 0; k < 12; k++) {
+    const t = 0.5 + (k % 2 ? -1 : 1) * (Math.floor(k / 2) * 2 + 1) * 0.031, p = cv.getPoint(t), n = cn.getPoint(t).normalize(), s = 0.078 - Math.floor(k / 2) * 0.0025;
+    skullAt(T, list, slot++, p.addScaledVector(n, s * 0.35), n, UP, s, BONE);
+  }
+  // ---- 13-24: skulls hung round the belt, front to back ----
+  const [bx, bz] = rig.trad(fit.belt);
+  for (let k = 0; k < 12; k++) {
+    const a = (k % 2 ? -1 : 1) * (0.55 + Math.floor(k / 2) * 0.4), s = 0.078;
+    const p = new V3(Math.sin(a) * (bx + 0.03 + s * 0.4), fit.belt - 0.06, Math.cos(a) * (bz + 0.03 + s * 0.4));
+    skullAt(T, list, slot++, p, new V3(Math.sin(a) / bx, -0.25 / bz, Math.cos(a) / bz), UP, s, OLD);
+  }
+  // ---- 25-36: a row of skulls over each shoulder guard, left and right in turn ----
+  const SH = [[0.62, 0.3], [0.62, -0.3], [0.72, 0.9], [0.72, -0.9], [0.85, 1.45], [0.85, -1.45]];   // a crest along the top of the guard, front to back
+  for (let k = 0; k < 12; k++) {
+    const side = k % 2 ? -1 : 1, A = side > 0 ? rig.armL : rig.armR, R = fit.sh[side > 0 ? 0 : 1], [th, ph] = SH[k >> 1], s = 0.08;
+    const d = new V3(side * Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph));
+    const e = [R * 1.08, R * fit.shy, R * 1.1], n = new V3(d.x / e[0], d.y / e[1], d.z / e[2]).normalize();
+    const p = new V3(side * 0.02 + d.x * e[0], d.y * e[1], d.z * e[2]).addScaledVector(n, s * 0.38);
+    skullAt(A, list, slot++, p, new V3(n.x, n.y * 0.25, n.z), UP, s, OLD);
+  }
+  // ---- 37-49: an aureole behind the head; its gold ring and ember flames arrive with the crowning skull ----
+  const [cy, cz, R] = fit.halo, GN = NEON(SURF.gold('#c99a3c'));
+  tPart(H, list, slot, gTor(R, 0.017, 6, 44), GN, 0, cy, cz);
+  tPart(H, list, slot, gTor(R - 0.05, 0.008, 4, 40), SURF.gold('#8c6024'), 0, cy, cz + 0.005);
+  if (!LOWB) for (let i = 0; i < 14; i++) {
+    const a = (i + 0.5) / 14 * TAU;
+    tPart(H, list, slot, gCone(0.022, 0.1, 5), GN, Math.sin(a) * (R + 0.04), cy + Math.cos(a) * (R + 0.04), cz, { r: [0, 0, -a] });
+  }
+  for (let k = 0; k < 13; k++) {
+    const a = k ? (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.4 : 0, s = k ? 0.085 : 0.12;
+    const rad = new V3(Math.sin(a), Math.cos(a), 0);
+    skullAt(H, list, slot++, new V3(rad.x * R, cy + rad.y * R, cz - 0.012), new V3(0, 0, -1), rad, s, k ? BONE : GILT);
+  }
+  // ---- the Black form's own pieces: swept obsidian horns, shoulder spikes, a spine ridge (slot 49) ----
+  const OB = sp('#0d0b0d', 0.22, 0, 3), EM = NEON(SURF.glow('#ff7a2a', 0.6));
+  if (fit.horns) for (const s of [1, -1]) {
+    const hp = fit.horns.map((p) => [s * p[0], p[1], p[2]]);
+    tPart(H, list, slot, gTube('trohorn' + ck + s, hp, 0.05, 0.006, 12, 6), OB);
+    tPart(H, list, slot, gTor(0.045, 0.012, 5, 12), GN, hp[0][0], hp[0][1], hp[0][2], { r: [PI / 2 - 0.5, 0, -s * 0.5] });
+  }
+  for (const [A, s] of [[rig.armL, 1], [rig.armR, -1]]) {
+    const R = fit.sh[s > 0 ? 0 : 1];
+    for (let i = 0; i < 3; i++) {
+      const ph = (i - 1) * 0.6, th = 0.35, d = new V3(s * Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph) * 0.8).normalize();
+      const p = new V3(s * 0.02 + d.x * R, d.y * R * fit.shy, d.z * R), len = i === 1 ? 0.3 : 0.2;
+      const m = tPart(A, list, slot, gCone(0.04, len, 6), OB, p.x + d.x * len * 0.45, p.y + d.y * len * 0.45, p.z + d.z * len * 0.45);
+      m.quaternion.setFromUnitVectors(UP, d); m.updateMatrix();
+      const tip = tPart(A, list, slot, gCone(0.016, 0.07, 5), EM, p.x + d.x * len * 0.92, p.y + d.y * len * 0.92, p.z + d.z * len * 0.92);
+      tip.quaternion.copy(m.quaternion);
+    }
+  }
+  for (let i = 0; i < 5; i++) {
+    const y = 0.32 + i * 0.1, z = -rig.tz(y) - 0.02, d = new V3(0, 0.55, -1).normalize();
+    const m = tPart(T, list, slot, gCone(0.035, 0.13 + (i === 3 ? 0.05 : 0), 5), OB, 0, y + d.y * 0.05, z + d.z * 0.05);
+    m.quaternion.setFromUnitVectors(UP, d);
+  }
+  return slot;
+}
+// the full trophy set of this fighter's character and detail level, in its skeleton's bone numbering
+function trophyFull(f) {
+  const rig = f.rig; if (!rig.bones || !rig.trad) return null;
+  const bi = (h) => rig.bones.findIndex((b) => b.holder === h);
+  const idx = [rig.torso, rig.head, rig.armL, rig.armR].map(bi);
+  if (idx.some((i) => i < 0)) return null;
+  const key = f.key + '|' + (f.lodf || 1) + '|' + idx.join(',');
+  let g = TRO_CACHE.get(key);
+  if (g) return g;
+  const prev = [LOWB, LODF, MYTH]; LOWB = !!f.lowb; LODF = f.lodf || 1; MYTH = { cloth: [], fur: [] };
+  const list = [];
+  try {
+    buildTrophies(rig, own(TFIT, f.key) ? TFIT[f.key] : TFIT.lion, list, f.key);
+    g = bakeGeometry(list.map((m) => [m, bi(m.parent)]), rig.bones.map((b) => b.holder), f.body, true);
+  } finally {
+    for (const m of list) if (m.parent) m.parent.remove(m);
+    [LOWB, LODF, MYTH] = prev;
+  }
+  if (TRO_CACHE.size >= 16) TRO_CACHE.delete(TRO_CACHE.keys().next().value);
+  TRO_CACHE.set(key, shared(g));
+  return g;
+}
+// copy vertex / index ranges [v0, v1, i0, i1] of a baked set into a fresh geometry of their own
+function trophyGeo(full, ranges) {
+  let nv = 0, ni = 0; for (const r of ranges) { nv += r[1] - r[0]; ni += r[3] - r[2]; }
+  const g = new THREE.BufferGeometry();
+  for (const name in full.attributes) {
+    const a = full.attributes[name], sz = a.itemSize, arr = new a.array.constructor(nv * sz); let o = 0;
+    for (const r of ranges) { arr.set(a.array.subarray(r[0] * sz, r[1] * sz), o); o += (r[1] - r[0]) * sz; }
+    g.setAttribute(name, new THREE.BufferAttribute(arr, sz));
+  }
+  const I = full.index.array, idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni); let o = 0, vo = 0;
+  for (const r of ranges) { for (let i = r[2]; i < r[3]; i++) idx[o++] = I[i] - r[0] + vo; vo += r[1] - r[0]; }
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  g.boundingSphere = new THREE.Sphere(new V3(0, 1, 0), 2.8);
+  return g;
+}
+// (re)build the fighter's trophy mesh for n skulls (+ the Black form's pieces)
+function trophyMesh(f) {
+  const T = f.tro;
+  if (T.mesh) { if (T.mesh.parent) T.mesh.parent.remove(T.mesh); T.mesh.geometry.dispose(); T.mesh = null; }
+  T.skel = f.skin ? f.skin.skeleton : null;
+  if (!f.skin || (!T.n && !T.black)) return;
+  const full = trophyFull(f); if (!full) return;
+  const M = full.userData.marks, E = full.userData.end, ranges = [];
+  if (T.n > 0) ranges.push([0, M[T.n][0], 0, M[T.n][1]]);
+  if (T.black) ranges.push([M[KILL.skulls][0], E[0], M[KILL.skulls][1], E[1]]);
+  const mesh = new THREE.SkinnedMesh(trophyGeo(full, ranges), fighterMat(f));
+  mesh.bind(f.skin.skeleton, new THREE.Matrix4());
+  mesh.castShadow = true; mesh.receiveShadow = GFX.level === 'high'; mesh.layers.mask = f.body.layers.mask;
+  f.body.add(mesh); T.mesh = mesh;
+}
+// a fighter's kill count and chosen look: skulls, Black form (50+, unless `normal`), name tag
+function trophySet(f, kills, normal) {
+  if (!f || f.isDummy || f.lantern) return;
+  kills = kcOf(kills);
+  const n = Math.min(kills, KILL.skulls), black = kills >= KILL.black && !normal;
+  f.kills = kills;
+  const T = f.tro || (f.tro = { n: -1, black: false, mesh: null, skel: null });
+  const was = T.black;
+  if (f.rig.mythic && (T.n !== n || T.black !== black || T.skel !== (f.skin ? f.skin.skeleton : null))) { T.n = n; T.black = black; trophyMesh(f); }
+  T.n = n; T.black = black;
+  if (was !== black) blackLook(f, black);
+  if (f.tagEl) f.tagEl.querySelector('small').textContent = f.def.short + (kills ? ' · ☠ ' + kills : '');
+}
+
+// ---- the Black form at runtime (all render-side: nothing here touches the simulation) ----
+let _furBlack = null, _faceBlack = null;
+function blackFurMat() {   // the same fur shader, its strands burnt dark with an ember undertone
+  if (!_furBlack) { _furBlack = shared(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0, envMap: null, color: '#3a302c', emissive: '#260700' })); _furBlack.extensions = furMat.extensions; _furBlack.onBeforeCompile = furMat.onBeforeCompile; }
+  return _furBlack;
+}
+function blackFaceMat() {   // painted face on a dark skin: the eyes burn
+  if (!_faceBlack) { _faceBlack = shared(FACE.mat.clone()); _faceBlack.color.setRGB(0.34, 0.3, 0.29); _faceBlack.emissive.setRGB(6, 1.6, 0.3); }
+  return _faceBlack;
+}
+const BLACK_EYE = { c: '#ff6a2a', e: '#ff3a00' };
+function eyeColors(f, ult) {   // the shark's own eye material: amber, ember while in the Black form, blood red while awakened
+  const E = (ult === undefined ? f.awaken > 0 : ult) ? { c: '#ff2020', e: '#ff0000' } : f.tro && f.tro.black ? BLACK_EYE : EYE;
+  if (f.rig.eyes) for (const m of f.rig.eyes) { m.material.color.set(E.c); m.material.emissive.set(E.e); }
+}
+function blackLook(f, on) {
+  const rig = f.rig;
+  if (rig.fur) for (const m of rig.fur) m.material = on ? blackFurMat() : furMat;
+  if (rig.face) rig.face.material = on ? blackFaceMat() : FACE.mat;
+  eyeColors(f);
+  if (!on) { f.blackK = 0; if (f.uBlack) f.uBlack.value = 0; f.bfx = null; blackFxOff(f); }
+}
+// dark smoke rising round a Black-form fighter (Medium / High): one open cylinder, noise-cut, edges denser
+const smokeGeo = shared(new THREE.CylinderGeometry(0.55, 0.95, 2.5, 18, 1, true));
+const SMOKE_VS = 'varying vec2 vUv; varying vec3 vN; varying vec3 vV; varying vec3 vP;\nvoid main() { vUv = uv; vP = position; vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = mv.xyz; vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * mv; }';
+const SMOKE_FS = `uniform float uTime; uniform float uAmt; varying vec2 vUv; varying vec3 vN; varying vec3 vV; varying vec3 vP;
+float bHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float bNoise(vec3 x) {
+  vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(bHash(i), bHash(i + vec3(1, 0, 0)), f.x), mix(bHash(i + vec3(0, 1, 0)), bHash(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(bHash(i + vec3(0, 0, 1)), bHash(i + vec3(1, 0, 1)), f.x), mix(bHash(i + vec3(0, 1, 1)), bHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+void main() {
+  float h = vUv.y;
+  vec3 q = vec3(vP.x * 2.2, vP.y * 1.1 - uTime * 1.1, vP.z * 2.2);
+  float n = bNoise(q) * 0.62 + bNoise(q * 2.3 + vec3(0.0, -uTime * 0.9, 1.7)) * 0.38;   // soft billows rising
+  float facing = abs(dot(normalize(vN), normalize(-vV)));
+  float soft = smoothstep(0.08, 0.7, facing);   // thins out towards the silhouette: no hard outline
+  float fade = smoothstep(0.0, 0.1, h) * (1.0 - smoothstep(0.12, 0.7, h));
+  float a = smoothstep(0.45, 0.8, n) * fade * soft * uAmt;
+  float hot = smoothstep(0.78, 0.92, n) * (1.0 - smoothstep(0.0, 0.35, h)) * soft * uAmt;
+  gl_FragColor = vec4(mix(vec3(0.012, 0.008, 0.008), vec3(1.7, 0.5, 0.1), hot), clamp(a * 0.75 + hot * 0.45, 0.0, 0.85));
+}`;
+// weapon trails: a ribbon between the forearm and the fist (or the blade / hammer head) over the last frames
+const TRAIL_N = 16, TRAIL_LIFE = 0.2;
+const trailIdx = (() => { const a = []; for (let i = 0; i < TRAIL_N - 1; i++) { const k = i * 2; a.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); } return a; })();
+const TRAIL_VS = 'attribute float aA; attribute float aS; varying float vA; varying float vS;\nvoid main() { vA = aA; vS = aS; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+const TRAIL_FS = 'varying float vA; varying float vS;\nvoid main() { vec3 c = mix(vec3(0.9, 0.12, 0.02), vec3(1.6, 1.05, 0.45), vS * vS); gl_FragColor = vec4(c * vA, 1.0); }';
+let _trailMat = null;
+function makeTrail() {
+  if (!_trailMat) _trailMat = shared(new THREE.ShaderMaterial({ vertexShader: TRAIL_VS, fragmentShader: TRAIL_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false }));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 6), 3).setUsage(THREE.DynamicDrawUsage));
+  g.setAttribute('aA', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 2), 1).setUsage(THREE.DynamicDrawUsage));
+  const s = new Float32Array(TRAIL_N * 2); for (let i = 0; i < TRAIL_N; i++) s[i * 2 + 1] = 1;
+  g.setAttribute('aS', new THREE.BufferAttribute(s, 1)); g.setIndex(trailIdx); g.setDrawRange(0, 0);
+  const m = new THREE.Mesh(g, _trailMat); m.frustumCulled = false; m.renderOrder = 4; m.visible = false; scene.add(m);
+  return { m, s: [], prev: new V3(), hasPrev: false };   // s: samples { a: inner, b: outer, age, w }
+}
+const _ta = new V3(), _tb = new V3(), _tr = new V3();
+function trailTick(f, tr, pivot, inner, outer, active, fdt, min) {
+  for (const q of tr.s) q.age += fdt;
+  while (tr.s.length && tr.s[tr.s.length - 1].age > TRAIL_LIFE) tr.s.pop();
+  pivot.localToWorld(_ta.copy(inner)); outer.obj.localToWorld(_tb.copy(outer.v));
+  _tr.copy(_tb).sub(f.root.position);
+  const sp = tr.hasPrev && fdt > 0 ? _tr.distanceTo(tr.prev) / fdt : 0; tr.prev.copy(_tr); tr.hasPrev = true;
+  const w = active ? clamp((sp - min) / 7, 0, 1) : 0;
+  if (w > 0 || (tr.s.length && tr.s[0].w > 0)) {
+    const q = tr.s.length >= TRAIL_N ? tr.s.pop() : { a: new V3(), b: new V3(), age: 0, w: 0 };
+    q.a.copy(_ta); q.b.copy(_tb); q.age = 0; q.w = w; tr.s.unshift(q);
+    if (w > 0.5 && GFX.fx >= 2 && Math.random() < fdt * 30) emit('ember', _tb, { n: 1, speed: 1.5, up: 1 });
+  }
+  const n = tr.s.length, g = tr.m.geometry;
+  if (n < 2) { tr.m.visible = false; return; }
+  const P = g.attributes.position.array, A = g.attributes.aA.array;
+  for (let i = 0; i < n; i++) {
+    const q = tr.s[i], k = (1 - q.age / TRAIL_LIFE) * q.w;
+    P.set([q.a.x, q.a.y, q.a.z, q.b.x, q.b.y, q.b.z], i * 6); A[i * 2] = k * 0.15; A[i * 2 + 1] = k;
+  }
+  g.attributes.position.needsUpdate = true; g.attributes.aA.needsUpdate = true; g.setDrawRange(0, (n - 1) * 6);
+  tr.m.visible = true;
+}
+const T_IN = new V3(0, -0.34, 0), T_FIST = { obj: null, v: new V3(0, -0.74, 0.02) };
+const T_SWORD = new V3(0, 0, 1.02), T_MACE = new V3(0, 0, 0.84);
+const SMOKE_DARK = ['#120c0b', '#1d1310', '#0b0909'];
+function blackFxOff(f) {
+  if (f.smoke) f.smoke.visible = false;
+  if (f.trails) for (const t of f.trails) { t.s.length = 0; t.m.visible = false; }
+}
+function blackDispose(f) {
+  if (f.smoke) { f.smoke.material.dispose(); f.smoke = null; }
+  if (f.trails) { for (const t of f.trails) { scene.remove(t.m); t.m.geometry.dispose(); } f.trails = null; }
+}
+// a dramatic entrance on every spawn (and the first transformation): the warrior appears in its old colours,
+// crouched in a column of dark fire, then bursts up as the lacquer turns black and the embers catch
+function blackEnter(f) { if (f && f.tro && f.tro.black) { f.bfx = { k: 'enter', t: 0, dur: 1.7, s: 0 }; f.blackK = 0; if (f.uBlack) f.uBlack.value = 0; } }
+// after each K.O.: a brief victory pose and a burst of embers (the victim's spirit flies to the killer)
+function blackFlourish(f) { if (f && f.tro && f.tro.black && !(f.bfx && f.bfx.k === 'enter')) f.bfx = { k: 'flourish', t: 0, dur: 1.15, s: 0 }; }
+// the poses (local fighters only; peers see them through the pose data they already receive)
+function blackPose(f, P, V, upright, hs) {
+  const b = f.bfx, still = upright && f.onGround && !f.busy && !f.action && !f.anim && !f.blocking && !f.carry;
+  if (b && b.k === 'enter') {
+    if (!still || hs > 0.84 || f.emote) { b.noPose = true; }
+    if (b.noPose) return;
+    const t = b.t, c = t < 0.45 ? 1 : 1 - ease((t - 0.45) / 0.2), o = t < 0.4 ? 0 : t < 0.62 ? ease((t - 0.4) / 0.22) : 1 - ease((t - 1.15) / 0.5);
+    P.legL[0] -= 0.75 * c; P.legR[0] -= 0.75 * c; V.y -= 0.32 * c; P.torso[0] += 0.5 * c; P.head[0] += 0.35 * c;
+    P.armL[0] -= 1.2 * c; P.armR[0] -= 1.2 * c; P.armL[2] -= 0.55 * c; P.armR[2] += 0.55 * c;
+    P.armL[2] += 1.35 * o; P.armR[2] -= 1.35 * o; P.armL[0] -= 0.35 * o; P.armR[0] -= 0.35 * o; P.torso[0] -= 0.22 * o; P.head[0] -= 0.4 * o;
+    if (P.jaw) P.jaw[0] += 0.6 * o;
+    return;
+  }
+  if (b && b.k === 'flourish') {
+    if (!upright || f.busy || f.action || f.anim || f.blocking) return;
+    const t = b.t, k = t < 0.18 ? ease(t / 0.18) : 1 - ease((t - 0.75) / 0.4);
+    P.armR[0] = lerp(P.armR[0], -2.95, k); P.armR[2] = lerp(P.armR[2], 0.12, k); P.armL[2] += 0.55 * k; P.armL[0] -= 0.2 * k;
+    P.head[0] -= 0.32 * k; P.torso[0] -= 0.14 * k; if (P.jaw) P.jaw[0] += 0.5 * k;
+    return;
+  }
+  // idle: a low, menacing guard that breathes slowly
+  if (still && hs < 0.84 && !f.emote && f.stun <= 0) {
+    const t = realClock * 1.7 + (f.localKey ? f.localKey.length : 0), br = Math.sin(t) * 0.5 + 0.5;
+    P.torso[0] += 0.16 + br * 0.04; P.head[0] -= 0.16 + br * 0.03; P.head[1] += Math.sin(t * 0.37) * 0.12;
+    P.armL[0] -= 0.55; P.armR[0] -= 0.75; P.armL[2] += 0.1 + br * 0.04; P.armR[2] -= 0.05 + br * 0.04;
+    P.legL[0] -= 0.14; P.legR[0] += 0.2; P.legL[2] += 0.08; P.legR[2] -= 0.08; V.y -= 0.05 + br * 0.015;
+  }
+}
+// every drawn frame (local fighters and peers' puppets): colour ramp, smoke, embers, trails, entrance / flourish effects
+function blackFrame(f, fdt) {
+  const T = f.tro; if (!T) return;
+  const b = f.bfx;
+  if (b) { b.t += fdt; if (b.t >= b.dur) f.bfx = null; }
+  if (!T.black) return;
+  // colour: held at 0 through the entrance's crouch, then the lacquer floods black
+  let k = f.blackK || 0;
+  k = b && b.k === 'enter' ? clamp((b.t - 0.38) / 0.4, 0, 1) : Math.min(1, k + fdt * 2.5);
+  f.blackK = k; if (f.uBlack) f.uBlack.value = k;
+  const shown = !f.dead && f.root.visible && f.V.y > 0.45, fx = GFX.fx, R = f.root.position;
+  // smoke shell (Medium / High)
+  if (fx >= 2 && shown) {
+    if (!f.smoke) {
+      f.smoke = new THREE.Mesh(smokeGeo, new THREE.ShaderMaterial({ uniforms: { uTime: RIG_U.uTime, uAmt: { value: 1 } }, vertexShader: SMOKE_VS, fragmentShader: SMOKE_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+      f.smoke.position.y = 1.2; f.smoke.renderOrder = 2; f.smoke.userData.noShadow = true; f.smoke.layers.mask = f.body.layers.mask; f.root.add(f.smoke);
+    }
+    f.smoke.visible = true;
+    f.smoke.material.uniforms.uAmt.value = (b && b.k === 'enter' ? 0.8 + 1.2 * Math.max(0, 1 - b.t / b.dur) : 0.8) * (f.ragdoll > 0 ? 0.4 : 1);
+  } else if (f.smoke) f.smoke.visible = false;
+  // embers drifting off the body, a little dark smoke on High
+  if (shown) {
+    f.emberAcc = (f.emberAcc || 0) + fdt * (fx >= 3 ? 12 : fx >= 2 ? 7 : 3);
+    while (f.emberAcc >= 1) { f.emberAcc--; emit('ember', _ta.set(R.x + rand(-0.45, 0.45), R.y + rand(0.2, 1.9), R.z + rand(-0.45, 0.45)), { n: 1 }); }
+    if (fx >= 3 && Math.random() < fdt * 2.5) spawnPuffs(_ta.set(R.x, R.y + rand(0.1, 0.6), R.z), SMOKE_DARK, 1, 0.3, 0.3);
+  }
+  // trails on the fists (or Steve's blade and hammer head) whenever they swing fast during a move
+  if (!f.trails) f.trails = [makeTrail(), makeTrail()];
+  const local = !f.remote, act = shown && (local ? !!(f.action || f.anim) : true), min = local ? 5 : 10;   // peers: only clearly faster than a running arm swing
+  if (act || f.trails[0].s.length || f.trails[1].s.length) {
+    f.root.updateMatrixWorld(true);
+    const rig = f.rig;
+    T_FIST.obj = rig.armL; trailTick(f, f.trails[0], rig.armL, T_IN, T_FIST, act, fdt, min);
+    const ro = rig.sword && rig.sword.visible ? { obj: rig.sword, v: T_SWORD } : rig.mace && rig.mace.visible ? { obj: rig.mace, v: T_MACE } : (T_FIST.obj = rig.armR, T_FIST);
+    trailTick(f, f.trails[1], rig.armR, T_IN, ro, act, fdt, min);
+  }
+  // entrance / flourish effects
+  if (b && b.k === 'enter') {
+    if (b.s === 0) {
+      b.s = 1; audioAt(R);
+      emit('ember', _ta.set(R.x, R.y + 0.3, R.z), { n: fx >= 2 ? 26 : 10, speed: 1.6, up: 7, life: 1.0 });
+      if (fx >= 2) spawnPuffs(_ta.set(R.x, R.y + 0.2, R.z), SMOKE_DARK, fx >= 3 ? 12 : 6, 0.55, 1.4);
+      ringFx(_ta.set(R.x, R.y, R.z), '#5a0e06', 2.6, 0.5);
+    }
+    if (b.s === 1 && b.t >= 0.4) {
+      b.s = 2; audioAt(R); SFX.awaken();
+      center(f, _ta); impactFlash(_ta, '#ff6a1a', true); spawnSparks(_ta, '#ffb04a', fx >= 2 ? 16 : 6);
+      emit('ember', _ta, { n: fx >= 2 ? 30 : 12, speed: 6, up: 4 });
+      ringFx(_tb.set(R.x, R.y, R.z), '#ff5a1a', 3.6, 0.55); ringFx(_tb, '#ffc04a', 2.2, 0.4);
+      if (f === player) { screenFlash('#ff4a1a', 0.42); fovKick = Math.max(fovKick, 4); rumble(0.3, 0.6, 160); }
+    }
+  } else if (b && b.k === 'flourish' && b.s === 0) {
+    b.s = 1; center(f, _ta);
+    emit('ember', _ta, { n: fx >= 2 ? 22 : 8, speed: 4, up: 5 }); ringFx(_tb.set(R.x, R.y, R.z), '#ff5a1a', 2.4, 0.45);
+    if (fx >= 2) spawnPuffs(_ta, SMOKE_DARK, fx >= 3 ? 6 : 3, 0.4, 1);
+  }
+}
+// render-side rings that are never mirrored to peers (they draw their own)
+function ringFx(pos, color, r, dur) { const c = NET.cap; NET.cap = false; ring(pos, color, r, dur); NET.cap = c; }
+// a fighter's spirit flying from the fallen to whoever knocked them out; it adds the skull when it lands
+const souls = [];
+function soulFly(from, to, black, onLand) {
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTex, color: black ? '#ff7a2a' : '#f2e4c0', blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false, toneMapped: false }));
+  sp.renderOrder = 5; sp.scale.setScalar(0.7); scene.add(sp);
+  const a = center(from, new V3());
+  souls.push({ sp, a, to, t: 0, dur: 0.6, black, onLand });
+}
+function updateSouls(fdt) {
+  for (let i = souls.length - 1; i >= 0; i--) {
+    const s = souls[i]; s.t += fdt; const k = Math.min(1, s.t / s.dur), e = ease(k);
+    const b = s.to.root.position; _tb.set(b.x, b.y + 1.7, b.z);
+    s.sp.position.lerpVectors(s.a, _tb, e); s.sp.position.y += Math.sin(k * PI) * 1.6;
+    s.sp.material.opacity = 0.6 + 0.4 * Math.sin(k * PI); s.sp.scale.setScalar(0.5 + 0.4 * Math.sin(k * PI));
+    if (GFX.fx >= 2 && Math.random() < fdt * 40) emit(s.black ? 'ember' : 'snow', s.sp.position, { n: 1, speed: 0.4, up: 0.5 });
+    if (k >= 1) {
+      emit(s.black ? 'ember' : 'snow', _tb, { n: 8, speed: 3, up: 2 });
+      scene.remove(s.sp); s.sp.material.dispose(); souls.splice(i, 1);
+      if (s.onLand) s.onLand();
+    }
+  }
+}
+
 // Golden Lantern: supply-crate plinth, a slowly turning palace lantern and a light beam to the sky.
 // Shared materials/geometry so the 60 s respawns never allocate GPU resources.
 const lanternMat = {
@@ -2965,6 +3425,11 @@ class Fighter {
       tagLayer.appendChild(el); this.tagEl = el; this.tagFill = el.querySelector('s'); this.tagHp = -1;
     }
     this.reset();
+    // kill trophies: the player's own count, a bot's cosmetic tier, a peer's sent count
+    if (this.rig.mythic && !this.isDummy) {
+      const mine = this.localKey === 'P';
+      trophySet(this, mine ? KILLS.n : o.kills || 0, mine ? SETTINGS.form === 'normal' : !!o.normal);
+    }
   }
   reset() {
     Object.assign(this, {
@@ -3002,6 +3467,7 @@ class Fighter {
     if (this.awaken > 0 && this.def.ult.end) this.def.ult.end(this);
     dropCarry(this);
     removeAura(this);
+    blackDispose(this);
     scene.remove(this.root);
     if (this.skin) this.skin.skeleton.dispose();
     for (const m of [this.matLow, this.matMid, this.matStd]) if (m) m.dispose();
@@ -3163,6 +3629,12 @@ function KO(t, att) {
   const killer = att && att !== t && att.name ? att.name : null;
   addFeed(killer, t.name); netFx(['k', killer, t.name]);
   if (t === player) { showBanner('Knocked out', 'Respawning'); rumble(0.9, 1, 420); }
+  // kill trophies (cosmetic): the player's count, bots' tiers grow too; Black-form killers flourish
+  if (att && att !== t && !t.isDummy && !t.lantern) {
+    if (att === player) creditKill(t);
+    else if (att.tro && !att.remote && att.ai) trophySet(att, (att.kills || 0) + 1, false);
+    if (att !== player && att.tro && att.tro.black && att.root) { blackFlourish(att); soulFly(t, att, true); }
+  }
   if (att && att.ai && !att.dead && Math.random() < 0.45) setTimeout(() => playEmote(att, ['laugh', 'taunt', 'dance', 'flex'][(Math.random() * 4) | 0]), 700);
 }
 function spawnPoint() {
@@ -3182,6 +3654,7 @@ function respawn(f) {
   Object.assign(f.V, { rx: 0, ry: 0, rz: 0, y: 1, sy: 1, sxz: 1 });
   if (f.ai) Object.assign(f.ai, makeAI());
   emit('wind', center(f), { n: 16 });
+  blackEnter(f);
 }
 function showWhiff(f) { if (f === player || (player && distH(f, player) < 12)) popText(head(f), 'WHIFF', 'call whiff'); }
 
@@ -4473,9 +4946,9 @@ const CHARS = {
     ultLifesteal: 0.25, ultAtk: 1.3, ultDesc: 'Attack 30% faster; bites heal 25% of their damage.',
     ult: {
       name: 'Blood in the Water',
-      start(f) { f.rig.eyes.forEach((m) => { m.material.color.set('#ff2020'); m.material.emissive.set('#ff0000'); }); addLight(f, 0xff2a2a, 1.4); },
+      start(f) { eyeColors(f, true); addLight(f, 0xff2a2a, 1.4); },
       tick(f, dt) { if (Math.random() < dt * 16.8) emit('blood', randBodyPoint(f), { n: 1, speed: 1, grav: -2 }); },
-      end(f) { f.rig.eyes.forEach((m) => { m.material.color.set(EYE.c); m.material.emissive.set(EYE.e); }); removeAura(f); },
+      end(f) { eyeColors(f, false); removeAura(f); },
     },
   },
   dummy: {
@@ -4536,6 +5009,7 @@ function animateFighter(f, fdt) {
     if (!upright || !f.onGround || f.busy || f.action || f.blocking || f.carry || hs > 0.84 || (e.dur && e.t > e.dur)) f.emote = null;
     else { e.t += adt; EMOTES[e.k].pose(P, V, e.t); }
   }
+  if (f.tro && f.tro.black) blackPose(f, P, V, upright, hs);
   if (f.anim) {
     f.anim.t += adt; const p = f.anim.t / f.anim.dur;
     if (p >= 1) f.anim = null;
@@ -4589,12 +5063,13 @@ function applyVisual(f, fdt) {
   f.ice.visible = f.frozen > 0;
   const rg = f.rig;
   if (rg.face) {
-    const fk = f.dead || f.ragdoll > 0 || f.flatten > 0 || f.stun > 0.25 ? 'hurt' : f.awaken > 0 ? 'awake' : f.emote && EMOTES[f.emote.k].face ? EMOTES[f.emote.k].face : rg.faceKey;
+    const fk = f.dead || f.ragdoll > 0 || f.flatten > 0 || f.stun > 0.25 ? 'hurt' : f.awaken > 0 || (f.tro && f.tro.black) ? 'awake' : f.emote && EMOTES[f.emote.k].face ? EMOTES[f.emote.k].face : rg.faceKey;
     if (rg.faceNow !== fk) { rg.faceNow = fk; rg.face.geometry = own(FACE.geo, fk) ? FACE.geo[fk] : FACE.geo[rg.baseFace] || FACE.geo.smile; }
     const nOn = f.awaken > 0;
     if (f.neonOn !== nOn) { f.neonOn = nOn; setNeon(f, nOn); }
   }
   rigSync(f, fdt);
+  if (f.tro) blackFrame(f, fdt);
 }
 
 // =====================================================================
@@ -4795,6 +5270,13 @@ const store = {
 { const saved = store.get('binds'); if (saved) for (const k in saved) if (k in BIND && typeof saved[k] === 'string') BIND[k] = saved[k]; }
 const SETTINGS = Object.assign({ autoLock: true, bots: 'normal', studs: true, avatar: {} }, store.get('settings') || {});
 RIG_U.uStuds.value = 0;   // studs belonged to the blocky look; only the lantern still uses that material
+// kill progression (scbg.kills): every K.O. the player lands, on bots and players, in every mode. n: the count,
+// cel: the 1000 celebration has been shown. SETTINGS.form: 'black' (default once unlocked) or 'normal'.
+const KILLS = (() => {
+  const o = store.get('kills'), ok = !!o && typeof o === 'object' && !Array.isArray(o);
+  return { n: ok && own(o, 'n') ? kcOf(o.n) : 0, cel: ok && own(o, 'cel') && o.cel === 1 ? 1 : 0 };
+})();
+if (SETTINGS.form !== 'normal') SETTINGS.form = 'black';
 const CODE2ACT = new Map();
 const ALT_KEYS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Numpad1: 'move1', Numpad2: 'move2', Numpad3: 'move3', Numpad4: 'move4', ShiftRight: 'shift' };
 function reindexBinds() { CODE2ACT.clear(); for (const k in BIND) if (BIND[k]) CODE2ACT.set(BIND[k], k); }
@@ -5222,9 +5704,9 @@ function botCount() { let n = 0; for (const f of fighters) if (f.ai && !f.remote
 function addBot() {
   if (botCount() >= BOT_MAX) return null;
   const k = PLAYABLE[(Math.random() * PLAYABLE.length) | 0];
-  const f = new Fighter(k, { name: pickName(), ai: makeAI(), localKey: 'B' + (Date.now() % 100000) });
+  const f = new Fighter(k, { name: pickName(), ai: makeAI(), localKey: 'B' + (Date.now() % 100000), kills: botKills() });
   f.faceMode = 'enemy'; f.pos.copy(spawnPoint()); f.yaw = rand(0, TAU); f.snap(); fighters.push(f);
-  f.id = NET.me + ':' + f.localKey; emit('wind', center(f), { n: 16 });
+  f.id = NET.me + ':' + f.localKey; emit('wind', center(f), { n: 16 }); blackEnter(f);
   updateRoomCount(); updateBotUI();
   return f;
 }
@@ -5283,7 +5765,10 @@ function packF(f) {
   if (f.blocking) fl |= 1; if (f.rig.sword && f.rig.sword.visible) fl |= 4; if (f.rig.mace && f.rig.mace.visible) fl |= 8;
   if (f.rig.rod && f.rig.rod.visible) fl |= 16; if (f.rig.bow && f.rig.bow.visible) fl |= 32; if (f.rig.fish && f.rig.fish.visible) fl |= 64;
   if (f.rig.ribbons && f.rig.ribbons.visible) fl |= 128; if (f.invuln()) fl |= 256; if (f.dead) fl |= 512; if (f.stars.visible) fl |= 1024; if (f.frozen > 0) fl |= 2048;
-  return { i: f.id, n: f.name, c: f.key, p: [r2(f.pos.x), r2(f.pos.y), r2(f.pos.z)], y: r3(f.yaw), h: r1(f.hp), v: [r3(f.V.rx), r3(f.V.ry), r3(f.V.rz), r3(f.V.y), r3(f.V.sy), r3(f.V.sxz)], q, fl, aw: f.awaken > 0 ? 1 : 0, av: f.av };
+  const o = { i: f.id, n: f.name, c: f.key, p: [r2(f.pos.x), r2(f.pos.y), r2(f.pos.z)], y: r3(f.yaw), h: r1(f.hp), v: [r3(f.V.rx), r3(f.V.ry), r3(f.V.rz), r3(f.V.y), r3(f.V.sy), r3(f.V.sxz)], q, fl, aw: f.awaken > 0 ? 1 : 0, av: f.av };
+  // kill trophies (older builds ignore these): kc the K.O. count, kf 1 when 50+ but wearing the normal form
+  if (f.kills > 0) { o.kc = f.kills; if (f.kills >= KILL.black && f.tro && !f.tro.black) o.kf = 1; }
+  return o;
 }
 // ---- snapshots: each one carries the sender's clock; remote fighters are drawn NETI.delay in the past,
 // interpolated between the two snapshots around that moment (no more exponential chasing)
@@ -5299,8 +5784,13 @@ function applyState(e, ts) {
   if (!e || ownerOf(e.i) === NET.me || !own(CHARS, e.c)) return;
   let f = fighters.find((x) => x.id === e.i);
   if (f && f.key !== e.c) { f.dispose(); fighters.splice(fighters.indexOf(f), 1); f = null; }
-  if (!f) { f = new Fighter(e.c, { id: e.i, name: e.n, remote: true, av: e.av }); f.pos.set(e.p[0], e.p[1], e.p[2]); f.yaw = e.y; f.snaps = []; fighters.push(f); }
-  else if (e.av && e.av !== f.av) applyAvatar(f, e.av);
+  // trophies: a whole number 0..100000 read from the snapshot's own fields only (never inherited ones)
+  const kc = own(e, 'kc') ? kcOf(e.kc) : 0, kf = own(e, 'kf') && e.kf === 1;
+  if (!f) { f = new Fighter(e.c, { id: e.i, name: e.n, remote: true, av: e.av, kills: kc, normal: kf }); f.pos.set(e.p[0], e.p[1], e.p[2]); f.yaw = e.y; f.snaps = []; fighters.push(f); blackEnter(f); }
+  else {
+    if (e.av && e.av !== f.av) applyAvatar(f, e.av);
+    if (f.tro && (f.kills !== kc || f.tro.black !== (kc >= KILL.black && !kf))) { const was = f.tro.black; trophySet(f, kc, kf); if (!was && f.tro.black) blackEnter(f); }
+  }
   if (!f.snaps) f.snaps = [];
   const S = f.snaps;
   if (S.length && ts <= S[S.length - 1].ts) return;   // out of order / duplicate
@@ -5333,8 +5823,9 @@ function updatePuppet(f, rdt) {
   const va = a.v, vb = b.v;
   f.V.rx = va[0] + angDiff(va[0], vb[0]) * k; f.V.ry = va[1] + angDiff(va[1], vb[1]) * k; f.V.rz = va[2] + angDiff(va[2], vb[2]) * k;
   f.V.y = lerp(va[3], vb[3], k); f.V.sy = lerp(va[4], vb[4], k); f.V.sxz = lerp(va[5], vb[5], k);
-  const fl = n.fl;
-  f.hp = n.h; f.dead = !!(fl & 512); f.netInv = !!(fl & 256); f.blocking = !!(fl & 1); f.frozen = fl & 2048 ? 1 : 0;
+  const fl = n.fl, wasDead = f.dead;
+  f.hp = n.h; f.dead = !!(fl & 512);
+  if (wasDead && !f.dead) blackEnter(f);   // a peer's Black-form fighter respawned f.netInv = !!(fl & 256); f.blocking = !!(fl & 1); f.frozen = fl & 2048 ? 1 : 0;
   f.stun = fl & 1024 ? 1 : 0; f.ragdoll = 0; f.flatten = 0; f.held = false; f.action = null;
   if (f.rig.sword) f.rig.sword.visible = !!(fl & 4);
   if (f.rig.mace) f.rig.mace.visible = !!(fl & 8);
@@ -5369,10 +5860,11 @@ function applyNetHit(m) {
   const o = deO(m.o || {});
   const att = fighters.find((x) => x.id === m.aid) || { id: m.aid, name: null, remote: true, pos: o.from || tgt.pos, def: { fx: 'dust' }, awaken: 0, ult: 0, fwd: (v) => v.set(0, 0, 1) };
   const from = o.from || att.pos;
-  let r;
+  let r, ko = false;
   if (m.rr !== undefined && from && nearestRecent(tgt, from.x, from.z) > m.rr + NETI.slack) r = 'miss';   // out of range even allowing for lag
-  else { NET.cap = true; r = hit(att, tgt, m.d, o); NET.cap = false; }
-  if (m.seq !== undefined) netReply({ t: 'hr', seq: m.seq, aid: m.aid, tid: m.tid, r: r || 'miss', d: m.d });
+  else { const was = tgt.dead; NET.cap = true; r = hit(att, tgt, m.d, o); NET.cap = false; ko = !was && tgt.dead; }
+  // ko: this hit knocked our fighter out, so the attacker's own client counts the K.O. (only it, only once)
+  if (m.seq !== undefined) { const rep = { t: 'hr', seq: m.seq, aid: m.aid, tid: m.tid, r: r || 'miss', d: m.d }; if (ko && r === 'hit') rep.ko = 1; netReply(rep); }
 }
 function netReply(msg) {
   const own = ownerOf(msg.aid);
@@ -5390,6 +5882,7 @@ function applyHitReply(m) {
     if (att.awaken <= 0) att.ult = Math.min(100, att.ult + m.d * AWAKEN.dealt);
     if (p.bite && att.awaken > 0 && att.def.ultLifesteal && m.d > 0) { const h = m.d * att.def.ultLifesteal; att.hp = Math.min(100, att.hp + h); popText(head(att), '+' + h.toFixed(1), 'heal'); }
     if (att === player && m.d > 0) comboHit();
+    if (att === player) { kHit.set(m.tid, realClock); if (kHit.size > 64) kHit.delete(kHit.keys().next().value); if (m.ko === 1 && tgt && !tgt.isDummy && !tgt.lantern) creditKill(tgt); }
     att.lastLand = gameTime; if (!p.m1 && gameTime - att.specUseT < 4) { att.specHit = true; att.specHitT = gameTime; }
     return;
   }
@@ -5406,7 +5899,7 @@ function applyFx(list) {
         case 'c': crater(new V3(r[1], 0, r[2]), r[3]); break;
         case 't': popText(new V3(r[1], r[2], r[3]), r[4], r[5]); break;
         case 's': sndAt = Math.min(0.7, r[3] || 0.5); if (SFX[r[1]]) SFX[r[1]](!!r[2]); break;
-        case 'k': addFeed(r[1], r[2]); break;
+        case 'k': addFeed(r[1], r[2]); koSeen(r[1], r[2]); break;
         case 'ws': { const p = new V3(r[1], r[2], r[3]); spawnDebris(p, 1.5, concreteChunk, tB.set(r[1] - r[4] * 1.5, r[2], r[3] - r[5] * 1.5), 9); shake(p, 0.75); break; }
         case 'L': {
           if (r[1] === 's') lanternAnnounce();
@@ -5601,7 +6094,7 @@ function setupHUD() {
   });
   lagHp = player.hp;
   for (const it of document.querySelectorAll('.citem')) it.setAttribute('aria-checked', String(it.dataset.char === player.key));
-  refreshKeyLabels(); buildHelp();
+  refreshKeyLabels(); buildHelp(); updateKillHud(); showForm();
 }
 // every on-screen key hint follows the current bindings
 function refreshKeyLabels() {
@@ -5777,6 +6270,123 @@ function addFeed(killer, victim, verb) {
 }
 let bannerTimer = 0;
 function showBanner(s, t) { $('#bannerS').textContent = s; $('#bannerT').textContent = t; $('#banner').classList.add('on'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => $('#banner').classList.remove('on'), 2200); }
+
+// ---- kill progression: counting, the HUD meter, the Settings form switch, 50 and 1000 ----
+function saveKills() { store.set('kills', { n: KILLS.n, cel: KILLS.cel }); }
+// One K.O. can reach us by two paths online (the owner's 'ko' reply and its kill feed), so each victim is
+// credited at most once in 3.5 s (a knocked-out fighter is down for 4 s before it can be hit again).
+const kCredit = new Map(), kHit = new Map();
+function creditKill(v) {
+  const id = v && v.id; if (!id || !player) return false;
+  const last = kCredit.get(id); if (last !== undefined && realClock - last < 3.5) return false;
+  kCredit.set(id, realClock); if (kCredit.size > 64) kCredit.delete(kCredit.keys().next().value);
+  setKills(KILLS.n + 1, true);
+  if (v.root) soulFly(v, player, !!(player.tro && player.tro.black));
+  blackFlourish(player);
+  return true;
+}
+function setKills(n, earned) {
+  const prev = KILLS.n; KILLS.n = kcOf(n); saveKills();
+  if (player) trophySet(player, KILLS.n, SETTINGS.form === 'normal');
+  if (earned && prev < KILL.black && KILLS.n >= KILL.black) blackUnlock();
+  if (earned && prev < KILL.trans && KILLS.n >= KILL.trans) transcend();
+  updateKillHud(); showForm();
+}
+// a K.O. reported in a peer's kill feed: one we landed that its owner saw (a bleed finish, or an older build that
+// sends no 'ko' in its hit replies) counts only if we hit that fighter moments before; a Black-form killer flourishes
+function koSeen(killer, victim) {
+  if (typeof killer !== 'string' || typeof victim !== 'string' || !player) return;
+  const v = fighters.find((x) => x.remote && x.name === victim && !x.isDummy && !x.lantern);
+  if (killer === player.name) {
+    if (!v) return;
+    const h = kHit.get(v.id); if (h === undefined || realClock - h > 2.5) return;
+    const id = v.id; setTimeout(() => creditKill(fighters.find((x) => x.id === id) || { id }), 1200);   // the 'ko' reply normally lands first
+    return;
+  }
+  const k = fighters.find((x) => x !== player && x.name === killer && x.tro);
+  if (!k) return;
+  if (!k.remote && k.ai) trophySet(k, (k.kills || 0) + 1, false);   // one of our bots knocked out a peer's fighter
+  if (k.tro.black) { blackFlourish(k); if (v) soulFly(v, k, true); }
+}
+function botKills() {   // bots wear a random cosmetic tier so the arena shows every stage
+  const r = Math.random();
+  return r < 0.3 ? 0 : r < 0.62 ? 1 + ((Math.random() * 49) | 0) : r < 0.9 ? 50 + ((Math.random() * 950) | 0) : 1000 + ((Math.random() * 1500) | 0);
+}
+function updateKillHud() {
+  const n = KILLS.n, next = n < KILL.black ? KILL.black : n < KILL.trans ? KILL.trans : 0, base = n < KILL.black ? 0 : KILL.black;
+  $('#killN').textContent = '\u2620 ' + n + (n === 1 ? ' K.O.' : ' K.O.s');
+  $('#killNext').textContent = next ? (next - n) + ' to ' + (next === KILL.black ? 'Black form' : 'transcend') : 'Transcended';
+  $('#killFill').style.transform = sx3(next ? (n - base) / (next - base) : 1);
+  const el = $('#killBar'); el.classList.toggle('black', n >= KILL.black); el.classList.toggle('trans', n >= KILL.trans);
+}
+function showForm() {
+  const n = KILLS.n, sel = $('#optForm');
+  sel.value = SETTINGS.form; sel.disabled = n < KILL.black;
+  $('#formNote').textContent = n < KILL.black ? n + ' K.O.s. Every K.O. adds a skull; the Black form unlocks at ' + KILL.black + ' (' + (KILL.black - n) + ' to go).'
+    : n < KILL.trans ? n + ' K.O.s. Black form unlocked. ' + KILL.trans + ' K.O.s transcend (' + (KILL.trans - n) + ' to go).' : n + ' K.O.s. Transcended.';
+}
+$('#optForm').addEventListener('change', (e) => {
+  SETTINGS.form = e.target.value === 'normal' ? 'normal' : 'black'; store.set('settings', SETTINGS);
+  if (player) { trophySet(player, KILLS.n, SETTINGS.form === 'normal'); blackEnter(player); }
+  e.target.blur();
+});
+function blackUnlock() {
+  showBanner(KILL.black + ' K.O.s', 'Black form'); SFX.gong && SFX.gong();
+  if (player && player.tro && player.tro.black) blackEnter(player);
+  screenFlash('#ff4a1a', 0.6);
+}
+// ---- 1000 K.O.s: transcendence (shown once), then the arena hook ----
+const TRANS = { t: -1, s: 0, beam: null };
+function transcend(force) {
+  if (!player || (KILLS.cel && !force)) return;
+  KILLS.cel = 1; saveKills();
+  TRANS.t = 0; TRANS.s = 0;
+  const el = $('#trans'); el.hidden = false; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+  addFeed(null, player.name + ' transcended', '');
+}
+function endTranscend() { const el = $('#trans'); el.classList.remove('on'); setTimeout(() => { if (!el.classList.contains('on')) el.hidden = true; }, 700); }
+$('#transGo').addEventListener('click', (e) => { endTranscend(); e.currentTarget.blur(); canvas.focus(); });
+function updateTrans(fdt) {
+  if (TRANS.t < 0) return;
+  const t = (TRANS.t += fdt), p = player, R = p.root.position, fx = GFX.fx;
+  if (!TRANS.beam) {
+    TRANS.beam = new THREE.Mesh(shared(new THREE.CylinderGeometry(0.7, 1.5, 70, 24, 1, true)), new THREE.MeshBasicMaterial({ color: '#ffd27a', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    TRANS.beam.renderOrder = 3; scene.add(TRANS.beam);
+  }
+  const B = TRANS.beam, k = t < 0.4 ? t / 0.4 : t > 4.2 ? Math.max(0, 1 - (t - 4.2) / 1.4) : 1;
+  B.position.set(R.x, 35, R.z); B.material.opacity = 0.42 * k; B.scale.set(1 + Math.sin(t * 9) * 0.08 + (1 - k) * 0.6, 1, 1 + Math.sin(t * 9) * 0.08 + (1 - k) * 0.6);
+  if (TRANS.s === 0) {
+    TRANS.s = 1; audioAt(null); SFX.gong && SFX.gong();
+    screenFlash('#ffe2a0', 0.9); fovKick = Math.max(fovKick, 12); speedLines(0.9, 1.4); rumble(0.6, 1, 500);
+    center(p, _ta); impactFlash(_ta, '#ffe0a0', true);
+    emit('stars', _ta, { n: fx >= 2 ? 50 : 20, speed: 9, up: 8 }); emit('ember', _ta, { n: fx >= 2 ? 40 : 15, speed: 5, up: 9, life: 1.4 });
+  }
+  if (t < 3.2 && Math.floor(t / 0.4) >= TRANS.s) {
+    TRANS.s++;
+    ringFx(_tb.set(R.x, R.y, R.z), TRANS.s % 2 ? '#ffd27a' : '#ff8a2a', 5 + TRANS.s * 1.2, 0.8);
+    emit('stars', _ta.set(R.x, R.y + rand(0.5, 3), R.z), { n: fx >= 2 ? 10 : 4, speed: 6, up: 5 });
+    if (fx >= 2) spawnPuffs(_ta.set(R.x, R.y + 0.2, R.z), ['#fff2c8', '#ffd27a'], fx >= 3 ? 6 : 3, 0.5, 2);
+    if (TRANS.s === 3) SFX.lantern && SFX.lantern();
+  }
+  if (t > 5.8) {
+    scene.remove(B); B.material.dispose(); TRANS.beam = null; TRANS.t = -1;
+    endTranscend();
+    selectArena('transcended');
+  }
+}
+// Arenas: the park is the only one built so far. 'transcended' (unlocked at 1000 K.O.s) is a hook for the next
+// step: give ARENAS.transcended a build() (and the park an unbuild()) and selectArena switches; until then any
+// arena that is not built falls back to the park.
+const ARENAS = { park: { name: 'Park', build: null, unbuild: null }, transcended: { name: 'Transcended realm', build: null, unbuild: null } };
+let ARENA = 'park';
+function selectArena(key) {
+  if (!own(ARENAS, key) || (key === 'transcended' && KILLS.n < KILL.trans)) key = 'park';
+  if (key !== 'park' && typeof ARENAS[key].build !== 'function') { console.info('Arena "' + key + '" is not built yet: staying in the park'); key = 'park'; }
+  if (key === ARENA) return ARENA;
+  const old = ARENAS[ARENA]; if (typeof old.unbuild === 'function') old.unbuild();
+  if (typeof ARENAS[key].build === 'function') ARENAS[key].build();
+  ARENA = key; return ARENA;
+}
 // mute is remembered between visits; a #mute hash in the URL always starts muted (handy for testing)
 function showMute(m) { $('#muteWave').style.display = m ? 'none' : ''; $('#muteBtn').setAttribute('aria-label', m ? 'Unmute sound' : 'Mute sound'); }
 function toggleMute() { const m = SFX.toggle(); SETTINGS.muted = m; store.set('settings', SETTINGS); showMute(m); }
@@ -5849,7 +6459,7 @@ function switchCharacter(key) {
   const nf = new Fighter(key, { id: old.id, name: old.name, localKey: 'P', noTag: true });
   nf.pos.copy(spawnPoint()); nf.yaw = camYaw; nf.snap(); nf.faceMode = shiftLock || fpv ? 'camera' : 'move'; nf.iframes = 0.86;
   fighters[fighters.indexOf(old)] = nf; old.dispose(); player = nf; setFpvView(nf, fpv);
-  setupHUD(); emit('wind', center(nf), { n: 20 }); ring(nf.pos, nf.def.color, 3);
+  setupHUD(); emit('wind', center(nf), { n: 20 }); ring(nf.pos, nf.def.color, 3); blackEnter(nf);
   canvas.focus();
 }
 
@@ -5921,7 +6531,7 @@ function frame(t) {
     for (const f of fighters) { if (f.remote) updatePuppet(f, fdt); else animateFighter(f, fdt); }
     updateContacts();
     drawProjs(renderAlpha);
-    updateParts(fdt); updateImpactFx(fdt); updateScreenFlash(fdt); updateRings(fdt); updateTemps(fdt); updateDebris(fdt); updateAuras();
+    updateParts(fdt); updateImpactFx(fdt); updateScreenFlash(fdt); updateRings(fdt); updateTemps(fdt); updateDebris(fdt); updateAuras(); updateSouls(fdt); updateTrans(fdt);
     if (cloudMesh) cloudMesh.rotation.y += fdt * 0.004;
     updateLock(fdt); animateLantern(fdt);
     updateCamera(fdt); updateSpeedLines(fdt); updateHUD(fdt); updateEventChip(); updateDuelHud(fdt); updateNums(fdt); updateTags();
@@ -6060,6 +6670,8 @@ fighters.push(player);
 spawnNPCs();
 camT.set(0, 1.7, -14);
 buildCharMenu(); setupHUD(); setRoomUI();
+blackEnter(player);
+if (KILLS.n >= KILL.trans) selectArena('transcended');   // falls back to the park until that arena is built
 enableTouch(coarsePointer.matches); syncHudVars();
 toggleHelp(innerWidth >= 980 && innerHeight >= 700 && !TOUCH.on);
 { const m = !!SETTINGS.muted || /mute/.test(location.hash); SFX.setMuted(m); showMute(m); }
@@ -6072,6 +6684,8 @@ requestAnimationFrame(frame);
 // ?dev=1 exposes internals for automated testing in the browser console
 if (/[?&]dev=1/.test(location.search)) window.__scbg = { SFX, fighters, get player() { return player; }, get gameTime() { return gameTime; }, CHARS, hit, press, held, BUF, SETTINGS, BIND, KOTH, NET, addBot, removeBot, useAbility, doM1, cycleLock, lock, toggleFpv, get fpv() { return fpv; }, renderer, M1, GUARD, PARRY, COMBO, scene, camera, updateTags, updateHUD, animateFighter, updateParts, updateRings, updateTemps, updateDebris, updateAuras, updateLock, updateCamera, updateNums, updateEventChip, drawProjs, simStep, fitShadow, GFX, applyGfx,
   applyAvatar, avatarOf, avatarParts, HATS, BACKS, FACES_UI, FACE, EMOTES, playEmote, SKIN_CACHE, rigSync, mythGfx, own,
-  applyState, packF, netNow, PORTRAITS };
+  applyState, packF, netNow, PORTRAITS,
+  KILLS, KILL, setKills, creditKill, trophySet, trophyFull, TRO_CACHE, blackEnter, blackFlourish, transcend, TRANS, selectArena, ARENAS, get ARENA() { return ARENA; },
+  koSeen, kCredit, kHit, applyNetHit, applyHitReply, applyFx, onData, pendingHits, botKills, souls, KO, respawn, switchCharacter };
 })();
 </script>
