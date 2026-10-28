@@ -2019,10 +2019,52 @@ function mythMatLow(uAwake) {
   m.userData.uAwake = uAwake; m.onBeforeCompile = mythOBCLow;
   return m;
 }
-// a fighter's body material for the current level (both share its awaken uniform)
+// Medium (phones by default): per-pixel Blinn-Phong instead of PBR. Roughness and metalness still come from the
+// vertices (shininess and specular colour), metal gets a cheap sky / ground sheen in place of reflections, and
+// the detail patterns and the warm rim stay. About as cheap to shade as Lambert, far cheaper than the PBR + env.
+function mythOBCMid(sh) {
+  Object.assign(sh.uniforms, MYTH_U); sh.uniforms.uAwake = this.userData.uAwake;
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 mat;\nattribute float emi;\nvarying vec4 vMat;\nvarying float vEmi;\nvarying vec3 vRest;\nvarying vec3 vRestN;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMat = mat; vEmi = emi; vRest = position; vRestN = normal;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+uniform sampler2D uDetailMap; uniform float uAwake; uniform float uTime; uniform vec3 uRimDir; uniform vec3 uRimCol;
+varying vec4 vMat; varying float vEmi; varying vec3 vRest; varying vec3 vRestN;
+float mythH;`)
+    .replace('#include <color_fragment>', `#include <color_fragment>
+  {
+    vec3 an = abs(vRestN); float p = vMat.z;
+    vec2 uv = an.x > an.y && an.x > an.z ? vRest.zy : (an.y > an.z ? vRest.xz : vRest.xy);
+    float sc = p < 1.5 ? 1.8 : (p < 2.5 ? 4.0 : (p < 3.5 ? 2.2 : 1.7));
+    vec4 t = texture2D(uDetailMap, uv * sc);
+    mythH = p < 0.5 ? 0.5 : (p < 1.5 ? t.r : (p < 2.5 ? t.g : (p < 3.5 ? t.b : t.a)));
+    diffuseColor.rgb *= 1.0 + (mythH - 0.5) * (p > 3.5 ? 0.55 : (p > 2.5 ? 0.3 : (p > 1.5 ? 0.16 : 0.22)));
+  }`)
+    .replace('#include <lights_phong_fragment>', `#include <lights_phong_fragment>
+  {
+    float rough = clamp(vMat.x + (0.5 - mythH) * 0.3, 0.05, 1.0), metal = vMat.y;
+    material.diffuseColor = diffuseColor.rgb * (1.0 - metal * 0.75);
+    material.specularColor = mix(vec3(0.04), diffuseColor.rgb * 1.6, metal) * (1.0 - rough * 0.7);
+    material.specularShininess = mix(90.0, 6.0, rough);
+  }`)
+    .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+  {
+    float fres = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);
+    float side = clamp(dot(normal, uRimDir) * 0.7 + 0.45, 0.0, 1.0);
+    totalEmissiveRadiance += uRimCol * fres * side * (1.0 - 0.45 * vMat.y);
+    totalEmissiveRadiance += diffuseColor.rgb * vMat.y * (0.22 + 0.2 * normal.y) * (1.0 - vMat.x * 0.5);
+    totalEmissiveRadiance += vColor * (vEmi * 1.4 + vMat.w * uAwake * (1.1 + 0.6 * sin(uTime * 7.0)));
+  }`);
+}
+function mythMatMid(uAwake) {
+  const m = new THREE.MeshPhongMaterial({ vertexColors: true, skinning: true });
+  m.userData.uAwake = uAwake; m.onBeforeCompile = mythOBCMid;
+  return m;
+}
+// a fighter's body material for the current level (all three share its awaken uniform)
 function fighterMat(f) {
   if (!f.uAwake) f.uAwake = { value: 0 };
   if (GFX.level === 'low') return f.matLow || (f.matLow = mythMatLow(f.uAwake));
+  if (GFX.level === 'medium') return f.matMid || (f.matMid = mythMatMid(f.uAwake));
   return f.matStd || (f.matStd = mythMat(f.uAwake));
 }
 // fur shells: copies of a base surface pushed out along their normals, each cut away by the strand texture
@@ -2963,7 +3005,7 @@ class Fighter {
     removeAura(this);
     scene.remove(this.root);
     if (this.skin) this.skin.skeleton.dispose();
-    for (const m of [this.matLow, this.matStd]) if (m) m.dispose();
+    for (const m of [this.matLow, this.matMid, this.matStd]) if (m) m.dispose();
     disposeTree(this.root);   // per-fighter materials (shield, ice, eyes, body...) and unshared rig geometry
     if (this.bliz) { scene.remove(this.bliz.grp); disposeTree(this.bliz.grp); this.bliz = null; }
     if (this.tagEl) this.tagEl.remove();
