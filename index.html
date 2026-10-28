@@ -67,10 +67,10 @@ button:focus-visible,input:focus-visible{outline:2px solid #fff;outline-offset:2
 .rbtn .sw{width:12px;height:12px;border-radius:3px;background:var(--accent)}
 .rbtn.on{background:rgba(255,255,255,.9)}.rbtn.on svg{stroke:#111}
 #charWrap{position:relative}
-#charMenu{position:absolute;top:52px;left:0;width:290px;border-radius:12px;padding:6px;display:grid;gap:4px;background:var(--glass-hi)}
-.citem{display:grid;grid-template-columns:14px 1fr auto;gap:10px;align-items:center;text-align:left;padding:9px 10px;border-radius:8px;border:0;background:none;cursor:pointer}
+#charMenu{position:absolute;top:52px;left:0;width:310px;border-radius:12px;padding:6px;display:grid;gap:4px;background:var(--glass-hi)}
+.citem{display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;text-align:left;padding:9px 10px;border-radius:8px;border:0;background:none;cursor:pointer}
 .citem:hover,.citem[aria-checked="true"]{background:rgba(255,255,255,.1)}
-.citem .sw{width:14px;height:14px;border-radius:4px}
+.citem .sw{width:52px;height:52px;border-radius:8px;background-size:cover;background-position:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
 .citem strong{display:block;font-size:15px;font-weight:700;line-height:1.15}
 .citem strong.han{font-size:20px}
 .citem span{display:block;font-size:11px;color:var(--dim);font-weight:500}
@@ -1759,8 +1759,10 @@ function randBodyPoint(f) { return new V3(f.pos.x + rand(-0.55, 0.55), f.pos.y +
 // Hiding a pivot (weapons, the hood under a custom hat, Steve's ult armour) collapses its bone (rigSync).
 // Cloth (sashes, skirt plates, plumes, tails) hangs on extra pivots with a little spring each frame.
 let MYTH = null;      // build context: { cloth: [], fur: [] } while a fighter (or its avatar gear) is being built
-let LOWB = false;     // building the Low version: fewer segments
-const sg = (n) => (LOWB ? Math.max(4, Math.round(n * 0.55)) : n);
+let LOWB = false;     // building the Low version: plain boxes, no bevels, no fur
+let LODF = 1;         // segment factor for the level being built (round shapes get coarser on Medium / Low)
+const LOD_F = { low: 0.5, medium: 0.7, high: 0.85 };
+const sg = (n) => Math.max(4, Math.round(n * LODF));
 const GK = new Map();
 function gk(key, make) { let g = GK.get(key); if (!g) { g = make(); if (!g.boundingSphere) g.computeBoundingSphere(); shared(g); GK.set(key, g); } return g; }
 const rk = (v) => Math.round(v * 1000);
@@ -1768,7 +1770,7 @@ const gSph = (r, ws, hs, p0 = 0, pl = TAU, t0 = 0, tl = PI) => { ws = sg(ws); hs
 const gCyl = (rt, rb, h, s, open = false, t0 = 0, tl = TAU) => { s = sg(s); return gk(['cyl', rk(rt), rk(rb), rk(h), s, open, rk(t0), rk(tl)].join(), () => new THREE.CylinderGeometry(rt, rb, h, s, 1, open, t0, tl)); };
 const gCone = (r, h, s) => { s = sg(s); return gk(['cone', rk(r), rk(h), s].join(), () => new THREE.ConeGeometry(r, h, s)); };
 const gTor = (R, r, rs, ts, arc = TAU) => { rs = sg(rs); ts = sg(ts); return gk(['tor', rk(R), rk(r), rs, ts, rk(arc)].join(), () => new THREE.TorusGeometry(R, r, rs, ts, arc)); };
-const gIco = (r, d = 1) => gk(['ico', rk(r), LOWB ? 0 : d].join(), () => new THREE.IcosahedronGeometry(r, LOWB ? 0 : d));
+const gIco = (r, d = 1) => gk(['ico', rk(r), LODF < 0.8 ? 0 : d].join(), () => new THREE.IcosahedronGeometry(r, LODF < 0.8 ? 0 : d));
 const gBox = (w, h, d, r = 0) => (LOWB || r <= 0 ? boxG(w, h, d) : bevelG(w, h, d, r));
 // lathe around y from (radius, y) pairs listed bottom to top
 const gLathe = (pts, s, p0 = 0, pl = TAU) => { s = sg(s); return gk('lat' + pts.map((p) => rk(p[0]) + ':' + rk(p[1])).join(',') + '|' + s + '|' + rk(p0) + '|' + rk(pl), () => new THREE.LatheGeometry(pts.map((p) => new THREE.Vector2(p[0], p[1])), s, p0, pl)); };
@@ -1791,10 +1793,10 @@ function gPlate(w, h, t, bend = 0, taper = 1, hang = false, ws = 8, hs = 2) {
 }
 // extruded outline (points in x / y), bevelled, centred on z
 function gExt(key, pts, depth, bev = 0.01) {
-  return gk('ext' + key + '|' + rk(depth) + '|' + rk(bev) + (LOWB ? 'L' : ''), () => {
+  return gk('ext' + key + '|' + rk(depth) + '|' + rk(bev) + '|' + LODF, () => {
     const sh = new THREE.Shape(); sh.moveTo(pts[0][0], pts[0][1]);
     for (let i = 1; i < pts.length; i++) { const p = pts[i]; if (p.length === 4) sh.quadraticCurveTo(p[0], p[1], p[2], p[3]); else sh.lineTo(p[0], p[1]); }
-    const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: bev > 0, bevelThickness: bev, bevelSize: bev, bevelSegments: LOWB ? 1 : 2, curveSegments: LOWB ? 4 : 8 });
+    const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: bev > 0, bevelThickness: bev, bevelSize: bev, bevelSegments: LODF < 0.8 ? 1 : 2, curveSegments: sg(8) });
     g.translate(0, 0, -depth / 2); return g;
   });
 }
@@ -1808,6 +1810,21 @@ function gTube(key, pts, r0, r1, seg = 12, rs = 6) {
       const ring = Math.floor(i / (rs + 1)), t = ring / seg, r = lerp(r0, r1, t);
       c.getPointAt(t, tmp); P.setXYZ(i, tmp.x + N.getX(i) * r, tmp.y + N.getY(i) * r, tmp.z + N.getZ(i) * r);
     }
+    return g;
+  });
+}
+// a flat band (w wide, t thick) laid along a smooth path, its face turned to the given normals: sashes, collars
+function gRibbon(key, pts, nrm, w, t, seg = 24) {
+  seg = sg(seg);
+  return gk('rib' + key + '|' + seg, () => {
+    const C = new THREE.CatmullRomCurve3(pts.map((p) => new V3(p[0], p[1], p[2]))), Cn = new THREE.CatmullRomCurve3(nrm.map((p) => new V3(p[0], p[1], p[2])));
+    const pos = [], idx = [], c = new V3(), T = new V3(), N = new V3(), S = new V3();
+    for (let i = 0; i <= seg; i++) {
+      const u = i / seg; C.getPoint(u, c); C.getTangent(u, T); Cn.getPoint(u, N); N.addScaledVector(T, -N.dot(T)).normalize(); S.crossVectors(T, N).normalize();
+      for (const [a, b] of [[1, 1], [-1, 1], [-1, -1], [1, -1]]) pos.push(c.x + (S.x * a * w + N.x * b * t) / 2, c.y + (S.y * a * w + N.y * b * t) / 2, c.z + (S.z * a * w + N.z * b * t) / 2);
+    }
+    for (let i = 0; i < seg; i++) for (let k = 0; k < 4; k++) { const a = i * 4 + k, b = i * 4 + (k + 1) % 4; idx.push(a, a + 4, b, b, a + 4, b + 4); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
     return g;
   });
 }
@@ -2098,7 +2115,7 @@ function skinBake(f) {
     if (i === undefined) { i = holders.length; hIdx.set(h, i); holders.push(h); }
     parts.push([m, i]);
   }
-  const key = f.lookKey ? f.lookKey + '|' + (LOWB ? 'L' : 'H') : null;
+  const key = f.lookKey ? f.lookKey + '|' + (f.lodf || 1) : null;
   let geo = key && SKIN_CACHE.get(key);
   if (!geo) {
     geo = bakeGeometry(parts, holders);
@@ -2186,6 +2203,16 @@ function mythBody(B, o) {
     for (let i = 1; i < p.length; i++) if (y <= p[i][1]) { r = lerp(p[i - 1][0], p[i][0], (y - p[i - 1][1]) / (p[i][1] - p[i - 1][1])); break; }
     const rx = r * (o.tw || 1); return (o.td || 0.64) * r * Math.sqrt(Math.max(0, 1 - (x / rx) ** 2));
   };
+  // a path over the torso: [x, y, side (1 front, -1 back, 0 = explicit z), z] -> points just proud of the surface and their normals
+  rig.tpath = (list, lift = 0.012) => {
+    const td = o.td || 0.64, tw = o.tw || 1, pts = [], nrm = [];
+    for (const [x, y, sd, z0] of list) {
+      if (!sd) { pts.push([x, y, z0]); nrm.push([x * 0.4, 1, z0 * 0.4]); continue; }
+      const z = sd * rig.tz(y, x), n = new V3(x * td * td / (tw * tw), 0.15, z).normalize();
+      pts.push([x + n.x * lift, y + n.y * lift, z + n.z * lift]); nrm.push([n.x, n.y, n.z]);
+    }
+    return [pts, nrm];
+  };
   P(T, gCyl(0.085, 0.1, 0.16, 10), o.skin, 0, 0.84, 0);
   rig.armL = piv(T, 0.6, 0.72, 0); rig.armR = piv(T, -0.6, 0.72, 0);
   if (o.arms !== false) for (const A of [rig.armL, rig.armR]) {
@@ -2269,6 +2296,10 @@ function buildLion(B) {
     const H = rig.head, my = HEAD.y - 0.085, mz = HEAD.r(-0.085) * HEAD.sz;
     P(H, gTube('lionstache' + s, [[s * 0.01, my, mz + 0.01], [s * 0.06, my - 0.005, mz - 0.005], [s * 0.11, my - 0.06, mz - 0.04], [s * 0.12, my - 0.16, mz - 0.06]], 0.016, 0.004, 12, 5), SURF.fur('#1a110c'));
     P(H, gCone(0.03, 0.14, 6), SURF.fur('#1a110c'), s * 0.03, HEAD.y - 0.27, HEAD.r(-0.2) * HEAD.sz - 0.035, { r: [PI + 0.25, 0, -s * 0.12] });
+    if (s > 0) {
+      P(H, gSph(1, 20, 14), SURF.fur('#1a110c'), 0, HEAD.y + 0.035, -0.04, { s: [0.247, 0.262, 0.238] });
+      P(H, gSph(0.07, 12, 10), SURF.fur('#1a110c'), 0, HEAD.y + 0.27, -0.06); P(H, gTor(0.05, 0.014, 5, 12), G, 0, HEAD.y + 0.25, -0.06, { r: [PI / 2, 0, 0], d: 1 });
+    }
   }
   P(T, gTor(0.15, 0.035, 6, 22), G, 0, 0.79, 0.005, { r: [PI / 2, 0, 0], s: [1, 0.75, 1] });
   // belt with a lion-mask buckle, a red sash knotted at the hip, lamellar skirt
@@ -2359,7 +2390,7 @@ function buildPenguin(B) {
     torso: [[0.31, -0.02], [0.34, 0.12], [0.355, 0.32], [0.36, 0.52], [0.41, 0.64], [0.44, 0.71], [0.38, 0.79], [0.13, 0.87], [0, 0.88]] });
   const T = rig.torso;
   P(T, gPlate(0.42, 0.5, 0.035, 1.3, 0.85), W, 0, 0.43, rig.tz(0.43) + 0.01, { r: [-0.08, 0, 0] });   // cream under-robe, the penguin's white front
-  for (const s of [1, -1]) P(T, gPlate(0.08, 0.36, 0.024, 0, 1), W, s * 0.075, 0.68, rig.tz(0.68, 0.075) - 0.005, { r: [-0.6, 0, s * 0.5] });   // crossed collar
+  for (const s of [1, -1]) { const [pp, nn] = rig.tpath([[s * 0.12, 0.86, 0, -0.02], [s * 0.13, 0.78, 1], [s * 0.07, 0.66, 1], [0, 0.56, 1]], 0.01); P(T, gRibbon('pcollar' + s, pp, nn, 0.075, 0.03, 14), W); }
   P(T, gCyl(0.335, 0.345, 0.13, 26), A, 0, 0.2, 0, { s: [1, 1, 0.77] });   // saffron sash
   P(T, gSph(0.06, 12, 8), A, 0.12, 0.2, 0.27, { s: [1.2, 0.9, 0.7] });
   const tails = clothPiv(T, 0.12, 0.16, 0.27, { amt: 1, k: 95, sway: 0.07 });
@@ -2373,9 +2404,10 @@ function buildPenguin(B) {
   }
   P(T, gIco(0.045, 1), JI, 0, 0.5, 0.3); P(T, gCone(0.022, 0.1, 6), ICE, 0, 0.42, 0.3, { r: [PI, 0, 0], d: 1 });
   // saffron kasaya draped from the left shoulder across to the right hip, front and back
-  for (const [z, ry] of [[1, 0], [-1, PI]]) {
-    P(T, gPlate(0.3, 0.98, 0.03, 0.5, 1), A, 0.04 * z, 0.43, z * (rig.tz(0.43) + 0.03), { r: [z * 0.06, ry, 0.62 * z], ord: 'YXZ' });
-    P(T, gPlate(0.035, 0.98, 0.034, 0.5, 1), sp('#7a2e10', 0.9, 0, 2), 0.04 * z - z * 0.085 * Math.cos(0.62), 0.43 - 0.085 * Math.sin(0.62), z * (rig.tz(0.43) + 0.032), { r: [z * 0.06, ry, 0.62 * z], ord: 'YXZ', d: 1 });
+  {
+    const path = [[-0.3, 0.12, 1], [-0.2, 0.27, 1], [-0.05, 0.45, 1], [0.1, 0.62, 1], [0.21, 0.76, 1], [0.27, 0.86, 0, 0], [0.21, 0.76, -1], [0.1, 0.62, -1], [-0.05, 0.45, -1], [-0.2, 0.27, -1], [-0.3, 0.12, -1]];
+    const [pp, nn] = rig.tpath(path, 0.02); P(T, gRibbon('kasaya', pp, nn, 0.24, 0.03, 40), A);
+    const [p2, n2] = rig.tpath(path, 0.036); P(T, gRibbon('kasayab', p2, n2, 0.05, 0.012, 40), sp('#7a2e10', 0.9, 0, 2), 0, 0, 0, { d: 1 });
   }
   P(rig.head, gSph(1, 8, 6), SURF.glow('#b01c1c', 0.2), 0, HEAD.y + 0.135, HEAD.r(0.135) * HEAD.sz - 0.004, { s: [0.012, 0.016, 0.006], d: 1 });
   skirt(T, SURF.cloth('#232838'), ICE, { y: 0.12, len: 0.5, w: 0.44, zf: 0.265, zb: 0.26, xs: 0.34, taper: 1.15 });
@@ -2432,8 +2464,10 @@ function buildSteve(B) {
   rig.neth = [];
   const T = rig.torso;
   // crossed collar (right over left), rope belt, gourd, patched robe skirt
-  P(T, gPlate(0.09, 0.6, 0.02, 0.3, 1), CR, 0.045, 0.5, rig.tz(0.5, 0.045) + 0.004, { r: [-0.3, 0, 0.42] });
-  P(T, gPlate(0.09, 0.62, 0.022, 0.3, 1), CR, -0.035, 0.49, rig.tz(0.49, 0.035) + 0.014, { r: [-0.3, 0, -0.42] });
+  for (const [s, lift] of [[-1, 0.008], [1, 0.02]]) {   // right side under, left side over
+    const [pp, nn] = rig.tpath([[s * 0.12, 0.86, 0, -0.03], [s * 0.13, 0.78, 1], [s * 0.06, 0.62, 1], [-s * 0.06, 0.44, 1], [-s * 0.16, 0.26, 1]], lift);
+    P(T, gRibbon('scollar' + s, pp, nn, 0.085, 0.022, 18), CR);
+  }
   P(T, gTor(0.3, 0.024, 6, 26), RO, 0, 0.21, 0, { r: [PI / 2, 0, 0], s: [1, 0.68, 1] });
   P(T, gTor(0.305, 0.024, 6, 26), RO, 0, 0.17, 0, { r: [PI / 2, 0, 0], s: [1, 0.68, 1] });
   P(T, gSph(0.04, 10, 8), RO, -0.1, 0.19, 0.205);
@@ -2722,10 +2756,10 @@ function applyAvatar(f, av) {
   if (rig.parts) rig.parts = rig.parts.filter((m) => !under(m.userData.holder, rig.hat) && !under(m.userData.holder, rig.back));
   for (const G of [rig.hat, rig.back]) for (const c of G.children.slice()) { if (c.isBone) continue; disposeTree(c); G.remove(c); }
   rig.hood.visible = hat === 'auto';
-  const prevLow = LOWB, prevCtx = MYTH; LOWB = !!f.lowb; MYTH = { cloth: [], fur: [] };
+  const prevLow = LOWB, prevF = LODF, prevCtx = MYTH; LOWB = !!f.lowb; LODF = f.lodf || 1; MYTH = { cloth: [], fur: [] };
   if (hat !== 'auto' && hat !== 'none') buildHat(rig.hat, hat);
   if (back !== 'none') buildBack(rig.back, back);
-  rig.clothAv = MYTH.cloth; LOWB = prevLow; MYTH = prevCtx;
+  rig.clothAv = MYTH.cloth; LOWB = prevLow; LODF = prevF; MYTH = prevCtx;
   rig.faceKey = face !== 'auto' ? face : rig.baseFace;
   f.lookKey = f.key + '|' + hat + '|' + back;
   if (f.skin) skinBake(f);
@@ -2819,13 +2853,13 @@ class Fighter {
     this.root = new THREE.Group();
     this.visual = piv(this.root, 0, 1, 0);
     this.body = piv(this.visual, 0, -1, 0);
-    BEVEL = !this.lantern; LOWB = this.lowb = GFX.level === 'low'; MYTH = null;
+    BEVEL = !this.lantern; LOWB = this.lowb = GFX.level === 'low'; LODF = this.lodf = LOD_F[GFX.level]; MYTH = null;
     this.rig = this.def.build(this.body, this);
     BEVEL = false; MYTH = null;
     if (this.rig.hood) applyAvatar(this, o.av || (this.localKey === 'P' ? avatarOf() : this.ai ? botAvatar() : 'auto|none|auto'));
     if (this.rig.mythic) { if (!this.lookKey) this.lookKey = key + '|auto|none'; skinBake(this); if (GFX.level === 'low') for (const m of this.rig.fur) m.visible = false; }
     else mergeMeshes(this.body);
-    LOWB = false; this.merged = true;
+    LOWB = false; LODF = 1; this.merged = true;
     this.pose = {}; this.tgt = {};
     for (const k of PARTS) if (this.rig[k]) { this.pose[k] = [0, 0, 0]; this.tgt[k] = [0, 0, 0]; }
     this.shield = new THREE.Mesh(shieldGeo, new THREE.MeshBasicMaterial({ color: '#8cc4ff', transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false }));
@@ -4255,7 +4289,7 @@ function sharkWave(f) {
 // =====================================================================
 const CHARS = {
   lion: {
-    name: '阿娟', han: true, short: 'Lion Dancer', roman: 'Ā Juān', title: 'The Lion Dancer', role: 'Momentum close-combat', color: '#e0262f', fx: 'lion', lieY: 0.22,
+    name: '阿娟', han: true, short: 'Lion Guardian', roman: 'Ā Juān', title: 'The Gilded Guardian', role: 'Momentum close-combat', color: '#e0262f', fx: 'lion', lieY: 0.22,
     build: buildLion, rest: { cape: [0.22, 0, 0] },
     m1: [   // 4 hits (was 5): jab, jab, sweep, head swipe
       { anim: 'jabL', dmg: 3.5 }, { anim: 'jabR', dmg: 3.5 },
@@ -4282,7 +4316,7 @@ const CHARS = {
     },
   },
   penguin: {
-    name: 'Penguin', short: 'Penguin', roman: 'Tuxedo bruiser', title: 'Physics disruptor', role: 'Physics & crowd control', color: '#7fd4ff', fx: 'ice', lieY: 0.22,
+    name: 'Penguin', short: 'Penguin', roman: 'Hooded frost monk', title: 'Physics disruptor', role: 'Physics & crowd control', color: '#7fd4ff', fx: 'ice', lieY: 0.22,
     build: buildPenguin, rest: { armL: [0, 0, 0.14], armR: [0, 0, -0.14] }, waddle: true,
     m1: [   // 4 hits (was 3): three tumbling flipper slaps, then a belly-bump that knocks back (no more pancake finisher)
       { anim: 'slapL', dmg: 4, side: 1, o: { tumble: 1, kb: 4.2 } },
@@ -4314,7 +4348,7 @@ const CHARS = {
     },
   },
   steve: {
-    name: 'Steve', short: 'Steve', roman: 'Minecraft Steve', title: 'Tactical weapon-switcher', role: 'Weapon switcher · jump crits', color: '#19aeb0', fx: 'voxel', lieY: 0.2,
+    name: 'Steve', short: 'Steve', roman: 'Wandering pilgrim', title: 'Tactical weapon-switcher', role: 'Weapon switcher · jump crits', color: '#19aeb0', fx: 'voxel', lieY: 0.2,
     build: buildSteve, airCrit: true,
     m1: [
       { anim: 'jabR', dmg: 5 }, { anim: 'sword', dmg: 5, range: 2.7, sword: true },
@@ -4339,7 +4373,7 @@ const CHARS = {
     },
   },
   shark: {
-    name: 'Shark', short: 'Shark', roman: 'Great white', title: 'Rushdown brawler', role: 'Aggressive rushdown', color: '#3d8fd6', fx: 'water', lieY: 0.22,
+    name: 'Shark', short: 'Shark', roman: 'River demon', title: 'Rushdown brawler', role: 'Aggressive rushdown', color: '#3d8fd6', fx: 'water', lieY: 0.22,
     build: buildShark, rest: { armL: [0, 0, 0.12], armR: [0, 0, -0.12], tail: [-0.15, 0, 0] },
     m1: [
       { anim: 'slapL', dmg: 4 }, { anim: 'slapR', dmg: 4 },
@@ -5669,13 +5703,55 @@ function buildCharMenu() {
     const d = CHARS[k];
     const b = document.createElement('button'); b.type = 'button'; b.className = 'citem'; b.setAttribute('role', 'menuitemradio'); b.dataset.char = k;
     b.innerHTML = '<i class="sw"></i><div><strong></strong><span></span></div><em></em>';
-    b.querySelector('.sw').style.background = d.color;
+    b.querySelector('.sw').style.backgroundColor = d.color;
     const st = b.querySelector('strong'); st.textContent = d.han ? d.name : d.name; if (d.han) st.classList.add('han');
-    b.querySelector('span').textContent = (d.han ? d.roman + ' · ' : '') + d.role;
+    b.querySelector('span').textContent = (d.roman ? d.roman + ' · ' : '') + d.role;
     b.querySelector('em').textContent = 'Spawn';
     b.addEventListener('click', () => switchCharacter(k));
     menu.appendChild(b);
   }
+  if (!buildCharMenu.done) { buildCharMenu.done = true; setTimeout(charPortraits, 400); }
+  else charPortraits();
+}
+// character-select portraits: each warrior is built once, rendered head-and-shoulders under its own warm key
+// and rim lights into a small render target, and kept as an image (no live 3D in the menu)
+const PORTRAITS = {};
+function charPortraits() {
+  try {
+    const N = 192, rt = new THREE.WebGLRenderTarget(N, N, { encoding: THREE.sRGBEncoding }), buf = new Uint8Array(N * N * 4);
+    const ps = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 0.1, 30);
+    ps.add(new THREE.HemisphereLight(0xc9d2e4, 0x2a2018, 0.55));
+    const key = new THREE.DirectionalLight(0xffe2b8, 1.7); key.position.set(-2, 3, 3); ps.add(key);
+    const rim = new THREE.DirectionalLight(0xff9a50, 1.6); rim.position.set(3, 2, -3); ps.add(rim);
+    cam.position.set(0.75, 1.92, 2.75); cam.lookAt(0, 1.72, 0);
+    const lv = GFX.level, det = MYTH_U.uDetail.value, cc = renderer.getClearColor(new THREE.Color()), ca = renderer.getClearAlpha();
+    GFX.level = 'high'; MYTH_U.uDetail.value = 1;
+    MYTH_U.uRimDir.value.set(0.7, 0.3, -0.6).normalize();
+    for (const k of PLAYABLE) {
+      if (!PORTRAITS[k]) {
+        const f = new Fighter(k, { name: '', noTag: true, av: 'auto|none|auto', localKey: 'portrait' });
+        scene.remove(f.root); ps.add(f.root); f.root.rotation.y = 0.3;
+        const rest = f.def.rest || {}; for (const p in rest) if (f.rig[p]) f.rig[p].rotation.set(rest[p][0], rest[p][1], rest[p][2]);
+        rigSync(f, 0);
+        renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(ps, cam);
+        renderer.readRenderTargetPixels(rt, 0, 0, N, N, buf);
+        ps.remove(f.root); f.dispose();
+        // ink-wash backdrop in the character's colour, the render on top (rows flipped: GL reads bottom-up)
+        const c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d');
+        const bg = g.createRadialGradient(N * 0.5, N * 0.42, 4, N * 0.5, N * 0.5, N * 0.75);
+        bg.addColorStop(0, CHARS[k].color); bg.addColorStop(0.55, '#2a2220'); bg.addColorStop(1, '#0d0b0a');
+        g.fillStyle = bg; g.fillRect(0, 0, N, N);
+        const t = document.createElement('canvas'); t.width = t.height = N; const tg = t.getContext('2d'), img = tg.createImageData(N, N);
+        for (let y = 0; y < N; y++) img.data.set(buf.subarray((N - 1 - y) * N * 4, (N - y) * N * 4), y * N * 4);
+        tg.putImageData(img, 0, 0); g.drawImage(t, 0, 0);
+        PORTRAITS[k] = c.toDataURL('image/png');
+      }
+      const el = document.querySelector('.citem[data-char="' + k + '"] .sw'); if (el) el.style.backgroundImage = 'url(' + PORTRAITS[k] + ')';
+    }
+    renderer.setRenderTarget(null); renderer.setClearColor(cc, ca);
+    GFX.level = lv; MYTH_U.uDetail.value = det;
+    rt.dispose();
+  } catch (e) { renderer.setRenderTarget(null); console.warn('portraits skipped', e); }
 }
 function toggleCharMenu() { const m = $('#charMenu'); m.hidden = !m.hidden; $('#charBtn').setAttribute('aria-expanded', String(!m.hidden)); }
 function closeCharMenu() { $('#charMenu').hidden = true; $('#charBtn').setAttribute('aria-expanded', 'false'); }
