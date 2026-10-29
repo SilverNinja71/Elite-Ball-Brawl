@@ -249,7 +249,8 @@ body.fin-cine #topbar,body.fin-cine #room,body.fin-cine #feed,body.fin-cine #tsb
 #evChip.live{border-color:rgba(255,207,58,.75);color:#fff6cf;box-shadow:0 0 14px rgba(255,207,58,.35)}
 #evChip.live i{animation:pulse .6s ease-in-out infinite alternate}
 #pillChip{display:inline-flex;align-items:center;gap:8px;max-width:100%;height:26px;padding:0 12px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#f3ddd0;white-space:nowrap;border-color:rgba(200,22,31,.6)}
-#pillChip[hidden]{display:none}
+#pillChip[hidden],#pillBtn[hidden]{display:none}
+#pillChip .sbtn{height:20px;padding:0 9px;font-size:10px;margin-right:-8px;pointer-events:auto}
 #pillChip span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 #pillChip i{flex:none;width:8px;height:8px;border-radius:50%;background:#c8161f;box-shadow:0 0 8px #c8161f}
 #pillChip.go{border-color:rgba(255,207,58,.8);color:#fff6cf;box-shadow:0 0 14px rgba(255,207,58,.35)}
@@ -454,7 +455,7 @@ body.touch .mini{height:52px}
 
   <div id="topc">
     <div id="evChip" class="glass" hidden><i></i><span id="evTxt">Golden Lantern</span></div>
-    <div id="pillChip" class="glass" hidden><i></i><span id="pillTxt"></span></div>
+    <div id="pillChip" class="glass" hidden><i></i><span id="pillTxt"></span><button type="button" class="sbtn" id="pillBtn" hidden>Go back down</button></div>
     <div id="duelChip" class="glass" hidden><i></i><span id="duelTxt"></span><button type="button" class="sbtn" id="duelWatch">Watch</button></div>
     <div id="cqHud" class="glass" hidden aria-label="Cabbage duel">
       <div class="cs a"><b id="cqAn"></b><i><s id="cqAb"></s></i><small id="cqAh"></small></div>
@@ -528,7 +529,7 @@ body.touch .mini{height:52px}
     <label class="opt"><span>Lion-dance drums</span><input type="range" id="optDrums" min="0" max="100" step="5" aria-label="Lion-dance drums volume"></label>
     <label class="opt"><span>Graphics</span><select id="optGfx"><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
     <p class="note" id="gfxNote"></p>
-    <label class="opt"><span>Bot difficulty (hosted servers)</span><select id="optBots"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></label>
+    <label class="opt"><span>Bot difficulty</span><select id="optBots"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></label>
     <div class="k-only">
       <div class="ht"><h4>Keys</h4><button type="button" class="sbtn" id="keysReset">Reset</button></div>
       <p class="note">Click a key, then press the new one (Esc cancels). Left click is always M1; arrow keys always move.</p>
@@ -3478,22 +3479,25 @@ function ascendStep(dt) {
   ringFx(tB.set(s.x, 0, s.z), '#ffd27a', 6, 1.2);
   addFeed(null, p.name + ' ascended', '');
 }
-// the hint chip near the Pillar
+// the hint chip near the Pillar (and, in the realm after an ascension, the way back down)
+$('#pillBtn').addEventListener('click', (e) => { e.currentTarget.blur(); canvas.focus(); if (ARENA_PASS && NET.mode !== 'client') descend(); });
 function pillarHud() {
   const p = player; let key = '';
   if (PILLAR.on && p && !p.dead) {
     if (PILLAR.asc) key = 'asc';
     else if (PILLAR.done && NET.mode === 'client' && p.pos.y > PILLAR.top - 1) key = 'guest';
     else if (pillarDist(p) < 7.5 && p.pos.y < 3) key = blackClimber(p) ? 'go' : KILLS.n >= KILL.black ? 'form' : 'locked';
-  }
+  } else if (ARENA === 'transcended' && ARENA_PASS === 'transcended' && NET.mode !== 'client' && p && !p.dead && !PILLAR.asc) key = 'down';   // ascended from the Pillar: the way back
   if (key === PILLAR.chipKey) return;
   PILLAR.chipKey = key;
   const el = $('#pillChip'); el.hidden = !key; el.classList.toggle('go', key === 'go' || key === 'asc');
   if (!key) return;
+  $('#pillBtn').hidden = key !== 'down';
   const el2 = $('#pillTxt');
   el2.textContent = key === 'go' ? (TOUCH.on ? 'Jump on the ring to climb' : keyName(BIND.jump) + ' on the ring to climb')
     : key === 'asc' ? 'Ascending…'
     : key === 'guest' ? 'Only the host can take the room up'
+    : key === 'down' ? 'Transcended realm'
     : key === 'form' ? 'Black lions only · wear the Black form'
     : 'Only a Black lion can climb this';
   el.title = key === 'locked' ? 'The Black form comes at ' + KILL.black + ' K.O.s' : '';
@@ -7012,8 +7016,8 @@ function updateDuelHud(fdt, a, b, near) {
   else if (D.ph === 'idle' && inR) {
     const guestOld = NET.mode === 'client' && !D.hostOk;
     const n = fighters.filter((f) => !f.dead && !f.isDummy && !f.lantern && inRing(f)).length;
-    key = guestOld ? 'old' : D.cool > 0 ? 'cool' : n > 2 ? 'crowd' : n === 2 && D.pair ? 'pair' : 'wait';
-    txt = { old: "This room's host can't run cabbage duels", cool: 'The greens are being hung again…', crowd: 'Cabbage duel: two dancers only', pair: 'Duel starting…', wait: 'Cabbage duel: waiting for a challenger' }[key];
+    key = guestOld ? 'old' : D.cool > 0 ? 'cool' : n > 2 ? 'crowd' : n === 2 && D.pair ? 'pair' : n === 1 && NET.mode !== 'client' && !fighters.some((f) => f.ai && !f.dead) && !fighters.some((f) => f.remote && !f.isDummy && !f.lantern) ? 'alone' : 'wait';
+    txt = { old: "This room's host can't run cabbage duels", cool: 'The greens are being hung again…', crowd: 'Cabbage duel: two dancers only', pair: 'Duel starting…', wait: 'Cabbage duel: waiting for a challenger', alone: 'Cabbage duel: add a bot (Bots +, top right) or invite a friend' }[key];
   }
   if (key === duelChip.key) return;
   duelChip.key = key; duelChip.el.hidden = !key;
@@ -8714,7 +8718,7 @@ function botSteer(b, I) {
   m.x = (nx / nl) * len; m.z = (nz / nl) * len;
   return I;
 }
-// bots only live in a server you host (up to BOT_MAX); the public lobby has just the training dummy
+// bots (up to BOT_MAX) are added with Bots + offline or in a room you host; the lobby starts with just the training dummy
 function botCount() { let n = 0; for (const f of fighters) if (f.ai && !f.remote) n++; return n; }
 function addBot() {
   if (botCount() >= BOT_MAX) return null;
@@ -9028,7 +9032,7 @@ function setRoomUI() {
   updateRoomCount(); updateBotUI();
 }
 function updateBotUI() {
-  const host = NET.mode === 'host' || (NET.mode === 'offline' && botCount() > 0);
+  const host = NET.mode !== 'client';   // offline too: practice bots without opening a room
   $('#botRow').hidden = !host;
   const n = botCount();
   $('#botN').textContent = n + '/' + BOT_MAX; $('#botPlus').disabled = n >= BOT_MAX; $('#botMinus').disabled = n <= 0;
