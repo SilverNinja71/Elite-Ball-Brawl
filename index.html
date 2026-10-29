@@ -386,6 +386,7 @@ body.touch .mini{height:52px}
 #slots.duel{opacity:.35;filter:grayscale(1)}
 #settings input[type=range]{width:150px;accent-color:#ffcf3a}
 @media (max-height:760px){#cqIntro,#cqWin{top:auto;bottom:calc(var(--tsbTop,170px) + 10px)}#cqIntro .cg{font-size:min(60px,16vw)}#cqIntro strong{font-size:min(52px,13vw)}}   /* short screens: sit on the hotbar, not under it */
+@media (max-height:620px){#hud:has(#cqIntro:not([hidden]):not(.go)) #topc{opacity:0;transition:opacity .2s}}   /* short screens: the intro card names both dancers; the chips step aside */
 @media (max-height:500px){#cqHud{padding:4px 6px;gap:6px}#cqHud .cg{width:24px;height:24px;font-size:16px}#cqIntro .cg{font-size:52px}#cqIntro strong{font-size:48px}#cqWin{padding:8px 12px 10px}}
 @media (prefers-reduced-motion:reduce){#cqWin.on{animation:none;opacity:1}#cqIntro strong.cqpop,#cqHud.hot .cg{animation:none}}
 </style>
