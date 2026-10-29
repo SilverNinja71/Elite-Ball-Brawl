@@ -3039,6 +3039,8 @@ function lionHead(rig, pal, o = {}) {
   const FU = (c) => SURF.fur(c);
   P(D, gLionShell(false), SHELL);
   P(D, gLionShell(true), INNER);
+  // the dark mesh veil across the upper mouth (the dancer looks out through it; a wide gape shows their face)
+  P(D, gPlate(0.86, 0.34, 0.02, 1.3, 1, false, 10, 1), INNER, 0, 0.29, 0.36);
   // ---- eyes: painted spiral eyeballs with a gold rim, fluffy brows, blinking lids with a fur fringe ----
   const E = LDH.eye; rig.lids = []; rig.eyeAt = [];
   for (const s of [1, -1]) {
