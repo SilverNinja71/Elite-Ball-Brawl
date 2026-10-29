@@ -9390,7 +9390,7 @@ function updateKillHud() {
 }
 function showForm() {
   const n = KILLS.n, sel = $('#optForm');
-  sel.value = SETTINGS.form; sel.disabled = n < KILL.black;
+  sel.value = n < KILL.black || SETTINGS.form === 'normal' ? 'normal' : 'black'; sel.disabled = n < KILL.black;   // locked: show the form actually worn
   $('#formNote').textContent = n < KILL.black ? n + ' K.O.s. Every K.O. adds a skull; the Black form unlocks at ' + KILL.black + ' (' + (KILL.black - n) + ' to go).'
     : n < KILL.trans ? n + ' K.O.s. Black form unlocked. ' + KILL.trans + ' K.O.s transcend (' + (KILL.trans - n) + ' to go).' : n + ' K.O.s. Transcended.';
 }
