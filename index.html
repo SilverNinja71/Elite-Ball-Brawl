@@ -805,7 +805,11 @@ rigMat.onBeforeCompile = (sh) => {
 const _bv = new Map();
 function bevelG(w, h, d, r) {
   const k = w + '|' + h + '|' + d + '|' + r; let g = _bv.get(k); if (g) return g;
-  g = new THREE.BoxGeometry(w, h, d, 3, 3, 3);
+  g = bevelBox(w, h, d, r); g.computeBoundingSphere(); shared(g); _bv.set(k, g); return g;
+}
+// the same rounded box, uncached (arenas bake these into merged meshes and free them)
+function bevelBox(w, h, d, r) {
+  const g = new THREE.BoxGeometry(w, h, d, 3, 3, 3);
   const P = g.attributes.position, N = g.attributes.normal, half = [w / 2, h / 2, d / 2], p = [0, 0, 0], q = [0, 0, 0];
   for (let i = 0; i < P.count; i++) {
     p[0] = P.getX(i); p[1] = P.getY(i); p[2] = P.getZ(i);
@@ -818,7 +822,7 @@ function bevelG(w, h, d, r) {
     l = Math.sqrt(l) || 1;
     P.setXYZ(i, p[0] + (q[0] / l) * r, p[1] + (q[1] / l) * r, p[2] + (q[2] / l) * r); N.setXYZ(i, q[0] / l, q[1] / l, q[2] / l);
   }
-  g.computeBoundingSphere(); shared(g); _bv.set(k, g); return g;
+  return g;
 }
 let BEVEL = false;   // on while a fighter is being built
 // the dancer's own face: one decal atlas (4 x 2 expressions, 256 px each) plus a matching glow atlas for eye
@@ -1172,7 +1176,7 @@ function updateContacts() {
   for (const f of fighters) {
     if (n >= CONTACT_MAX) break;
     const R = f.root; if (!R.visible || !R.parent) continue;
-    const gy = f.onGround ? R.position.y : 0, h = Math.max(0, R.position.y - gy), k = clamp(1 - h / 5, 0, 1);
+    const gy = f.onGround ? R.position.y : groundAt(R.position.x, R.position.z, R.position.y), h = Math.max(0, R.position.y - gy), k = clamp(1 - h / 5, 0, 1);
     if (k <= 0.02) continue;
     const lying = (f.ragdoll > 0 || f.dead) && f.onGround, s = (f.lantern ? 2.6 : 1.5) * (1 + h * 0.12) * (f.flatten > 0 ? 1.4 : 1);
     _cq.setFromAxisAngle(_cy, R.rotation.y);
@@ -1493,9 +1497,40 @@ function addBlock(x, y, z, s, mat, o = {}) {
   if (o.grow) m.scale.setScalar(0.01);
   blocks.push(b); return b;
 }
+// A static collider is a box (min / max). Optional fields, all set by the arena that builds it:
+//   ramp {ax, c0, c1, y0, y1}: the top is a slope along x (ax 0) or z (ax 1), y0 at coordinate c0 rising to y1 at c1
+//   foot: a narrow beam or pole top only holds a fighter whose centre is within foot of its edge (else they slip off)
+//   gate(f): when false for a fighter the collider is a wall at every height and never something to stand on
+//   cam: the camera is kept in front of it; thin: the camera is pushed out of it
 function addStatic(x, y, z, w, h, d, mat) {
   const b = { m: null, x, y, z, s: Math.max(w, d), min: new V3(x - w / 2, y, z - d / 2), max: new V3(x + w / 2, y + h, z + d / 2), alive: true, static: true, mat: mat || concreteChunk };
   blocks.push(b); return b;
+}
+// a slope over the box [x0, x1] x [z0, z1], from y0 at coordinate c0 to y1 at c1 along x (ax 0) or z (ax 1);
+// solid from `under` (default the floor) up to the slope
+function addRamp(x0, x1, z0, z1, ax, c0, c1, y0, y1, under = 0, mat) {
+  const b = addStatic((x0 + x1) / 2, under, (z0 + z1) / 2, x1 - x0, Math.max(y0, y1) - under, z1 - z0, mat);
+  b.ramp = { ax, c0, c1, y0, y1 }; return b;
+}
+// the walkable height of a collider at (x, z) (clamped onto it)
+function colTop(b, x, z) {
+  const r = b.ramp; if (!r) return b.max.y;
+  const c = r.ax ? clamp(z, b.min.z, b.max.z) : clamp(x, b.min.x, b.max.x);
+  return r.y0 + (r.y1 - r.y0) * clamp((c - r.c0) / (r.c1 - r.c0), 0, 1);
+}
+// the highest static surface under (x, z) at or below height y (the floor is 0): contact shadows, loose props
+function groundAt(x, z, y = 1e9) {
+  let g = 0;
+  for (const b of blocks) {
+    if (!b.static || x < b.min.x || x > b.max.x || z < b.min.z || z > b.max.z) continue;
+    const t = colTop(b, x, z); if (t > g && t <= y + 0.05) g = t;
+  }
+  return g;
+}
+// no static collider within pad of (x, z): somewhere safe to spawn or wander to
+function spotClear(x, z, pad) {
+  for (const b of blocks) if (b.static && b.alive && x > b.min.x - pad && x < b.max.x + pad && z > b.min.z - pad && z < b.max.z + pad) return false;
+  return true;
 }
 function breakBlock(b, from) {
   if (!b.alive || b.static) return;
@@ -1667,10 +1702,11 @@ function buildMap() {
 
 // =====================================================================
 // arenas: each one builds its own ground, scenery, colliders, sky and light, and everything it made is freed
-// when another one is chosen (see selectArena). The fighting rules are the same everywhere: a flat floor at
-// y = 0, the BOUND clamp, spawns within 26 units of the centre, the duel ring and the Golden Lantern drop spot.
+// when another one is chosen (see selectArena). The fighting rules are the same everywhere: a floor at y = 0
+// (plus whatever raised surfaces an arena's colliders give: decks, ramps, beams, pole tops), the BOUND clamp,
+// spawns within 26 units of the centre on clear ground, the duel ring and the Golden Lantern drop spot.
 // =====================================================================
-const ARENA_IDS = ['park', 'transcended'];   // the only arena ids a room may name; anything else is ignored
+const ARENA_IDS = ['course', 'park', 'transcended'];   // the only arena ids a room may name; anything else is ignored
 const DUEL_AO = [];                           // the duel ring's baked footprints, painted into every arena's AO
 // the park's sky, fog and light, as set up above (restored whenever the park is built again)
 const ENV0 = { fog: scene.fog.color.clone(), near: scene.fog.near, far: scene.fog.far, hemiS: hemi.color.clone(), hemiG: hemi.groundColor.clone(), hemiI: hemi.intensity,
@@ -4990,10 +5026,11 @@ function KO(t, att) {
 function spawnPoint() {
   for (let i = 0; i < 25; i++) {
     const a = rand(0, TAU), r = rand(8, 26), x = Math.cos(a) * r, z = Math.sin(a) * r;
-    if (Math.hypot(x - DUEL.x, z - DUEL.z) < DUEL.r + 2) continue;
+    if (Math.hypot(x - DUEL.x, z - DUEL.z) < DUEL.r + 2 || !spotClear(x, z, 1.2)) continue;
     if (!fighters.some((f) => Math.hypot(f.pos.x - x, f.pos.z - z) < 4)) return new V3(x, 0, z);
   }
-  return new V3(rand(-20, 20), 0, rand(-20, 20));
+  for (let i = 0; i < 40; i++) { const x = rand(-20, 20), z = rand(-20, 20); if (Math.hypot(x - DUEL.x, z - DUEL.z) > DUEL.r + 1 && spotClear(x, z, 0.8)) return new V3(x, 0, z); }
+  return new V3(0, 0, -14);
 }
 function respawn(f) {
   if (f.awaken > 0) { f.awaken = 0; f.def.ult.end(f); }
@@ -5262,7 +5299,8 @@ function updateCans(dt) {
     }
     if (c.state === 'loose') {
       c.t += dt; c.vel.y -= GRAV * dt; m.position.addScaledVector(c.vel, dt);
-      if (m.position.y < 0.45) { m.position.y = 0.45; c.vel.y = Math.abs(c.vel.y) * 0.2; c.vel.x *= Math.exp(-5.6 * dt); c.vel.z *= Math.exp(-5.6 * dt); }
+      const fl = groundAt(m.position.x, m.position.z, m.position.y - 0.45) + 0.45;   // a deck or platform top holds it too
+      if (m.position.y < fl) { m.position.y = fl; c.vel.y = Math.abs(c.vel.y) * 0.2; c.vel.x *= Math.exp(-5.6 * dt); c.vel.z *= Math.exp(-5.6 * dt); }
       m.rotation.x = damp(m.rotation.x, PI / 2, 11.2, dt);
       m.position.x = clamp(m.position.x, -BOUND, BOUND); m.position.z = clamp(m.position.z, -BOUND, BOUND);
       if (c.t > 18) { c.state = 'idle'; m.position.copy(c.home); m.rotation.set(0, 0, 0); c.vel.set(0, 0, 0); emit('dust', c.home, { n: 6 }); }
@@ -5525,7 +5563,7 @@ function updateProjs(dt) {
       if (!p.noBlockTest) {
         for (const b of blocks) {
           if (!b.alive || (b.temp && b.owner === p.owner)) continue;
-          if (p.pos.x > b.min.x - p.r && p.pos.x < b.max.x + p.r && p.pos.y > b.min.y - p.r && p.pos.y < b.max.y + p.r && p.pos.z > b.min.z - p.r && p.pos.z < b.max.z + p.r) { if (p.onBlock) p.onBlock(p, b); break; }
+          if (p.pos.x > b.min.x - p.r && p.pos.x < b.max.x + p.r && p.pos.y > b.min.y - p.r && p.pos.y < (b.ramp ? colTop(b, p.pos.x, p.pos.z) : b.max.y) + p.r && p.pos.z > b.min.z - p.r && p.pos.z < b.max.z + p.r) { if (p.onBlock) p.onBlock(p, b); break; }
         }
       }
     }
@@ -6527,7 +6565,9 @@ function collideWorld(f) {
     const cx = clamp(f.pos.x, b.min.x, b.max.x), cz = clamp(f.pos.z, b.min.z, b.max.z);
     const dx = f.pos.x - cx, dz = f.pos.z - cz, d2 = dx * dx + dz * dz;
     if (d2 > r * r) continue;
-    if (f.pos.y >= b.max.y - 0.4) { support = Math.max(support, b.max.y); continue; }
+    if (b.gate && f.action && f.action.pclimb) continue;   // the Black lion running up the Pillar
+    const wall = b.gate && !b.gate(f), top = b.ramp ? colTop(b, cx, cz) : b.max.y;
+    if (!wall && f.pos.y >= top - 0.4) { if (!b.foot || d2 <= b.foot * b.foot) support = Math.max(support, top); continue; }
     if (f.pos.y + 1.9 < b.min.y) continue;
     const hs = Math.hypot(f.vel.x, f.vel.z);
     // a fast ragdoll pins against anything solid (tree, lamp post, bench, cobblestone wall): Wall Splat
@@ -6545,7 +6585,9 @@ function collideWorld(f) {
       if (Math.abs(mx) < Math.abs(mz)) { f.pos.x += mx; f.vel.x = 0; } else { f.pos.z += mz; f.vel.z = 0; }
     }
   }
-  if (f.pos.y <= support) {
+  // walking down a slope (or off a low step) keeps the feet on it instead of a string of tiny falls
+  const snap = wasGround && f.vel.y <= 0 && f.ragdoll <= 0 && !f.dead && f.pos.y > support && f.pos.y - support < 0.3;
+  if (f.pos.y <= support || snap) {
     f.pos.y = support;
     if (!wasGround && (f.ragdoll > 0 || f.dead) && prevVy < -21) {
       emit('dust', f.pos, { n: 8, speed: 4 });
