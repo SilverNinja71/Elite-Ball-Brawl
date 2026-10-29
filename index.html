@@ -9775,6 +9775,7 @@ function finCineOn(R) {
 }
 function finCineOff() {
   const R = FIN.cine; FIN.cine = null;
+  if (R && R.cam && R.cam.hid) { R.cam.hid = false; if (fighters.includes(R.a)) setFpvView(R.a, false); }
   document.body.classList.remove('fin-cine');
   const el = FINUI.el; el.classList.remove('on', 'cut', 'canskip');
   setTimeout(() => { if (!FIN.cine) el.hidden = true; }, 380);
@@ -9816,9 +9817,11 @@ function finCamera(fdt) {
   const R = FIN.cine; if (!R || !R.cam) return false;
   const T = R.T, t = R.tr, C = R.cam, d = R.dir, vp = R.vp, ap = R.ap, sx = -d.z, sz = d.x;
   let fov;
+  // the pan keeps the attacker out of this camera's picture (its shadow stays), the cut brings it back
+  if ((t < T.pan) !== !!C.hid && fighters.includes(R.a)) { C.hid = t < T.pan; setFpvView(R.a, C.hid); }
   if (t < T.pan) {
     // the pan: in front of the victim and off to one side, from the shoes up to the mask, then a beat on the mask
-    const u = t / T.pan, e = ease(u / 0.8), ang = lerp(0.95, 1.05, e) * C.side, fx = -d.x, fz = -d.z, ca = Math.cos(ang), sa = Math.sin(ang);
+    const u = t / T.pan, e = ease(u / 0.8), ang = lerp(0.95, 0.45, e) * C.side, fx = -d.x, fz = -d.z, ca = Math.cos(ang), sa = Math.sin(ang);
     const dx = fx * ca - fz * sa, dz = fx * sa + fz * ca, dist = lerp(2.0, 3.4, e) - Math.max(0, u - 0.8) * 1.4;
     let cx = vp.x + dx * dist, cy = vp.y + lerp(0.3, 2.3, e), cz = vp.z + dz * dist;
     const k = finSeg(vp.x, cy, vp.z, cx, cy, cz); if (k < 1) { cx = vp.x + (cx - vp.x) * Math.max(0.3, k - 0.05); cz = vp.z + (cz - vp.z) * Math.max(0.3, k - 0.05); }
