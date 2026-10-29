@@ -2559,6 +2559,7 @@ function buildCourse() {
   const S = taKit(), Gd = taKit(), Gl = taKit(), Far = taKit(), Rf = taKit();
   const tops = [];   // light glows: [x, y, z, colour, size]
   const hang = [];   // lantern anchors: [x, y, z, tangent x, tangent z, phase]
+  const nav = [];    // ways up for bots: the foot of a ramp or stairs (fx, fz) at height base, where it leads (tx, tz) and how high (top)
   const BV = new Map();
   const bev = (w, h, d, r) => { const k = w.toFixed(3) + '|' + h.toFixed(3) + '|' + d.toFixed(3) + '|' + r.toFixed(3); let g = BV.get(k); if (!g) { g = bevelBox(w, h, d, r); BV.set(k, g); } return g; };
   // a rounded block w x h x d centred at (x, y, z); o: r (corner radius), ry or rot, pm (parent matrix), ao
@@ -2901,6 +2902,7 @@ function buildCourse() {
     }
     const c0 = sg > 0 ? (ax ? z0 : x0) : (ax ? z1 : x1), c1 = sg > 0 ? (ax ? z1 : x1) : (ax ? z0 : x0);
     addRamp(x0, x1, z0, z1, ax, c0, c1, y0, y1, 0, wood);
+    if (y1 > 2 && y1 - y0 > 1.5) { const f = c0 - sg * 1.2, t = c1 + sg * 0.8; nav.push(ax ? { fx: cx, fz: f, tx: cx, tz: t, top: y1, base: y0 } : { fx: f, fz: cz, tx: t, tz: cz, top: y1, base: y0 }); }
     if (y0 < 0.01) aoR(cx, cz, ax ? W : L * 0.6, ax ? L * 0.6 : W, 0.25); else aoR(cx, cz, ax ? W : L, ax ? L : W, 0.4);
   };
   deck(36, -36, 8, 8, 3.0, false);
@@ -2963,6 +2965,7 @@ function buildCourse() {
         solid(px, 0, pz, w, top, d);
       }
       aoR(ax ? z : x0 - sgn * n * 0.25, ax ? x0 - sgn * n * 0.25 : z, ax ? 2 : n * 0.5, ax ? n * 0.5 : 2, 0.35);
+      const f = x0 + sgn * 1.0, t = x0 - sgn * (n * 0.5 + 1.2); nav.push(ax ? { fx: z, fz: f, tx: z, tz: t, top: h, base: 0 } : { fx: f, fz: z, tx: t, tz: z, top: h, base: 0 });
     };
     stairs(-22.4 + 0.5 * Math.ceil(2.3 / 0.36), -24, 0, 1, 2.3);
     stairs(-22.4 + 0.5 * Math.ceil(2.4 / 0.36), -36, 0, 1, 2.4);
@@ -3109,7 +3112,7 @@ function buildCourse() {
   gfx();
   let padK = 0, fxT = 0;
   return {
-    gfx, detail: GFX.level,
+    gfx, detail: GFX.level, nav,
     tick(fdt) {
       const t = realClock, fx = GFX.fx, p = player;
       if (fx >= 2 && !reduceMotion) placeLanterns(t);
@@ -7743,7 +7746,8 @@ function aiPickTarget(b, ai) {
   let best = null, bd = 34, human = null, hd = 34;
   for (const o of fighters) {
     if (o === b || o.dead || o.lantern) continue;
-    const d = distH(b, o); if (d < bd) { bd = d; best = o; }
+    // someone well above (a high platform, a pole top, the Pillar) counts as further away: bots prefer who they can reach
+    const d = distH(b, o) + Math.max(0, o.pos.y - b.pos.y - 2) * 4; if (d < bd) { bd = d; best = o; }
     if (!o.ai && !o.isDummy && d < hd) { hd = d; human = o; }
   }
   const onHuman = human ? fighters.filter((o) => o !== b && o.ai && o.ai.target === human).length : 0;   // don't all gang up on one player
@@ -7839,14 +7843,59 @@ function aiIntent(b, dt) {
 // cauldron) would hold them against its face. When one stands in the next few units of the path, steer past it
 // on the side away from its centre (kept for a moment so the choice does not flicker). Movement only: what the
 // bot decides to do is unchanged.
+// On raised ground (the course's decks, beams and poles) a bot also hops: up toward a target standing a little
+// higher close by, and when it has been pushing against something without moving for a moment.
 function botSteer(b, I) {
   const m = I.move, len = Math.hypot(m.x, m.z), ai = b.ai;
-  if (!ai || b.dead || len < 0.05) return I;
-  const dx = m.x / len, dz = m.z / len, x0 = b.pos.x, z0 = b.pos.z, R = 0.6;
-  const tg = ai.target && fighters.includes(ai.target) ? Math.hypot(ai.target.pos.x - x0, ai.target.pos.z - z0) : 99;
+  if (!ai || b.dead || len < 0.05) { if (ai) ai.stk = 0; return I; }
+  let dx = m.x / len, dz = m.z / len;
+  const x0 = b.pos.x, z0 = b.pos.z, R = 0.6;
+  const T = ai.target && fighters.includes(ai.target) ? ai.target : null, tg = T ? Math.hypot(T.pos.x - x0, T.pos.z - z0) : 99;
+  if (b.onGround && !b.busy && T && !T.dead && tg < 3.4 && T.pos.y > b.pos.y + 0.8 && T.pos.y < b.pos.y + 2.6 && T.onGround) {
+    I.m1 = false; ai.upT = gameTime + 0.7;   // jump up to them (straight at them, not round the ledge) rather than swing at their feet
+    if (!b.action) I.jump = true;
+  }
+  if (ai.upT > gameTime && T && !T.dead) { const gl = tg || 1; m.x = ((T.pos.x - x0) / gl) * len; m.z = ((T.pos.z - z0) / gl) * len; if (ai.navT > 0) ai.navT -= SIM_DT; return I; }
+  if (b.onGround && !b.action && !b.busy) {
+    ai.stk = len > 0.5 && Math.hypot(b.vel.x, b.vel.z) < RUN * 0.15 ? (ai.stk || 0) + SIM_DT : 0;
+    if (ai.stk > 0.5) { I.jump = true; ai.stk = 0; ai.navT = 0.6; ai.navSide = -(ai.navSide || 1); }
+  }
+  // a target up on a deck or platform out of jumping reach: walk round to the foot of a ramp or stairs (on the
+  // level the bot stands on) that leads up there, then straight up it
+  const nav = ARENA_SET && ARENA_SET.out.nav, nv = ai.navP;
+  if (nav && nv && ai.navUp > gameTime && T && !T.dead && Math.hypot(nv.fx - x0, nv.fz - z0) > 0.9 && b.pos.y > nv.base - 0.3 && b.pos.y < nv.top - 0.2) {   // on the way up
+    const gx = nv.tx - x0, gz = nv.tz - z0, gl = Math.hypot(gx, gz) || 1;
+    m.x = (gx / gl) * len; m.z = (gz / gl) * len; if (ai.navT > 0) ai.navT -= SIM_DT; return I;
+  }
+  if (nav && T && !T.dead && T.onGround && b.onGround && tg < 26 && T.pos.y > b.pos.y + 1.2 && !(tg < 3.4 && T.pos.y < b.pos.y + 2.6)) {
+    if (!(ai.navUp > gameTime && ai.navP)) {
+      let pd = 1e9; ai.navP = null;
+      for (const n of nav) {
+        if (Math.abs(n.base - b.pos.y) > 0.35 || n.top < T.pos.y - 2.6 || Math.hypot(n.tx - T.pos.x, n.tz - T.pos.z) > 13) continue;   // only a way up near them
+        const d = Math.hypot(n.tx - T.pos.x, n.tz - T.pos.z) + Math.hypot(n.fx - x0, n.fz - z0) * 0.5; if (d < pd) { pd = d; ai.navP = n; }
+      }
+      if (ai.navP && Math.hypot(ai.navP.fx - x0, ai.navP.fz - z0) < 1.1) ai.navUp = gameTime + 2.5;   // at the foot: keep heading up a while
+    }
+    const n = ai.navP;
+    if (n) {
+      const go = ai.navUp > gameTime, gx = (go ? n.tx : n.fx) - x0, gz = (go ? n.tz : n.fz) - z0, gl = Math.hypot(gx, gz) || 1;
+      m.x = (gx / gl) * len; m.z = (gz / gl) * len; dx = gx / gl; dz = gz / gl;
+      if (go) { if (ai.navT > 0) ai.navT -= SIM_DT; return I; }   // the way up is clear by construction: no side-stepping off it
+    }
+  }
+  // on a beam or a tightrope: walk along it, never sideways off it
+  if (b.onGround && b.pos.y > 0.5) for (const k of blocks) {
+    if (!k.foot || !k.alive || x0 < k.min.x - 0.3 || x0 > k.max.x + 0.3 || z0 < k.min.z - 0.3 || z0 > k.max.z + 0.3 || Math.abs(colTop(k, x0, z0) - b.pos.y) > 0.15) continue;
+    const alongX = k.max.x - k.min.x > k.max.z - k.min.z, c = alongX ? (k.min.z + k.max.z) / 2 : (k.min.x + k.max.x) / 2;
+    const u = alongX ? m.x : m.z, pull = clamp(((alongX ? z0 : x0) - c) * -4, -0.4, 0.4) * len;
+    if (Math.abs(u) < 0.05 * len) break;   // nothing to do along it: hold still rather than step off
+    if (alongX) { m.x = Math.sign(u) * len; m.z = pull; } else { m.z = Math.sign(u) * len; m.x = pull; }
+    if (ai.navT > 0) ai.navT -= SIM_DT;
+    return I;
+  }
   let hit = null, best = Math.min(3.2, tg);
   for (const k of blocks) {
-    if (!k.static || !k.alive || b.pos.y >= k.max.y - 0.4) continue;
+    if (!k.static || !k.alive || (b.pos.y >= colTop(k, x0, z0) - 0.4 && !(k.gate && !k.gate(b)))) continue;
     const cx = (k.min.x + k.max.x) / 2 - x0, cz = (k.min.z + k.max.z) / 2 - z0;
     if (dx * cx + dz * cz <= 0) continue;   // behind us, or we are moving away from it
     let t0 = 0, t1 = best;
