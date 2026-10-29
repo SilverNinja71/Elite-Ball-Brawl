@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- fonts load without blocking the first paint; Ma Shan Zheng only ships the two glyphs the game uses (阿娟) -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&text=%E9%98%BF%E5%A8%9F%E8%B6%85%E5%87%A1%E9%BB%91%E5%A4%A9%E9%96%80&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&text=%E9%98%BF%E5%A8%9F%E8%B6%85%E5%87%A1%E9%BB%91%E5%A4%A9%E9%96%80%E9%87%87%E9%9D%92%E7%A6%8F&display=swap" media="print" onload="this.media='all'">
 <style>
 /* Layout: full-bleed live arena. Roblox-style glass buttons top-left, room panel top-right, TSB hotbar stack bottom-center. Single dark-glass look by design. */
 :root{
@@ -322,6 +322,50 @@ body.touch .mini{height:52px}
   .slot{height:96px}.slot .n{font-size:12px}.slot .t{font-size:28px}.slot .k{font-size:15px}
   #help,#settings{width:380px;font-size:12.5px}
 }
+/* cabbage duel: the panel up top (names, height bars, clock), the intro and the win card */
+#cqHud{width:100%;border-radius:12px;padding:6px 8px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:center;border-color:rgba(242,182,50,.6)}
+#cqHud .cs{display:grid;gap:3px;min-width:0}
+#cqHud .cs b{font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#cqHud .cs.a b{color:#ff8a7e}#cqHud .cs.b b{color:#8fdcff;text-align:right}
+#cqHud .cs i{display:block;height:8px;border-radius:4px;background:rgba(0,0,0,.55);border:1px solid var(--line);overflow:hidden}
+#cqHud .cs s{display:block;height:100%;width:100%;transform:scaleX(0);transition:transform .15s linear}
+#cqHud .cs.a s{background:linear-gradient(90deg,#b3161e,#ff4d3d);transform-origin:left center}
+#cqHud .cs.b s{background:linear-gradient(270deg,#1677b3,#3dc6ff);transform-origin:right center}
+#cqHud .cs small{font-size:10px;font-weight:700;color:var(--dim);font-variant-numeric:tabular-nums}
+#cqHud .cs.b small{text-align:right}
+#cqHud .cm{display:grid;justify-items:center;gap:1px}
+.cg{font-family:var(--brush);font-weight:400;color:#bff08a;text-shadow:0 0 8px rgba(124,197,68,.7),0 2px 0 #1d3a0e}
+#cqHud .cg{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#8fd35a,#3d9a2c 70%);border:2px solid #f2b632;font-size:20px;line-height:1;color:#fff8d0;text-shadow:0 1px 0 #1d3a0e}
+#cqHud.hot .cg{animation:pulse .35s ease-in-out infinite alternate;box-shadow:0 0 12px rgba(255,207,58,.7)}
+#cqHud .cm small{font-size:10px;font-weight:800;font-variant-numeric:tabular-nums;color:#ffe7a3}
+#cqIntro{position:absolute;left:0;right:0;top:max(30%,calc(var(--roomB,84px) + 150px));display:grid;justify-items:center;gap:4px;text-align:center;pointer-events:none;padding:0 16px;text-shadow:0 3px 0 #000}
+#cqIntro .cg{font-size:min(84px,20vw);line-height:1}
+#cqIntro small{font-size:12px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#ffcf3a}
+#cqIntro .vs{display:flex;align-items:center;gap:12px;max-width:100%;font-size:min(26px,6vw);font-weight:800;text-transform:uppercase}
+#cqIntro .vs b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#cqIntro .vs b:first-child{color:#ff8a7e}#cqIntro .vs b:last-child{color:#8fdcff}
+#cqIntro .vs em{font-style:normal;font-size:.7em;color:#ffcf3a}
+#cqIntro strong{font-size:min(72px,16vw);font-weight:800;line-height:1.05;color:#fff}
+#cqIntro.go strong{color:#ffcf3a}
+#cqIntro.go .vs,#cqIntro.go small,#cqIntro.go .cg{opacity:0;transition:opacity .25s}
+#cqIntro strong.cqpop{animation:cqpop .45s cubic-bezier(.2,.9,.3,1.3)}
+@keyframes cqpop{from{transform:scale(1.8);opacity:0}to{transform:scale(1);opacity:1}}
+#cqWin{position:absolute;left:50%;top:max(32%,calc(var(--roomB,84px) + 150px));transform:translateX(-50%);width:min(420px,calc(100vw - 32px));display:grid;justify-items:center;gap:4px;padding:14px 16px 16px;border-radius:14px;text-align:center;pointer-events:none;
+  background:linear-gradient(180deg,rgba(150,12,20,.88),rgba(90,6,12,.88));border:2px solid #f2b632;box-shadow:0 0 30px rgba(255,180,60,.35);opacity:0}
+#cqWin.on{animation:cqwin 3.6s ease forwards}
+@keyframes cqwin{0%{opacity:0;transform:translateX(-50%) scale(.8)}8%{opacity:1;transform:translateX(-50%) scale(1.04)}14%{transform:translateX(-50%) scale(1)}85%{opacity:1}100%{opacity:0}}
+#cqWin .env{display:block;width:30px;height:42px;border-radius:3px;background:linear-gradient(160deg,#e3242c,#a50d15);border:2px solid #f2c24a;position:relative;margin-bottom:2px}
+#cqWin .env::after{content:'';position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-4px 0 0 -7px;border-radius:50%;background:#f2c24a}
+#cqWin small{font-size:11px;font-weight:800;letter-spacing:.24em;text-transform:uppercase;color:#ffd77a}
+#cqWin strong{max-width:100%;font-size:min(34px,8vw);font-weight:800;line-height:1.1;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 3px 0 #3a0306}
+#cqWin span{font-size:12px;font-weight:600;color:#ffe6c8}
+#cqWin.draw{background:linear-gradient(180deg,rgba(40,44,52,.9),rgba(20,22,28,.9));border-color:#9aa3ad}
+#cqWin.draw .env{display:none}
+#cqWin.lost strong{color:#ffd0c9}
+#slots.duel{opacity:.35;filter:grayscale(1)}
+#settings input[type=range]{width:150px;accent-color:#ffcf3a}
+@media (max-height:500px){#cqHud{padding:4px 6px;gap:6px}#cqHud .cg{width:24px;height:24px;font-size:16px}#cqIntro .cg{font-size:52px}#cqIntro strong{font-size:48px}#cqWin{padding:8px 12px 10px}}
+@media (prefers-reduced-motion:reduce){#cqWin.on{animation:none;opacity:1}#cqIntro strong.cqpop,#cqHud.hot .cg{animation:none}}
 </style>
 
 <canvas id="game" tabindex="0" aria-label="Arena view"></canvas>
@@ -384,12 +428,19 @@ body.touch .mini{height:52px}
 
   <div id="combo"><b id="comboN">0</b><span>hit combo</span></div>
   <div id="banner"><small id="bannerS">Awakened</small><strong id="bannerT"></strong></div>
+  <div id="cqIntro" hidden><span class="cg" lang="zh">采青</span><small>Cabbage duel · first to the greens wins</small><div class="vs"><b id="cqIa"></b><em>VS</em><b id="cqIb"></b></div><strong id="cqCd"></strong></div>
+  <div id="cqWin" hidden><i class="env" aria-hidden="true"></i><small id="cqWs"></small><strong id="cqWt"></strong><span id="cqWd"></span></div>
   <div id="cross"></div>
 
   <div id="topc">
     <div id="evChip" class="glass" hidden><i></i><span id="evTxt">Golden Lantern</span></div>
     <div id="pillChip" class="glass" hidden><i></i><span id="pillTxt"></span></div>
     <div id="duelChip" class="glass" hidden><i></i><span id="duelTxt"></span><button type="button" class="sbtn" id="duelWatch">Watch</button></div>
+    <div id="cqHud" class="glass" hidden aria-label="Cabbage duel">
+      <div class="cs a"><b id="cqAn"></b><i><s id="cqAb"></s></i><small id="cqAh"></small></div>
+      <div class="cm"><span class="cg" lang="zh">青</span><small id="cqT"></small></div>
+      <div class="cs b"><b id="cqBn"></b><i><s id="cqBb"></s></i><small id="cqBh"></small></div>
+    </div>
     <div id="lockHud" class="glass" hidden>
       <div class="lh"><span id="lockName">Target</span><small id="lockChar"></small></div>
       <div class="hp"><i class="lag" id="lockLag"></i><i class="fill" id="lockFill"></i><b><span class="tg">◎ LOCKED</span><span id="lockTxt">100</span></b></div>
@@ -450,6 +501,8 @@ body.touch .mini{height:52px}
     <p class="note" id="formNote"></p>
     <label class="opt"><span>Arena</span><select id="optArena"><option value="course">Lion-dance course</option><option value="park">Park</option><option value="transcended">Transcended realm</option></select></label>
     <p class="note" id="arenaNote"></p>
+    <label class="opt"><span>Volume</span><input type="range" id="optVol" min="0" max="100" step="5" aria-label="Volume"></label>
+    <label class="opt"><span>Lion-dance drums</span><input type="range" id="optDrums" min="0" max="100" step="5" aria-label="Lion-dance drums volume"></label>
     <label class="opt"><span>Graphics</span><select id="optGfx"><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
     <p class="note" id="gfxNote"></p>
     <label class="opt"><span>Bot difficulty (hosted servers)</span><select id="optBots"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></label>
@@ -515,6 +568,14 @@ const M1 = {
   finisher: { kb: 21, up: 9.8, ragdoll: 0.79 },
   upper: { kb: 0.5, up: 24, ragdoll: 0.75, stun: 0.72, float: 0.6 },   // lower launch than before (was ~9 units high, now ~4), then a short hang
   down: { kb: 4.2, up: -42, ragdoll: 0.86 },
+};
+// cabbage duel kicks (M1 in a duel): the same cadence and damage as the fighter's own M1 string, more push: a kick
+// shoves a dancer on the floor back (kb), and one up on a pole or in the air clean off it (kbHigh / upHigh); the
+// 4th is a spinning kick that launches like the M1 finisher
+const KICK = {
+  kb: 4.2, kbHigh: 9.5, upHigh: 5.5, range: 2.8, arc: 0.22,
+  anims: ['kickR', 'kickL', 'roundKick', 'spinKick'], air: 'flyKick', up: 'riseKick', down: 'axeKick',
+  fin: { kb: 19, up: 9, ragdoll: 0.75 },
 };
 const CHASE = { window: 0.7, maxSpeed: 22 };   // after a landed uppercut, Space leaps after the target
 const CRIT = { cd: 1.2 };                  // Steve's falling jump-crit has its own cooldown
@@ -995,12 +1056,12 @@ function netFx(rec) { if (NET.cap && online() && NET.fx.length < 220) NET.fx.pus
 let sndAt = 1;
 function audioAt(pos) { sndAt = pos ? clamp(1 - Math.hypot(pos.x - camera.position.x, pos.z - camera.position.z) / 50, 0.06, 1) : 1; }
 const SFX = (() => {
-  let ctx = null, master = null, noise = null, muted = false;
+  let ctx = null, master = null, noise = null, muted = false, vol = 1;
   function init() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
     try {
       ctx = new (window.AudioContext || window.webkitAudioContext)();
-      master = ctx.createGain(); master.gain.value = 0.5;
+      master = ctx.createGain(); master.gain.value = 0.5 * vol;
       const comp = ctx.createDynamicsCompressor(); master.connect(comp); comp.connect(ctx.destination);
       const len = ctx.sampleRate; noise = ctx.createBuffer(1, len, ctx.sampleRate);
       const d = noise.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
@@ -1028,7 +1089,10 @@ const SFX = (() => {
     os.connect(g); g.connect(master); os.start(t); os.stop(t + dur + 0.05);
   }
   return {
-    init, toggle() { muted = !muted; return muted; }, setMuted(m) { muted = !!m; return muted; },
+    init, toggle() { muted = !muted; return muted; }, setMuted(m) { muted = !!m; return muted; }, isMuted: () => muted,
+    // Settings > Volume (0..1) scales everything; the drum band (DRUMS) plays through the same master
+    setVolume(v) { vol = clamp(Number(v) || 0, 0, 1); if (master) master.gain.setTargetAtTime(0.5 * vol, ctx.currentTime, 0.03); return vol; },
+    _ctx: () => ctx, _out: () => master, _noise: () => noise,
     swing() { nz(0.12, { type: 'bandpass', f: 500, f2: 2200, q: 0.9, vol: 0.1 }); },
     hit() { nz(0.09, { f: 2200, vol: 0.3 }); tn(160, 0.1, { f2: 70, vol: 0.35 }); },
     heavy() { nz(0.25, { f: 900, f2: 200, vol: 0.45 }); tn(110, 0.25, { f2: 40, vol: 0.5 }); },
@@ -1068,10 +1132,110 @@ const SFX = (() => {
 })();
 // every sound made by the local simulation is mirrored to peers
 for (const k of Object.keys(SFX)) {
-  if (k === 'init' || k === 'toggle') continue;
+  if (k === 'init' || k === 'toggle' || k === 'setMuted' || k === 'setVolume' || k === 'isMuted' || k[0] === '_') continue;
   const orig = SFX[k];
   SFX[k] = (a) => { netFx(['s', k, a ? 1 : 0, r1(sndAt)]); orig(a); };
 }
+// ---------------------------------------------------------------------
+// lion-dance band for the cabbage duel: a big drum, a pair of cymbals and a gong, synthesised and scheduled a
+// little ahead of time (so a slow frame never stutters the beat). play('intro') rolls the drum up to the start,
+// play('duel') keeps the classic lion-dance beat going (faster and busier as `heat` rises from 0 to 1),
+// win() ends it with a cymbal crash and a gong, stop() lets it fade. tick() runs once per drawn frame. It goes
+// through the master volume, its own Drums volume (`level`) and fades out with distance from the duel; mute
+// silences it at once and nothing is scheduled while muted.
+// ---------------------------------------------------------------------
+const DRUMS = (() => {
+  let bus = null, mode = '', next = 0, step = 0, heat = 0, t0 = 0, gain = 0;
+  function ready() {
+    const c = SFX._ctx(); if (!c || !SFX._out() || !SFX._noise()) return null;
+    if (!bus) { bus = c.createGain(); bus.gain.value = 0; bus.connect(SFX._out()); }
+    return c;
+  }
+  function env(c, t, node, peak, a, d) {
+    const g = c.createGain(); g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
+    node.connect(g); g.connect(bus);
+  }
+  function osc(c, t, type, f0, f1, dur, peak, a = 0.004) {
+    const o = c.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t);
+    if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.6);
+    env(c, t, o, peak, a, dur); o.start(t); o.stop(t + a + dur + 0.05);
+  }
+  function nz(c, t, type, f, q, dur, peak, a = 0.002) {
+    const s = c.createBufferSource(); s.buffer = SFX._noise(); s.loop = true;
+    const fl = c.createBiquadFilter(); fl.type = type; fl.frequency.value = f; fl.Q.value = q; s.connect(fl);
+    env(c, t, fl, peak, a, dur); s.start(t, Math.random() * 0.5); s.stop(t + a + dur + 0.05);
+  }
+  // the voices: the big drum (a deep membrane thump and the stick's slap), its rim, the cymbals (a short choked
+  // "cha" or an open crash: bright noise over inharmonic metal partials) and the gong (a slow low shimmer)
+  const V = {
+    drum(c, t, acc) { osc(c, t, 'sine', acc ? 132 : 158, 54, acc ? 0.45 : 0.28, acc ? 0.85 : 0.5); osc(c, t, 'triangle', acc ? 250 : 300, 130, 0.07, 0.1); nz(c, t, 'lowpass', 1500, 0.7, 0.05, acc ? 0.3 : 0.17); },
+    rim(c, t) { osc(c, t, 'square', 880, 640, 0.035, 0.04); nz(c, t, 'bandpass', 2600, 2, 0.04, 0.1); },
+    cha(c, t, open) {
+      nz(c, t, 'highpass', 4300, 0.6, open ? 0.75 : 0.15, open ? 0.3 : 0.2); nz(c, t, 'bandpass', 7400, 1.3, open ? 0.5 : 0.09, 0.1);
+      for (const f of [587, 845, 1172, 1663, 2213]) osc(c, t, 'square', f, null, open ? 0.5 : 0.1, 0.011);
+    },
+    gong(c, t, big) {
+      const d = big ? 4.6 : 2.6;
+      osc(c, t, 'triangle', 98, 91, d, big ? 0.46 : 0.3, 0.012); osc(c, t, 'sine', 197.6, 189, d * 0.8, 0.13, 0.012);
+      osc(c, t, 'sine', 293, 284, d * 0.6, 0.07, 0.025); osc(c, t, 'sine', 416, null, d * 0.45, 0.045, 0.04);
+      nz(c, t, 'lowpass', 430, 1, d * 0.4, big ? 0.2 : 0.11, 0.03);
+    },
+  };
+  // a bar is 16 steps: x accented drum, o drum, r rim · c choked cymbal, C open cymbal · g gong
+  const BARS = [
+    { d: 'x.o.x.oox.o.x.o.', c: '....C.......C...', g: 'g...............' },   // calm: the walking beat
+    { d: 'x.oox.oox.oox.or', c: '..c.C.c...c.C.c.', g: 'g.......g.......' },   // close: busier
+    { d: 'xoorxooroxoorxoo', c: 'c.c.C.c.c.c.C.cC', g: 'g...g...g...g...' },   // one hop from the greens: the frenzy
+  ];
+  function playStep(c, t, i) {
+    if (mode === 'intro') {   // a roll that swells into the start, a gong on every bar line
+      const k = Math.min(1, (t - t0) / 2.6);
+      if (i % 16 === 0) V.gong(c, t, false);
+      if (i % 2 === 0 || k > 0.45) V.drum(c, t, i % 4 === 0);
+      else V.rim(c, t);
+      if (k > 0.7 && i % 4 === 2) V.cha(c, t, false);
+      return;
+    }
+    const B = BARS[heat < 0.4 ? 0 : heat < 0.78 ? 1 : 2], j = i % 16, bar = (i / 16) | 0;
+    const d = B.d[j];
+    if (d === 'x' || d === 'o') V.drum(c, t, d === 'x'); else if (d === 'r') V.rim(c, t);
+    else if (heat > 0.55 && Math.random() < (heat - 0.5) * 0.7) V.drum(c, t, false);   // rolls creep in near the top
+    if (B.c[j] !== '.') V.cha(c, t, B.c[j] === 'C');
+    if (B.g[j] === 'g' && (heat >= 0.4 || bar % 2 === 0)) V.gong(c, t, false);
+  }
+  const s16 = () => (mode === 'intro' ? 0.085 : 15 / (104 + 76 * heat));   // 104 to 180 beats a minute
+  return {
+    get mode() { return mode; },
+    play(m) {
+      const c = ready(); if (!c || mode === m) return;
+      mode = m; step = 0; next = c.currentTime + 0.05; t0 = next;
+    },
+    win() {
+      const c = ready(); mode = 'out';
+      if (!c) return;
+      next = c.currentTime;
+      if (SFX.isMuted()) return;
+      const t = c.currentTime + 0.02;
+      V.cha(c, t, true); V.drum(c, t, true); V.gong(c, t + 0.02, true);
+      V.cha(c, t + 0.36, true); V.drum(c, t + 0.36, true); V.drum(c, t + 0.52, true); V.drum(c, t + 0.68, true); V.cha(c, t + 0.68, true);
+    },
+    gong() { const c = ready(); if (c && !SFX.isMuted()) { V.gong(c, c.currentTime + 0.02, true); V.cha(c, c.currentTime + 0.02, true); } },
+    stop() { if (mode !== 'out') mode = ''; },
+    // heat: 0..1 how close a duelist is to the greens · level: 0..1 the Drums volume times nearness
+    tick(h, level) {
+      const c = SFX._ctx(); if (!c || !bus) return;
+      heat += (clamp(h, 0, 1) - heat) * 0.08;
+      const muted = SFX.isMuted(), want = muted ? 0 : clamp(level, 0, 1) * 0.9;
+      if (Math.abs(want - gain) > 0.004) { gain = want; bus.gain.setTargetAtTime(want, c.currentTime, muted ? 0.01 : 0.25); }
+      if (mode === 'out') { if (c.currentTime > next + 4) mode = ''; return; }
+      if (!mode) return;
+      if (muted || c.state !== 'running') { next = c.currentTime + 0.05; return; }
+      if (next < c.currentTime - 0.25) next = c.currentTime + 0.02;   // back from a hidden tab: pick the beat up again
+      while (next < c.currentTime + 0.14) { playStep(c, next, step); next += s16(); step++; }
+    },
+  };
+})();
 
 // =====================================================================
 // particles, rings, decals, temporary props, damage numbers
@@ -5701,7 +5865,7 @@ function parried(att, by) {   // the attacker side of a parry (also used when a 
 }
 function hit(att, tgt, dmg, o = {}) {
   if (!tgt || tgt.dead || tgt === att) return false;
-  if (DUEL.on && duelSide(att) !== duelSide(tgt)) return false;   // nobody hits across the duel wall
+  if (duelSide(att) !== duelSide(tgt)) return false;   // nobody hits across the duel wall (either way)
   if (tgt.remote) return hitRemote(att, tgt, dmg, o);
   if (tgt.lantern) return hitLantern(att, tgt, dmg);
   if (tgt.invuln()) return false;
@@ -5833,20 +5997,22 @@ function inString(f) { return (f.action && f.action.name === 'm1') || (f.comboId
 function doM1(f, I) {
   const d = f.def; if (!d.m1.length) return;
   if (gameTime - f.lastM1 > M1.reset) f.comboIdx = 0;
-  const i = f.comboIdx, last = i === d.m1.length - 1, h = d.m1[i];
-  if (d.airCrit && !f.onGround && f.vel.y < 0 && f.critCd <= 0 && !last) return steveCrit(f);
+  const kick = duelKicks(f);   // in a cabbage duel the string is kicks (same damage per hit, more push)
+  const i = f.comboIdx, last = i === d.m1.length - 1, h0 = d.m1[i];
+  const h = kick ? { anim: !f.onGround && !last ? KICK.air : last ? KICK.anims[3] : KICK.anims[Math.min(i, 2)], dmg: h0.dmg, range: KICK.range, arc: last ? -0.2 : KICK.arc } : h0;
+  if (!kick && d.airCrit && !f.onGround && f.vel.y < 0 && f.critCd <= 0 && !last) return steveCrit(f);
   let variant = null;
   if (last) { if (!f.onGround) variant = 'down'; else if (I.spaceHeld) variant = 'up'; }
   const spd = f.atkSpeed(), gap = M1.gap / spd, wind = M1.wind / spd;
   const dur = last ? wind + 0.6 : gap * 0.8;
   aim(f, 4.5);
   const tg0 = bestFront(f, 3.6, 0.2);
-  if (tg0) { const dd = distH(f, tg0); if (dd > 1.35) { const step = Math.min(dd - 1.3, M1.lunge); f.fwd(tA); f.pos.addScaledVector(tA, step); } }
+  if (tg0 && !(kick && f.pos.y > 0.3)) { const dd = distH(f, tg0); if (dd > 1.35) { const step = Math.min(dd - 1.3, M1.lunge); f.fwd(tA); f.pos.addScaledVector(tA, step); } }   // no lunge off a pole top
   f.lastM1 = gameTime;
   f.m1Lock = last ? dur + 0.05 : gap;
-  if (d.onM1) d.onM1(f, h, i);
+  if (!kick && d.onM1) d.onM1(f, h, i);
   const animDur = last ? 0.55 : gap;
-  f.play(variant === 'up' ? 'uppercut' : variant === 'down' ? 'downslam' : h.anim, animDur, true, wind / animDur);
+  f.play(variant === 'up' ? (kick ? KICK.up : 'uppercut') : variant === 'down' ? (kick ? KICK.down : 'downslam') : h.anim, animDur, true, wind / animDur);
   audioAt(f.pos); SFX.swing();
   f.startAction({
     name: 'm1', dur, moveMul: last ? 0.12 : 0.3, noGravity: variant === 'down', strike: wind, hitLanded: false, variant,
@@ -5864,22 +6030,23 @@ function doM1(f, I) {
       let opt;
       if (variant === 'up') opt = Object.assign({ heavy: true }, M1.upper);
       else if (variant === 'down') opt = Object.assign({ heavy: true, spike: true }, M1.down);
-      else if (last) opt = Object.assign({ heavy: true }, M1.finisher, h.o);
+      else if (last) opt = Object.assign({ heavy: true }, kick ? KICK.fin : M1.finisher, h.o);
+      else if (kick) { const high = tg.pos.y > 0.35 || (!tg.remote && !tg.onGround); opt = { stun: M1.stun, kb: high ? KICK.kbHigh : KICK.kb }; if (high) opt.up = KICK.upHigh; }
       else opt = Object.assign({ stun: M1.stun, kb: M1.kb }, h.o);
       opt.m1 = true; opt.reach = (h.range || 2.5) + M1.lunge;   // lets a remote owner reject hits from too far away
-      if (!f.onGround && variant !== 'down') { opt.float = M1.airHang; if (!last) opt.kb = M1.airKb; }
+      if (!f.onGround && variant !== 'down' && !kick) { opt.float = M1.airHang; if (!last) opt.kb = M1.airKb; }
       if (h.side && !variant) opt.dir = f.right(new V3()).multiplyScalar(h.side * 0.8).add(f.fwd(tA).multiplyScalar(0.6));
       if (h.bleed) opt.bleed = true;
-      if (d.m1Mod) d.m1Mod(f, opt, last);
+      if (!kick && d.m1Mod) d.m1Mod(f, opt, last);
       const r = hit(f, tg, h.dmg, opt);
       if (r === 'hit') {
         a.hitLanded = true; f.comboIdx = last ? 0 : i + 1;
-        if (!f.onGround) { f.vel.y = Math.max(f.vel.y, M1.airFloat); f.floatT = variant === 'down' ? 0 : M1.airHang; }   // air strings hang together
+        if (!f.onGround && !kick) { f.vel.y = Math.max(f.vel.y, M1.airFloat); f.floatT = variant === 'down' ? 0 : M1.airHang; }   // air strings hang together (a kick from the air does not)
         if (variant === 'up') { f.chase = { t: gameTime, tg }; ring(tg.pos, '#ffffff', 2.5, 0.35); emit('wind', center(tg), { n: 12, dir: new V3(0, 1, 0), dirSpeed: 10 }); }
       } else if (r === 'blocked') { f.m1Lock = Math.max(f.m1Lock, M1.blockLag); f.comboIdx = 0; a.dur = Math.max(a.dur, a.t + M1.blockLag); a.moveMul = 0.05; }
       else if (r === false && !tg.remote) { a.dur = Math.max(a.dur, a.t + M1.whiffLag); f.whiffUntil = gameTime + M1.whiffLag; }
     },
-    end() { if (d.onM1End) d.onM1End(f); },
+    end() { if (!kick && d.onM1End) d.onM1End(f); },
   });
 }
 // after a landed uppercut, Space leaps toward the launched target for an air string (finish with the downslam)
@@ -6205,105 +6372,616 @@ function updateEventChip() {
 }
 
 // =====================================================================
-// duel ring: two fighters inside start a 1v1 (full health, walled in, nobody outside can hit in or be hit);
-// the first K.O. ends it (or the clock: after 60 s the healthier fighter wins). Everyone else keeps brawling in the park, can sit on the bleachers, or Watch.
-// Every client works the duel out from the shared positions and fences in only its own fighters.
+// Cabbage-picking duel (cai qing 采青, "plucking the greens", the climax of a lion dance).
+// A lettuce with a red envelope tied to it hangs high over the duel ring from a tall mast. Two dancers step into
+// the ring; after a short drum roll they race up a run of plum-blossom poles to it, kicking each other off on the
+// way (in a duel M1 is a string of kicks; dashes, block and Evasive work as always; moves, Awakening and trash
+// cans wait). The first to touch the greens wins: they eat the lettuce, spit it out in a burst of leaves and hold
+// up the red envelope; the loser is knocked away. A K.O. also ends it, and after 90 s it is a draw. Everyone else
+// can watch from outside the ring: nobody outside can hit a duelist, be hit by one, or touch the greens.
+// One authority decides it: offline this client, in a room the host alone. The host picks who duels, starts it,
+// decides who picked the greens and sends the state to every guest ({ t: 'du' }). Guests only ask
+// ({ t: 'dq', k: 'in' }: my fighter stands in the ring; { t: 'dq', k: 'grab' }: my fighter touched the greens)
+// and the host checks each ask against what it has seen. Older builds ignore both messages and just see fighters.
 // =====================================================================
-const DUEL = { x: -17, z: 17, r: 6.5, on: false, a: null, b: null, cool: 0, watch: false, mesh: null, wall: null, crowd: 0, t: 0, max: 60 };
-const duelSide = (f) => (DUEL.on && f && (f === DUEL.a || f === DUEL.b) ? 1 : 0);
+const DUEL = { x: -17, z: 17, r: 7.5, ph: 'idle', on: false, seq: 0, aid: '', bid: '', an: '', bn: '', w: '', k: '', t: 0, cool: 0,
+  watch: false, pair: '', pairT: 0, crowd: 0, ready: 0, hostOk: false, req: new Map(), rate: new Map(), pend: null, sendT: 0, gone: 0,
+  inT: 0, grabT: 0, call: null, initT: 50, fin: null, wall: null, mesh: null };
+const DUEL_PH = ['idle', 'intro', 'go', 'end'], DUEL_K = ['', 'grab', 'ko', 'time', 'quit'];
+// timings (s) · cy: the greens' centre while a duel is on (a hop from the summit pole reaches it, a leap from the
+// pole below does not), hoist: hauled up out of reach in between · cs: the lettuce's size · touch: the greens' radius plus a dancer's · body: how tall a dancer reaches above their feet (the lion head) · minGo: no
+// pick this soon after the start (nobody climbs that fast) · wait: two dancers stand in the ring this long first
+const CQ = { intro: 3, max: 90, end: 4.6, cool: 3, cy: 9.2, hoist: 10.8, arm: 11.7, cs: 1.3, touch: 1.25, body: 2.6, minGo: 1.0, wait: 1.0 };
+const CQ_F = new V3(1, 0, 0), CQ_R = new V3(-CQ_F.z, 0, CQ_F.x);   // F: the ring's front (east, toward the plaza's side; the lantern mast stays off the view line) · R: across it
+const CQ_YAW = Math.atan2(CQ_F.x, CQ_F.z);
+function cqAt(u, v, out = new V3()) { return out.set(DUEL.x + u * CQ_R.x + v * CQ_F.x, 0, DUEL.z + u * CQ_R.z + v * CQ_F.z); }
+// the poles (u across, v toward the front, top height): three steps up on each side to the summit pole under the greens
+const CQ_POLES = [[-4.3, 1.9, 1.2], [-3.5, -0.2, 2.2], [-1.9, -1.1, 3.1], [4.3, 1.9, 1.2], [3.5, -0.2, 2.2], [1.9, -1.1, 3.1], [0, 0, 4.0]]
+  .map(([u, v, top]) => { const p = cqAt(u, v); return { x: p.x, z: p.z, top, u, v }; });
+const CQ_PATH = { '-1': [0, 1, 2, 6], 1: [3, 4, 5, 6] };
+const CQ_MARK = (s) => cqAt(s * 5.4, 3.4);
+const CQ_CAB = cqAt(0, 0);   // straight above the summit pole
+const duelSide = (f) => (DUEL.on && f && f.id && (f.id === DUEL.aid || f.id === DUEL.bid) ? 1 : 0);
+const duelKicks = (f) => DUEL.ph === 'go' && duelSide(f) === 1;   // M1 is a kick string, moves wait
+const duelHold = (f) => DUEL.ph === 'intro' && duelSide(f) === 1;   // the drum roll: duelists stand on their marks
+const duelAuth = () => NET.mode !== 'client';
 const inRing = (f, pad = 0) => Math.hypot(f.pos.x - DUEL.x, f.pos.z - DUEL.z) < DUEL.r + pad;
-const duelChip = { el: $('#duelChip'), txt: $('#duelTxt'), key: '' };
-const ringMat = shared(new THREE.MeshBasicMaterial({ color: '#ffffff' }));
-const wallMat = shared(new THREE.MeshBasicMaterial({ color: '#ff5a4a', transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+function duelFighter(id) { if (!id) return null; for (const f of fighters) if (f.id === id) return f; return null; }
+function duelFoe(f) { return duelFighter(f.id === DUEL.aid ? DUEL.bid : DUEL.aid); }
+// does a dancer standing at p touch the greens? (the hanging lettuce, its centre at CAB.y; slack for a host's check)
+function cabTouch(p, slack = 0) {
+  const dh = Math.hypot(p.x - CQ_CAB.x, p.z - CQ_CAB.z), dy = CAB.y - clamp(CAB.y, p.y, p.y + CQ.body);
+  return Math.hypot(dh, dy) < CQ.touch + slack;
+}
+const cqNeed = () => CQ.cy - CQ.body - CQ.touch;   // the lowest feet that can touch the greens from under them
+function cqProg(f) { return f ? clamp(f.pos.y / cqNeed(), 0, 1) : 0; }
+
+// ---- the stage: the ring, the poles (colliders, there in every arena), the mast and arm, bleachers and a band ----
+const ringMat = shared(new THREE.MeshBasicMaterial({ color: '#f2c24a', transparent: true, opacity: 0.95 }));
+const wallMat = shared(new THREE.MeshBasicMaterial({ color: '#ffb84a', transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+const CQS = { grp: null, level: '', cols: [] };
 function buildDuelRing() {
-  const G = new THREE.Group(); G.position.set(DUEL.x, 0, DUEL.z); scene.add(G);
-  const ring = new THREE.Mesh(new THREE.RingGeometry(DUEL.r - 0.22, DUEL.r + 0.22, 64).rotateX(-PI / 2), ringMat);
-  ring.position.y = 0.02; G.add(ring);
-  // "1v1" painted in the middle
-  const tex = canvasTex(256, 128, (g, w, h) => {
-    g.fillStyle = 'rgba(255,255,255,0.92)'; g.font = '900 86px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('1v1', w / 2, h / 2 + 4);
-  });
-  const label = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.7).rotateX(-PI / 2), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.75 }));
-  label.position.y = 0.018; G.add(label);
-  for (let i = 0; i < 8; i++) {   // corner posts with glossy caps
-    const a = (i / 8) * TAU, px = Math.cos(a) * (DUEL.r + 0.25), pz = Math.sin(a) * (DUEL.r + 0.25);
-    bx(G, 0.22, 0.9, 0.22, '#e9ecef', px, 0.45, pz); bx(G, 0.3, 0.12, 0.3, '#ff5a4a', px, 0.94, pz);
-    AO.push(['r', DUEL.x + px, DUEL.z + pz, 0.22, 0.22, 0, 0.55]);
-  }
-  // bleachers: three white steps facing the ring from the corner of the park
-  const B = piv(G, -Math.SQRT1_2 * (DUEL.r + 3.2), 0, Math.SQRT1_2 * (DUEL.r + 3.2)); B.rotation.y = PI * 0.75;
-  for (let s = 0; s < 3; s++) { bx(B, 7, 0.45, 0.9, s % 2 ? '#cfd6de' : '#eef2f6', 0, 0.22 + s * 0.45, -s * 0.9).receiveShadow = true; bx(B, 7, 0.45 * (s + 1), 0.9, '#9aa3ad', 0, 0.225 * (s + 1), -s * 0.9 - 0.02); }
-  mergeMeshes(G);
-  G.traverse((m) => { if (m.isMesh && m.material === rigMat) { m.castShadow = true; m.receiveShadow = true; } });
-  { const c = Math.cos(B.rotation.y), sn = Math.sin(B.rotation.y);   // baked AO under the bleachers (local centre z = -0.9)
-    AO.push(['r', DUEL.x + B.position.x - 0.9 * sn, DUEL.z + B.position.z - 0.9 * c, 7, 2.7, B.rotation.y, 0.55]); }
-  DUEL.wall = new THREE.Mesh(new THREE.CylinderGeometry(DUEL.r, DUEL.r, 2.6, 48, 1, true), wallMat);
-  DUEL.wall.position.y = 1.3; DUEL.wall.visible = false; G.add(DUEL.wall);
-  DUEL.mesh = ring;
-}
-function startDuel(a, b) {
-  DUEL.on = true; DUEL.a = a; DUEL.b = b; DUEL.t = 0; DUEL.wall.visible = true; ringMat.color.set('#ff5a4a');
-  for (const f of [a, b]) if (!f.remote) { f.hp = 100; f.guard = GUARD.max; if (f.emote) f.emote = null; }
-  addFeed(null, 'Duel: ' + a.name + ' vs ' + b.name, '');
-  if (player === a || player === b || distH(player, a) < 26) showBanner('Duel', a.name + ' vs ' + b.name);
-  ring(tB.set(DUEL.x, 0, DUEL.z), '#ff5a4a', DUEL.r * 1.3, 0.45, 0.3);
-}
-function endDuel(w) {
-  DUEL.on = false; DUEL.a = DUEL.b = null; DUEL.cool = 3; DUEL.wall.visible = false; DUEL.watch = false; ringMat.color.set('#ffffff');
-  if (!w) addFeed(null, 'The duel ended in a draw', '');
-  if (w) {
-    addFeed(w.name, 'the duel', 'won');
-    if (player === w || distH(player, w) < 26) showBanner('Duel won', w.name);
-    if (!w.remote) { w.hp = Math.min(100, w.hp + 35); if (w.ai && Math.random() < 0.6) setTimeout(() => playEmote(w, 'cheer'), 600); }
-    emit('stars', center(w, tA), { n: 20, speed: 6 });
-  }
-}
-// runs every simulation step (after movement): who is in, who won, and the fence for our own fighters
-function updateDuel(dt) {
-  if (DUEL.on) {
-    const out = (f) => !fighters.includes(f) || f.dead;
-    if (out(DUEL.a) || out(DUEL.b)) return endDuel(out(DUEL.a) && out(DUEL.b) ? null : out(DUEL.a) ? DUEL.b : DUEL.a);
-    DUEL.t += dt;
-    if (DUEL.t >= DUEL.max) return endDuel(DUEL.a.hp === DUEL.b.hp ? null : DUEL.a.hp > DUEL.b.hp ? DUEL.a : DUEL.b);
-    for (const f of fighters) {
-      if (f.remote || f.lantern || f.dead) continue;
-      const dx = f.pos.x - DUEL.x, dz = f.pos.z - DUEL.z, d = Math.hypot(dx, dz) || 1e-4;
-      const mine = f === DUEL.a || f === DUEL.b;
-      if (mine && d > DUEL.r - 0.45) { const k = (DUEL.r - 0.45) / d; f.pos.x = DUEL.x + dx * k; f.pos.z = DUEL.z + dz * k; }
-      else if (!mine && d < DUEL.r + 0.5) { const k = (DUEL.r + 0.5) / d; f.pos.x = DUEL.x + dx * k; f.pos.z = DUEL.z + dz * k; }
+  const first = !CQS.grp;
+  if (CQS.grp) { scene.remove(CQS.grp); CQS.grp.traverse((m) => { if (m.geometry && !SHARED.has(m.geometry)) m.geometry.dispose(); if (m.material && !SHARED.has(m.material)) { if (m.material.map) m.material.map.dispose(); m.material.dispose(); } }); }
+  const lo = GFX.level === 'low', seg = lo ? 10 : 18;
+  CQS.level = GFX.level;
+  const G = new THREE.Group(); G.name = 'cabbageStage'; scene.add(G); CQS.grp = G;
+  const K = taKit(), Kg = taKit();
+  const cyl = new THREE.CylinderGeometry(1, 1, 1, seg), cylS = new THREE.CylinderGeometry(1, 1, 1, 8), box = new THREE.BoxGeometry(1, 1, 1), sph = new THREE.SphereGeometry(1, 10, 8);
+  const W = (u, v, y) => { const p = cqAt(u, v); return [p.x, y, p.z]; };
+  const ao = (u, v, w, d, a) => { if (first) { const p = cqAt(u, v); AO.push(['r', p.x, p.z, w, d, CQ_YAW, a]); } };
+  // the ring's mat: red felt, gold rims, cloud scrolls, a red mark and a blue mark where the two dancers start
+  const N = lo ? 512 : 1024, RD = DUEL.r + 0.1;
+  const tex = canvasTex(N, N, (g) => {
+    const k = N / (2 * RD), X = (u) => (0.5 - u / (2 * RD)) * N, Y = (v) => (0.5 + v / (2 * RD)) * N;
+    g.fillStyle = '#a3121b'; g.beginPath(); g.arc(N / 2, N / 2, RD * k, 0, TAU); g.fill();
+    g.strokeStyle = '#f2b632'; g.lineWidth = 0.22 * k; g.beginPath(); g.arc(N / 2, N / 2, (RD - 0.35) * k, 0, TAU); g.stroke();
+    g.strokeStyle = 'rgba(255,215,122,.55)'; g.lineWidth = 0.07 * k; g.beginPath(); g.arc(N / 2, N / 2, (RD - 0.75) * k, 0, TAU); g.stroke();
+    g.strokeStyle = 'rgba(242,182,50,.5)'; g.lineWidth = 0.08 * k; g.lineCap = 'round';
+    for (let i = 0; i < 20; i++) {   // cloud scrolls round the rim
+      g.save(); g.translate(N / 2, N / 2); g.rotate((i / 20) * TAU); g.translate(0, -(RD - 1.25) * k);
+      for (const sx of [-1, 1]) { g.beginPath(); g.arc(sx * 0.3 * k, 0, 0.24 * k, sx > 0 ? PI : 0, sx > 0 ? PI * 2.6 : -PI * 1.6, sx < 0); g.stroke(); }
+      g.restore();
     }
+    g.strokeStyle = 'rgba(255,215,122,.35)'; g.lineWidth = 0.05 * k;
+    g.beginPath(); g.arc(N / 2, N / 2, 2.0 * k, 0, TAU); g.stroke();
+    for (const [s, c] of [[-1, '#ff4d3d'], [1, '#3dc6ff']]) {   // start marks
+      const m = cqAt(s * 5.4, 3.4), u = (m.x - DUEL.x) * CQ_R.x + (m.z - DUEL.z) * CQ_R.z, v = (m.x - DUEL.x) * CQ_F.x + (m.z - DUEL.z) * CQ_F.z;
+      g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.arc(X(u), Y(v), 0.95 * k, 0, TAU); g.fill();
+      g.strokeStyle = c; g.lineWidth = 0.16 * k; g.beginPath(); g.arc(X(u), Y(v), 0.8 * k, 0, TAU); g.stroke();
+      g.fillStyle = c; g.beginPath(); g.arc(X(u), Y(v), 0.22 * k, 0, TAU); g.fill();
+    }
+  });
+  tex.anisotropy = Math.min(lo ? 2 : 8, renderer.capabilities.getMaxAnisotropy());
+  const mat = new THREE.Mesh(new THREE.CircleGeometry(RD, lo ? 40 : 64).rotateX(-PI / 2), new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -3 }));
+  mat.position.set(DUEL.x, 0.012, DUEL.z); mat.rotation.y = CQ_YAW; mat.receiveShadow = true; G.add(mat);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(DUEL.r - 0.2, DUEL.r + 0.2, 64).rotateX(-PI / 2), ringMat);
+  ring.position.set(DUEL.x, 0.022, DUEL.z); G.add(ring); DUEL.mesh = ring;
+  // corner posts with gold caps and a red rope between them (a gap at the front where dancers step in)
+  const posts = [];
+  for (let i = 0; i < 10; i++) { const a = (i / 10) * TAU + PI / 10, u = Math.sin(a) * (DUEL.r + 0.3), v = Math.cos(a) * (DUEL.r + 0.3); posts.push([u, v]);
+    K.put(cylS, '#7a1016', W(u, v, 0.5), [0.13, 1.0, 0.13]); Kg.put(sph, '#f2b632', W(u, v, 1.04), [0.17, 0.17, 0.17]); ao(u, v, 0.4, 0.4, 0.45); }
+  for (let i = 0; i < 10; i++) {
+    const [u0, v0] = posts[i], [u1, v1] = posts[(i + 1) % 10];
+    if (v0 > 6 && v1 > 6) continue;   // the front: open
+    const a = new V3(...W(u0, v0, 0.86)), b = new V3(...W(u1, v1, 0.86));
+    K.beam(cylS, '#c8161f', a, b, 0.035, 0.035);
+  }
+  // the poles: red lacquer, gold bands, a wooden top ringed in gold, a stone foot
+  for (const p of CQ_POLES) {
+    const pos = (y) => [p.x, y, p.z], sum = p.top === 4.0;
+    K.put(cyl, '#a9141c', pos(p.top / 2), [0.17, p.top, 0.17]);
+    for (let y = 0.6; y < p.top - 0.3; y += 0.9) Kg.put(cylS, '#f2b632', pos(y), [0.19, 0.06, 0.19]);
+    K.put(cyl, '#d8ccb6', pos(0.12), [0.34, 0.24, 0.34], null, null, true);
+    K.put(cyl, '#c98e52', pos(p.top - 0.06), [sum ? 0.55 : 0.45, 0.12, sum ? 0.55 : 0.45]);
+    Kg.put(cyl, '#f2b632', pos(p.top - 0.14), [sum ? 0.58 : 0.48, 0.05, sum ? 0.58 : 0.48]);
+    if (!lo) for (let i = 0; i < 5; i++) { const a = (i / 5) * TAU; Kg.put(sph, '#ffd77a', [p.x + Math.cos(a) * (sum ? 0.4 : 0.32), p.top + 0.005, p.z + Math.sin(a) * (sum ? 0.4 : 0.32)], [0.06, 0.03, 0.06]); }   // a five-petal plum blossom on top
+    if (first) {
+      const b = addStatic(p.x, 0, p.z, 0.7, p.top, 0.7, woodMat); b.thin = true; b.cqPole = true; CQS.cols.push(b);
+      AO.push(['c', p.x, p.z, 0.5, 0.45]);
+    }
+  }
+  // the mast behind the summit and the arm the greens hang from (out of reach above)
+  { const mu = 0, mv = -3.3, H = CQ.arm + 0.4;
+    K.put(cyl, '#8e0f17', W(mu, mv, H / 2), [0.2, H, 0.2]);
+    for (let y = 1; y < H - 0.5; y += 1.4) Kg.put(cylS, '#f2b632', W(mu, mv, y), [0.23, 0.08, 0.23]);
+    K.put(cyl, '#d8ccb6', W(mu, mv, 0.2), [0.42, 0.4, 0.42], null, null, true);
+    Kg.put(sph, '#f2b632', W(mu, mv, H + 0.2), [0.3, 0.3, 0.3]);
+    const a = new V3(...W(mu, mv, CQ.arm)), b = new V3(...W(0, 0.25, CQ.arm));
+    K.beam(box, '#8e0f17', a, b, 0.18, 0.22); Kg.beam(box, '#f2b632', new V3(...W(0, -0.1, CQ.arm - 0.15)), new V3(...W(0, 0.3, CQ.arm - 0.15)), 0.26, 0.12);
+    // a banner down the mast: 采青, "pluck the greens"
+    const bt = canvasTex(128, 512, (g, w, h) => {
+      g.fillStyle = '#c41e24'; g.fillRect(0, 0, w, h); g.strokeStyle = '#f2b632'; g.lineWidth = 8; g.strokeRect(8, 8, w - 16, h - 16);
+      g.fillStyle = '#ffd77a'; g.font = '92px ' + '"Ma Shan Zheng","KaiTi","STKaiti","Songti SC","Noto Serif CJK SC","Noto Sans CJK SC","WenQuanYi Zen Hei",serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('采', w / 2, h * 0.3); g.fillText('青', w / 2, h * 0.68);
+    });
+    const ban = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 3.2), new THREE.MeshLambertMaterial({ map: bt, side: THREE.DoubleSide }));
+    ban.position.set(...W(mu, mv + 0.26, 6.2)); ban.rotation.y = CQ_YAW; G.add(ban);
+    Kg.beam(cylS, '#f2b632', new V3(...W(-0.5, mv + 0.26, 7.85)), new V3(...W(0.5, mv + 0.26, 7.85)), 0.04, 0.04);
+    if (first) { const p = cqAt(mu, mv), c = addStatic(p.x, 0, p.z, 0.5, H, 0.5, woodMat); c.thin = true; CQS.cols.push(c); AO.push(['c', p.x, p.z, 0.6, 0.5]); }
+  }
+  // bleachers behind the ring (three steps, walk-through), and the band beside them: a drum and a gong frame
+  { const bv = -(DUEL.r + 3.2);
+    for (let s = 0; s < 3; s++) { K.put(box, s % 2 ? '#cfd6de' : '#eef2f6', W(0, bv - s * 0.9, 0.22 + s * 0.45), [7, 0.45, 0.9], [0, CQ_YAW, 0]); K.put(box, '#9aa3ad', W(0, bv - s * 0.9 - 0.02, 0.225 * (s + 1)), [7, 0.45 * (s + 1), 0.9], [0, CQ_YAW, 0]); }
+    ao(0, bv - 0.9, 7, 2.7, 0.55);
+    const du = -5.4, dv = bv - 0.6;
+    K.put(cyl, '#c8161f', W(du, dv, 1.05), [0.75, 0.9, 0.75]); K.put(cyl, '#ecd6a8', W(du, dv, 1.52), [0.72, 0.04, 0.72]);
+    for (let i = 0; i < (lo ? 8 : 14); i++) { const a = (i / (lo ? 8 : 14)) * TAU; Kg.put(sph, '#f2b632', [W(du, dv, 0)[0] + Math.sin(a) * 0.76, 1.2, W(du, dv, 0)[2] + Math.cos(a) * 0.76], [0.05, 0.05, 0.05]); }
+    for (let i = 0; i < 3; i++) { const a = (i / 3) * TAU; K.put(cylS, '#3a2416', [W(du, dv, 0)[0] + Math.sin(a) * 0.55, 0.3, W(du, dv, 0)[2] + Math.cos(a) * 0.55], [0.05, 0.6, 0.05]); }
+    const gu = 5.4, gv = bv - 0.6;
+    for (const s of [-1, 1]) K.put(box, '#5a2a12', W(gu + s * 0.95, gv, 1.2), [0.14, 2.4, 0.14], [0, CQ_YAW, 0]);
+    K.put(box, '#5a2a12', W(gu, gv, 2.42), [2.3, 0.16, 0.16], [0, CQ_YAW, 0]);
+    Kg.put(cyl, '#d9a62e', W(gu, gv, 1.45), [0.72, 0.08, 0.72], [PI / 2, CQ_YAW, 0]);
+    Kg.put(cyl, '#b8861c', W(gu, gv, 1.45), [0.22, 0.12, 0.22], [PI / 2, CQ_YAW, 0]);
+    ao(du, dv, 1.8, 1.8, 0.4); ao(gu, gv, 2.4, 0.6, 0.35);
+    if (first) for (const [u, w, d] of [[du, 1.5, 1.5], [gu, 2.2, 0.4]]) { const p = cqAt(u, dv); CQS.cols.push(addStatic(p.x, 0, p.z, w, 2.5, d, woodMat)); }
+  }
+  const mS = lo ? new THREE.MeshLambertMaterial({ vertexColors: true }) : new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 30, specular: '#3a3026' });
+  const mG = lo ? new THREE.MeshLambertMaterial({ vertexColors: true }) : new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 70, specular: '#8a6a30' });
+  for (const [kit, m] of [[K, mS], [Kg, mG]]) { const me = new THREE.Mesh(kit.geo(), m); me.castShadow = true; me.receiveShadow = true; me.matrixAutoUpdate = false; G.add(me); }
+  for (const g of [cyl, cylS, box, sph]) g.dispose();
+  // the fence that walls the duel in (shown while one is on)
+  DUEL.wall = new THREE.Mesh(new THREE.CylinderGeometry(DUEL.r, DUEL.r, 3.2, 48, 1, true), wallMat);
+  DUEL.wall.position.set(DUEL.x, 1.6, DUEL.z); DUEL.wall.visible = DUEL.ph === 'intro' || DUEL.ph === 'go'; G.add(DUEL.wall);
+  // a coloured ring under each duelist (red: the first, blue: the second)
+  CQS.feet = ['#ff4d3d', '#3dc6ff'].map((c) => { const m = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.82, 32).rotateX(-PI / 2), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.85, depthWrite: false })); m.visible = false; m.renderOrder = 3; G.add(m); return m; });
+  buildCabbage(G);
+}
+// a graphics level picked in Settings rebuilds the stage's meshes at that detail (its colliders stay)
+function duelStageGfx() { if (CQS.grp && CQS.level !== GFX.level) buildDuelRing(); }
+
+// ---- the greens: a lettuce of cupped, ruffled leaves, a red bow, and a red envelope (hongbao) tied under it ----
+const CAB = { g: null, head: null, env: null, cord: null, y: CQ.hoist, vy: 0, sw: 0, s: 1, show: 1, envFly: 0 };
+function buildCabbage(G) {
+  const lo = GFX.level === 'low', hi = GFX.level === 'high';
+  const root = new THREE.Group(); G.add(root); CAB.g = root;
+  const head = new THREE.Group(); root.add(head); CAB.head = head;
+  const K = taKit(), pale = new THREE.Color('#f1fac8'), deep = new THREE.Color('#4fa83a'), mid = new THREE.Color('#9fd65e');
+  // one leaf: a patch of a sphere cupped round the head, starting at th0 down from the top; pale at the heart, a
+  // fresh green toward its wavy rim, and the rim curled out a little
+  const leaf = (r, phiL, th0, thL, ruffle) => {
+    const g = new THREE.SphereGeometry(r, lo ? 8 : 14, lo ? 6 : 10, -phiL / 2, phiL, th0, thL), P = g.attributes.position, col = [], v = new V3(), c = new THREE.Color();
+    for (let i = 0; i < P.count; i++) {
+      v.fromBufferAttribute(P, i);
+      const ph = Math.atan2(v.z, -v.x), th = Math.acos(clamp(v.y / r, -1, 1)), top = 1 - clamp((th - th0) / (thL * 0.5), 0, 1), side = Math.abs(ph) / (phiL / 2), e = Math.max(top, side * 0.8);
+      v.multiplyScalar(1 + (ruffle * Math.sin(ph * 7 + th * 6) + 0.12 * top * top) * e); P.setXYZ(i, v.x, v.y, v.z);
+      c.copy(pale).lerp(mid, clamp(e * 1.3, 0, 1)).lerp(deep, clamp((e - 0.6) * 1.6, 0, 1) * (1 - top * 0.3)); col.push(c.r, c.g, c.b);
+    }
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals(); return g;
+  };
+  K.put(new THREE.SphereGeometry(0.42, lo ? 10 : 16, lo ? 8 : 12), '#e9f7b8', [0, 0, 0], [1, 0.95, 1]);   // the pale heart
+  const n = lo ? 6 : hi ? 12 : 9;
+  for (let i = 0; i < n; i++) {
+    const outer = i >= n * 0.4, r = outer ? 0.55 : 0.47, g = leaf(r, outer ? 2.0 : 1.7, outer ? 0.55 : 0.25, outer ? 1.95 : 1.7, outer ? 0.05 : 0.03);
+    K.put(g, '#ffffff', [0, outer ? -0.04 : 0, 0], [1, 1, 1], [0, i * 2.399, outer ? 0.24 : 0.08]);   // tipped outward about its own tangent
+  }
+  K.put(new THREE.CylinderGeometry(0.08, 0.12, 0.16, 8), '#bfe08a', [0, -0.52, 0]);   // the stem
+  const cab = new THREE.Mesh(K.geo(), lo ? new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }) : new THREE.MeshPhongMaterial({ vertexColors: true, side: THREE.DoubleSide, shininess: 45, specular: '#3a5a20' }));
+  cab.castShadow = true; head.add(cab);
+  // a red ribbon bow on top and the cord it hangs by
+  const bow = taKit(), tor = new THREE.TorusGeometry(0.14, 0.04, 6, 14);
+  bow.put(tor, '#d81e26', [-0.13, 0.5, 0], [1, 1, 1], [0, 0, 0.5]); bow.put(tor, '#d81e26', [0.13, 0.5, 0], [1, 1, 1], [0, 0, -0.5]);
+  bow.put(new THREE.SphereGeometry(0.07, 8, 6), '#f2b632', [0, 0.5, 0]);
+  const bowM = new THREE.Mesh(bow.geo(), new THREE.MeshLambertMaterial({ vertexColors: true })); head.add(bowM);
+  // the red envelope: gold border and a gold 福 (fortune), on a short cord under the lettuce
+  const et = canvasTex(128, 192, (g, w, h) => {
+    g.fillStyle = '#d2121c'; g.fillRect(0, 0, w, h); g.fillStyle = '#b00d16'; g.beginPath(); g.moveTo(0, 0); g.lineTo(w / 2, h * 0.28); g.lineTo(w, 0); g.fill();
+    g.strokeStyle = '#f2c24a'; g.lineWidth = 6; g.strokeRect(6, 6, w - 12, h - 12);
+    g.fillStyle = '#f2c24a'; g.beginPath(); g.arc(w / 2, h * 0.6, 34, 0, TAU); g.fill();
+    g.fillStyle = '#c0111b'; g.font = '48px "Ma Shan Zheng","KaiTi","STKaiti","Songti SC","Noto Serif CJK SC","Noto Sans CJK SC",serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('福', w / 2, h * 0.61);
+  });
+  const env = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.6, 0.035), [0, 1, 2, 3].map(() => new THREE.MeshLambertMaterial({ color: '#c0111b' })).concat([new THREE.MeshLambertMaterial({ map: et }), new THREE.MeshLambertMaterial({ map: et })]));
+  env.position.set(0, -0.98, 0.02); env.castShadow = true; head.add(env); CAB.env = env;
+  const ec = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.36, 4), new THREE.MeshLambertMaterial({ color: '#d81e26' })); ec.position.set(0, -0.62, 0); head.add(ec); CAB.envCord = ec;
+  const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1, 5).translate(0, -0.5, 0), new THREE.MeshLambertMaterial({ color: '#d81e26' }));
+  root.add(cord); CAB.cord = cord;
+  for (const g of [tor]) g.dispose();
+  placeCabbage(0);
+}
+// the greens follow the duel: hauled up out of reach in between, lowered for a duel, swinging a little
+function placeCabbage(fdt) {
+  if (!CAB.g) return;
+  const fin = DUEL.fin, eaten = fin && fin.k === 'grab' && fin.spit;
+  const want = DUEL.ph === 'intro' || DUEL.ph === 'go' || (DUEL.ph === 'end' && DUEL.k === 'grab') ? CQ.cy : CQ.hoist;
+  CAB.y = fdt ? damp(CAB.y, want, 2.2, fdt) : want;
+  CAB.sw += fdt * (DUEL.ph === 'go' ? 1.9 : 1.2);
+  const sx = Math.sin(CAB.sw) * 0.05, sz = Math.cos(CAB.sw * 0.7) * 0.04;
+  const top = CQ.arm - 0.1;
+  if (fin && fin.k === 'grab' && fin.cab) {   // flying to the winner's mouth, then being chewed
+    CAB.head.position.copy(fin.cab);
+    CAB.head.visible = !eaten; CAB.head.scale.setScalar(fin.s * CQ.cs); CAB.cord.visible = true; CAB.cord.position.set(CQ_CAB.x, top, CQ_CAB.z); CAB.cord.scale.set(1, 0.6, 1);
     return;
   }
-  if (DUEL.cool > 0) { DUEL.cool -= dt; return; }
-  let a = null, b = null, n = 0;
-  for (const f of fighters) if (!f.dead && !f.isDummy && !f.lantern && inRing(f)) { n++; if (!a) a = f; else if (!b) b = f; }
-  DUEL.crowd = n;
-  if (n === 2) startDuel(a, b);
+  const x = CQ_CAB.x + sx * (top - CAB.y), z = CQ_CAB.z + sz * (top - CAB.y);
+  CAB.s = fdt ? Math.min(1, CAB.s + fdt * 1.6) : 1;
+  CAB.head.visible = true; CAB.head.position.set(x, CAB.y, z); CAB.head.scale.setScalar(ease(CAB.s) * CQ.cs); CAB.head.rotation.set(sz * 2, CAB.sw * 0.2, -sx * 2);
+  CAB.env.visible = CAB.envCord.visible = true; CAB.env.position.set(0, -0.98, 0.02); CAB.env.rotation.set(0, Math.sin(CAB.sw * 1.3) * 0.4, 0);
+  CAB.cord.visible = true; CAB.cord.position.set(CQ_CAB.x, top, CQ_CAB.z);
+  const L = Math.max(0.05, top - CAB.y - 0.65 * CQ.cs); CAB.cord.scale.set(1, L, 1); CAB.cord.rotation.set(-sz * 2, 0, sx * 2);
 }
-function updateDuelHud(fdt) {
-  if (DUEL.on) wallMat.opacity = 0.055 + Math.sin(realClock * 4) * 0.025;
-  const watching = DUEL.watch && DUEL.on;
-  const left = DUEL.on ? Math.max(0, Math.ceil(DUEL.max - DUEL.t)) : 0;
-  const key = DUEL.on ? 'on' + (watching ? 'w' : '') + duelSide(player) + left + DUEL.a.name + DUEL.b.name : DUEL.crowd > 2 && inRing(player) ? 'crowd' : '';
+
+// ---- state: the authority's decisions, and what every client does when the state changes ----
+function duelMsg() { return { t: 'du', s: DUEL.seq, ph: DUEL.ph, a: DUEL.aid, b: DUEL.bid, an: DUEL.an, bn: DUEL.bn, w: DUEL.w, k: DUEL.k, e: r2(DUEL.t) }; }
+function duelSend(conn) {
+  if (NET.mode !== 'host') return;
+  if (conn) sendTo(conn, duelMsg()); else broadcast(duelMsg());
+  DUEL.sendT = DUEL.ph === 'idle' ? 3 : 1;
+}
+function duelStart(a, b) {
+  DUEL.seq++; DUEL.aid = a.id; DUEL.bid = b.id; DUEL.an = String(a.name || '').slice(0, 32); DUEL.bn = String(b.name || '').slice(0, 32); DUEL.w = ''; DUEL.k = '';
+  DUEL.pair = ''; DUEL.call = null; DUEL.pend = null; DUEL.gone = 0;
+  duelEnter('intro'); duelSend();
+}
+function duelPhase(ph) { duelEnter(ph); duelSend(); }
+function duelFinish(w, k) { DUEL.w = w || ''; DUEL.k = k; DUEL.pend = null; duelPhase('end'); }
+// leave any duel at once (the room changed under it): no winner, nothing sent
+function duelReset() {
+  if (DUEL.ph !== 'idle') duelEnter('idle');
+  DUEL.req.clear(); DUEL.rate.clear(); DUEL.pend = null; DUEL.call = null; DUEL.hostOk = false; DUEL.cool = 0; DUEL.pair = '';
+}
+// ids change when a room opens (offline 'local:P' becomes 'peerid:P'): a duel among our own fighters follows them
+function duelRekey(old) {
+  if (DUEL.ph === 'idle') return;
+  for (const [oid, f] of old) { if (DUEL.aid === oid) DUEL.aid = f.id; if (DUEL.bid === oid) DUEL.bid = f.id; if (DUEL.w === oid) DUEL.w = f.id; }
+}
+function duelEnter(ph) {
+  const was = DUEL.ph;
+  DUEL.ph = ph; DUEL.on = ph !== 'idle'; DUEL.t = 0;
+  if (DUEL.wall) DUEL.wall.visible = ph === 'intro' || ph === 'go';
+  ringMat.color.set(ph === 'idle' ? '#f2c24a' : '#ff5a4a');
+  const a = duelFighter(DUEL.aid), b = duelFighter(DUEL.bid), near = duelNear();
+  if (ph === 'intro') {
+    DUEL.fin = null; CAB.s = Math.max(CAB.s, 0.01);
+    addFeed(null, 'Cabbage duel: ' + DUEL.an + ' vs ' + DUEL.bn, '');
+    [a, b].forEach((f, i) => { if (f && !f.remote) duelPlace(f, i ? 1 : -1); });
+    cqIntro(true);
+  } else if (ph === 'go') {
+    cqIntro(true);
+    if (near) DRUMS.gong();
+  } else if (ph === 'end') {
+    DUEL.watch = DUEL.watch && near;
+    const w = duelFighter(DUEL.w), los = w ? (w === a ? b : a) : null;
+    DUEL.fin = { k: DUEL.k, w: DUEL.w, wn: w ? w.name : DUEL.w === DUEL.aid ? DUEL.an : DUEL.bn, t: 0, cab: null, s: 1, spit: false, env: 0 };
+    if (DUEL.k === 'grab' && w) {
+      DUEL.fin.cab = CAB.head ? CAB.head.position.clone() : CQ_CAB.clone().setY(CAB.y);
+      if (!w.remote) { w.cqEat = 1.6; w.hp = Math.min(100, w.hp + 35); if (w.emote) w.emote = null; }
+      if (los && !los.remote && !los.dead) duelKnock(los);
+    } else if (w && !w.remote) { w.hp = Math.min(100, w.hp + 35); }
+    if (w && w.ai && !w.remote && Math.random() < 0.8) setTimeout(() => playEmote(w, 'cheer'), 2600);
+    if (near && w) DRUMS.win(); else DRUMS.stop();
+    if (!w) addFeed(null, 'The cabbage duel ended in a draw', '');
+    else addFeed(DUEL.fin.wn, DUEL.k === 'grab' ? 'the greens' : 'the cabbage duel', DUEL.k === 'grab' ? 'picked' : 'won');
+    cqWin();
+  } else if (ph === 'idle') {
+    DUEL.cool = CQ.cool; DUEL.watch = false; DUEL.fin = null; if (was !== 'idle') { CAB.s = 0; CAB.y = CQ.hoist + 1.5; }
+    DRUMS.stop(); cqIntro(false);
+  }
+  if (CQS.feet) for (const m of CQS.feet) m.visible = ph !== 'idle';
+  duelChip.key = null;
+}
+// a duelist of ours walks onto its mark facing the greens, healed and calm
+function duelPlace(f, s) {
+  if (f.action) f.endAction(true);
+  if (f.awaken > 0) { f.awaken = 0; f.def.ult.end(f); }
+  dropCarry(f); f.emote = null; f.held = false; f.heldPose = null;
+  f.hp = 100; f.guard = GUARD.max; f.stun = 0; f.ragdoll = 0; f.flatten = 0; f.frozen = 0; f.bleed = null; f.comboIdx = 0;
+  const m = CQ_MARK(s); f.pos.set(m.x, 0, m.z); f.vel.set(0, 0, 0); f.onGround = true;
+  f.yaw = Math.atan2(CQ_CAB.x - m.x, CQ_CAB.z - m.z); f.snap();
+  if (f === player) { camYaw = f.yaw; camPitch = 0.38; }
+  if (f.ai) { f.ai.cqSide = s; f.ai.cqAir = null; f.ai.hopAt = 0; }
+}
+// the loser of a pick is knocked away from under the greens (no damage)
+function duelKnock(f) {
+  if (f.action) f.endAction(true);
+  tA.set(f.pos.x - CQ_CAB.x, 0, f.pos.z - CQ_CAB.z); if (tA.lengthSq() < 0.01) f.fwd(tA).negate(); tA.normalize();
+  f.vel.set(tA.x * 13, 10, tA.z * 13); f.onGround = false; f.pos.y += 0.05; f.ragdoll = Math.max(f.ragdoll, 1.0); f.ragSpin = -13; f.stun = Math.max(f.stun, 1.0);
+  popText(head(f), 'TOO SLOW!', 'call');
+}
+// who may duel: our own player and bots; a guest's fighter only while its owner keeps saying it stands in the ring
+function duelEligible(f) {
+  if (f.dead || f.isDummy || f.lantern) return false;
+  if (!f.remote) return f === player || !!f.ai;
+  const r = DUEL.req.get(ownerOf(f.id));
+  return !!(r && r.id === f.id && gameTime - r.t < 1.5);
+}
+// every simulation step, on every client: the authority's rules, the guest's asks, the fences for our own fighters
+function updateDuel(dt) {
+  if (DUEL.ph !== 'idle') DUEL.t += dt;
+  if (duelAuth()) duelAuthStep(dt); else duelGuestStep(dt);
+  if (DUEL.ph === 'intro' || DUEL.ph === 'go') {
+    for (const f of fighters) {
+      if (f.remote || f.lantern || f.dead) continue;
+      const dx = f.pos.x - DUEL.x, dz = f.pos.z - DUEL.z, d = Math.hypot(dx, dz) || 1e-4, mine = duelSide(f) === 1;
+      if (mine && d > DUEL.r - 0.45) { const k = (DUEL.r - 0.45) / d; f.pos.x = DUEL.x + dx * k; f.pos.z = DUEL.z + dz * k; }
+      else if (!mine && d < DUEL.r + 0.5) { const k = (DUEL.r + 0.5) / d; f.pos.x = DUEL.x + dx * k; f.pos.z = DUEL.z + dz * k; }
+      if (mine && DUEL.ph === 'intro') { f.vel.x = 0; f.vel.z = 0; }
+    }
+  }
+}
+function duelAuthStep(dt) {
+  const D = DUEL;
+  if (NET.mode === 'host') { D.sendT -= dt; if (D.sendT <= 0) duelSend(); }
+  if (D.ph === 'idle') {
+    if (D.cool > 0) { D.cool -= dt; D.pair = ''; return; }
+    const el = []; let crowd = 0;
+    for (const f of fighters) { if (f.dead || f.isDummy || f.lantern || !inRing(f)) continue; crowd++; if (duelEligible(f)) el.push(f); }
+    D.crowd = crowd; D.ready = el.length;
+    const key = el.length === 2 ? el[0].id + '|' + el[1].id : '';
+    if (key !== D.pair) { D.pair = key; D.pairT = 0; }
+    if (key) { D.pairT += dt; if (D.pairT >= CQ.wait) { duelStart(el[0], el[1]); return; } }
+    duelCallBots(el, dt);
+    return;
+  }
+  const a = duelFighter(D.aid), b = duelFighter(D.bid);
+  if (D.ph === 'intro' || D.ph === 'go') {
+    D.gone = !a || !b ? D.gone + dt : 0;
+    if (a && a.dead && !(b && b.dead)) return duelFinish(D.bid, 'ko');
+    if (b && b.dead && !(a && a.dead)) return duelFinish(D.aid, 'ko');
+    if (a && b && a.dead && b.dead) return duelFinish('', 'ko');
+    if (D.gone > 1.5) return duelFinish(a ? D.aid : b ? D.bid : '', 'quit');
+    if (D.ph === 'intro') { if (D.t >= CQ.intro) duelPhase('go'); return; }
+    if (D.t >= CQ.max) return duelFinish('', 'time');
+    if (D.t < CQ.minGo) return;
+    for (const f of [a, b]) if (f && !f.remote && !f.dead && cabTouch(f.pos)) return duelFinish(f.id, 'grab');
+    // a guest's pick waits a moment for the snapshots that show it (they ride the same ordered channel)
+    const P = D.pend;
+    if (P) {
+      const f = duelFighter(P.id);
+      if (!f || gameTime - P.t > 0.4) D.pend = null;
+      else if (duelSeen(f, P.p)) return duelFinish(P.id, 'grab');
+    }
+  } else if (D.ph === 'end' && D.t >= CQ.end) duelPhase('idle');
+}
+// does what the host has seen of a guest's fighter (its last few snapshots) agree with a pick it claims at p?
+function duelSeen(f, p) {
+  const S = f.snaps || [];
+  for (let i = S.length - 1; i >= 0 && i >= S.length - 6; i--) {
+    const q = S[i].e && S[i].e.p; if (!Array.isArray(q)) continue;
+    if (Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]) < 1.5 && cabTouch(tB.set(q[0], q[1], q[2]), 0.5)) return true;
+  }
+  return false;
+}
+// a guest: say so while our fighter stands in the ring, and ask for the pick when it touches the greens
+function duelGuestStep(dt) {
+  if (NET.mode !== 'client' || !NET.host || !player) return;
+  DUEL.inT -= dt; DUEL.grabT -= dt;
+  if (DUEL.ph === 'idle' && !player.dead && inRing(player) && DUEL.inT <= 0) { DUEL.inT = 0.4; sendTo(NET.host, { t: 'dq', k: 'in', i: player.id }); }
+  if (DUEL.ph === 'go' && duelSide(player) && !player.dead && DUEL.grabT <= 0 && cabTouch(player.pos)) {
+    DUEL.grabT = 0.15; sendTo(NET.host, { t: 'dq', k: 'grab', i: player.id, s: DUEL.seq, p: [r2(player.pos.x), r2(player.pos.y), r2(player.pos.z)] });
+  }
+}
+// the host: a guest's ask. Its own fighter only (the id's owner is the sender), a live duel, the right duel, a spot
+// that touches the greens, and the host's own view of that fighter agreeing; anything else is dropped.
+function duelAsk(m, from) {
+  if (NET.mode !== 'host' || typeof from !== 'string' || !NET.conns.has(from)) return;
+  if (!own(m, 'k') || (m.k !== 'in' && m.k !== 'grab')) return;
+  if (!own(m, 'i') || typeof m.i !== 'string' || m.i.length > 80 || ownerOf(m.i) !== from) return;
+  const f = fighters.find((x) => x.remote && x.id === m.i); if (!f) return;
+  if (m.k === 'in') { DUEL.req.set(from, { id: m.i, t: gameTime }); return; }
+  const last = DUEL.rate.get(from); if (last !== undefined && gameTime - last < 0.1) return;
+  DUEL.rate.set(from, gameTime);
+  if (DUEL.ph !== 'go' || DUEL.t < CQ.minGo || f.dead) return;
+  if (!own(m, 's') || m.s !== DUEL.seq || (m.i !== DUEL.aid && m.i !== DUEL.bid)) return;
+  const p = own(m, 'p') && Array.isArray(m.p) && m.p.length === 3 && m.p.every((v) => typeof v === 'number' && Number.isFinite(v)) ? m.p : null;
+  if (!p || !cabTouch(tA.set(p[0], p[1], p[2]), 0.2)) return;
+  if (duelSeen(f, p)) duelFinish(m.i, 'grab'); else DUEL.pend = { id: m.i, p: p.slice(), t: gameTime };
+}
+// a guest: the host's state. Only from the host's own connection; every field checked; unknown values dropped.
+function duelFromHost(m, from) {
+  if (NET.mode !== 'client' || !NET.host || from !== NET.host.peer) return;
+  if (!own(m, 'ph') || !DUEL_PH.includes(m.ph) || !own(m, 's') || !Number.isInteger(m.s) || m.s < 0 || m.s > 1e9) return;
+  const id = (k) => (own(m, k) && typeof m[k] === 'string' && m[k].length <= 80 ? m[k] : '');
+  const nm = (k) => (own(m, k) && typeof m[k] === 'string' ? m[k].slice(0, 32) : '');
+  const a = id('a'), b = id('b'), w = id('w'), k = own(m, 'k') && DUEL_K.includes(m.k) ? m.k : '';
+  if (m.ph !== 'idle' && (!a || !b || a === b)) return;
+  if (w && w !== a && w !== b) return;
+  const e = own(m, 'e') && typeof m.e === 'number' && Number.isFinite(m.e) ? clamp(m.e, 0, 200) : 0;
+  DUEL.hostOk = true;
+  if (m.s !== DUEL.seq || m.ph !== DUEL.ph) {
+    DUEL.seq = m.s; DUEL.aid = a; DUEL.bid = b; DUEL.an = nm('an'); DUEL.bn = nm('bn'); DUEL.w = w; DUEL.k = k;
+    duelEnter(m.ph);
+  }
+  if (Math.abs(DUEL.t - e) > 0.4) DUEL.t = e;
+}
+// bots answer a challenge: someone waits alone in the ring, so one bot nearby walks in after a moment; now and
+// then a bot steps in by itself to wait for a challenger
+function duelCallBots(el, dt) {
+  const D = DUEL, ok = (b) => b && b.ai && !b.remote && !b.dead && fighters.includes(b);
+  if (el.length === 1) {
+    if (!D.call || !ok(D.call.bot) || D.call.bot === el[0]) {
+      let best = null, bd = 46;
+      for (const b of fighters) if (ok(b) && b !== el[0] && distH(b, el[0]) < bd) { bd = distH(b, el[0]); best = b; }
+      D.call = best ? { bot: best, at: gameTime + rand(1.2, 3), until: gameTime + 25, s: 0 } : null;
+    }
+    if (D.call && D.call.bot !== el[0]) { const w = el[0]; tA.set(w.pos.x - DUEL.x, 0, w.pos.z - DUEL.z); D.call.s = tA.x * CQ_R.x + tA.z * CQ_R.z > 0 ? -1 : 1; }
+  } else if (D.call && (el.length !== 0 || gameTime > D.call.until || !ok(D.call.bot))) D.call = null;
+  if (el.length === 0 && !D.call) {
+    D.initT -= dt;
+    if (D.initT <= 0) {
+      D.initT = rand(45, 80);
+      const bots = fighters.filter(ok);
+      if (bots.length) D.call = { bot: bots[(Math.random() * bots.length) | 0], at: gameTime, until: gameTime + 16, s: Math.random() < 0.5 ? -1 : 1 };
+    }
+  }
+}
+// a bot sent to the ring walks onto a mark and waits there (true: this bot's intent is set)
+function duelBotWalk(b, I) {
+  const c = DUEL.call;
+  if (!c || c.bot !== b || gameTime < c.at || DUEL.ph !== 'idle' || !duelAuth()) return false;
+  const m = CQ_MARK(c.s || 1), dx = m.x - b.pos.x, dz = m.z - b.pos.z, d = Math.hypot(dx, dz);
+  if (d > 0.6) I.move.set(dx / d, 0, dz / d).multiplyScalar(Math.min(1, d / 1.5 + 0.2));
+  else I.byaw = Math.atan2(CQ_CAB.x - b.pos.x, CQ_CAB.z - b.pos.z);
+  b.ai.target = null;
+  return true;
+}
+// a bot in a duel: climb the poles on its side to the greens and hop to them, kick the other dancer when it is in
+// reach (or blocking the way above), block a kick now and then
+function duelBotIntent(b, I, P, dt) {
+  const ai = b.ai, now = gameTime, o = duelFoe(b);
+  ai.target = o && !o.dead ? o : null;
+  const x0 = b.pos.x, z0 = b.pos.z;
+  if (ai.cqSide === undefined) ai.cqSide = (x0 - DUEL.x) * CQ_R.x + (z0 - DUEL.z) * CQ_R.z < 0 ? -1 : 1;
+  // where it stands: the floor, or one of the poles (which also picks the side it climbs)
+  let lvl = -1;
+  if (b.onGround && b.pos.y > 0.4) for (let i = 0; i < CQ_POLES.length; i++) {
+    const p = CQ_POLES[i]; if (Math.abs(p.top - b.pos.y) > 0.2 || Math.hypot(p.x - x0, p.z - z0) > 1.0) continue;
+    if (i === 6) lvl = 3; else { ai.cqSide = i < 3 ? -1 : 1; lvl = i % 3; }
+  }
+  if (b.onGround && b.pos.y <= 0.4) { const L = CQ_POLES[0], R = CQ_POLES[3]; ai.cqSide = Math.hypot(L.x - x0, L.z - z0) < Math.hypot(R.x - x0, R.z - z0) ? -1 : 1; }
+  if (b.onGround && !ai.cqWas) { ai.hopAt = now + (P.react < 0.2 ? rand(0.08, 0.22) : P.react < 0.3 ? rand(0.2, 0.45) : rand(0.45, 0.85)); ai.cqAir = null; }
+  ai.cqWas = b.onGround;
+  // kicks: in reach and about level, or just above us (kick them off the pole we want)
+  if (o && !o.dead && canHit(o)) {
+    const dx = o.pos.x - x0, dz = o.pos.z - z0, d = Math.hypot(dx, dz), dy = o.pos.y - b.pos.y;
+    if (o.action && o.action.name === 'm1' && o.action !== ai.seen && d < 3.2) { ai.seen = o.action; if (Math.random() < P.block * 0.8) ai.blockUntil = now + P.react + rand(0.2, 0.4); }
+    if (now < ai.blockUntil && now > ai.blockUntil - 0.45 && b.onGround && !b.action) { I.block = true; I.byaw = Math.atan2(dx, dz); return I; }
+    if (d < 2.6 && dy > -1.3 && dy < 1.9 && b.m1Lock <= 0 && now >= ai.nextClick && !b.action) {
+      I.m1 = true; ai.nextClick = now + rand(P.cadence[0], P.cadence[1]); I.byaw = Math.atan2(dx, dz);
+      return I;
+    }
+  }
+  if (b.action) return I;
+  // climbing: the next pole up on our side (the summit after the third), then the greens from the summit
+  const path = CQ_PATH[ai.cqSide];
+  const tgt = !b.onGround && ai.cqAir ? ai.cqAir : lvl >= 3 ? CQ_POLES[6] : CQ_POLES[path[lvl + 1]];
+  const gx = tgt.x - x0, gz = tgt.z - z0, gd = Math.hypot(gx, gz) || 1e-4, ux = gx / gd, uz = gz / gd;
+  if (b.onGround) {
+    if (lvl >= 3) {   // on the summit: step under the greens and hop up to them
+      I.move.set(ux, 0, uz).multiplyScalar(clamp(gd / 0.5, 0, 1));
+      if (gd < 0.35 && now >= ai.hopAt) { I.jump = true; ai.hopAt = now + 0.5; ai.cqAir = CQ_POLES[6]; }
+    } else if (b.pos.y > 0.4) {   // on a pole: keep to the middle of its top until it is time to hop on
+      const cur = lvl >= 0 ? CQ_POLES[path[lvl]] : tgt, cx = cur.x - x0, cz = cur.z - z0, cd = Math.hypot(cx, cz);
+      if (now >= ai.hopAt) { I.jump = true; ai.cqAir = tgt; ai.hopAt = now + 0.4; I.move.set(ux, 0, uz).multiplyScalar(clamp(gd / 2.2, 0.4, 1)); }
+      else if (cd > 0.12) I.move.set(cx / cd, 0, cz / cd).multiplyScalar(clamp(cd / 0.5, 0, 0.6));
+    } else {   // on the floor: run at the first pole and jump on from a stride away
+      I.move.set(ux, 0, uz).multiplyScalar(gd < 2.6 ? clamp(gd / 2.6, 0.45, 1) : 1);
+      if (gd < 2.0 && gd > 0.75 && now >= ai.hopAt) { I.jump = true; ai.cqAir = tgt; ai.hopAt = now + 0.4; }
+      else if (gd <= 0.75) I.move.set(-ux, 0, -uz);   // too close under it: step back out for the run-up
+    }
+  } else {
+    // in the air: drift onto the pole top (proportional, so it stops over it)
+    I.move.set(ux, 0, uz).multiplyScalar(clamp(gd / 1.3, 0, 1));
+  }
+  return I;
+}
+
+// ---- what the duel looks and sounds like (every drawn frame, all clients) ----
+const duelChip = { el: $('#duelChip'), txt: $('#duelTxt'), key: '' };
+const CQH = { hud: $('#cqHud'), an: $('#cqAn'), bn: $('#cqBn'), ab: $('#cqAb'), bb: $('#cqBb'), ah: $('#cqAh'), bh: $('#cqBh'), tm: $('#cqT'), intro: $('#cqIntro'), cd: $('#cqCd'),
+  ia: $('#cqIa'), ib: $('#cqIb'), win: $('#cqWin'), ws: $('#cqWs'), wt: $('#cqWt'), wd: $('#cqWd'), last: {}, introT: 0, winT: 0 };
+function duelNear() { return !!player && (duelSide(player) === 1 || DUEL.watch || Math.hypot(player.pos.x - DUEL.x, player.pos.z - DUEL.z) < 34); }
+function cqSet(el, k, v) { const L = CQH.last, key = el.id + k; if (L[key] === v) return; L[key] = v; if (k === 'text') el.textContent = v; else if (k === 'w') el.style.transform = 'scaleX(' + v + ')'; else if (k === 'hide') el.hidden = v; }
+function cqIntro(on) {
+  if (!on || !duelNear()) { CQH.intro.hidden = true; CQH.introT = 0; return; }
+  CQH.ia.textContent = DUEL.an; CQH.ib.textContent = DUEL.bn;
+  CQH.intro.hidden = false; CQH.introT = DUEL.ph === 'go' ? 0.9 : CQ.intro + 0.9;
+}
+function cqWin() {
+  if (!duelNear()) return;
+  const f = DUEL.fin, mine = player && f && f.w === player.id, lost = player && duelSide(player) && f && f.w && !mine;
+  CQH.ws.textContent = f.k === 'grab' ? (mine ? 'You picked the greens' : 'Picked the greens') : f.k === 'ko' ? 'Duel won · K.O.' : f.k === 'quit' && f.w ? 'Duel won · forfeit' : 'Cabbage duel';
+  CQH.wt.textContent = f.w ? f.wn : 'Draw';
+  CQH.wd.textContent = f.k === 'grab' ? (lost ? 'Too slow! Knocked off the poles' : 'Ate the lettuce, won the red envelope') : f.w ? (lost ? 'Better luck next time' : 'The greens stay hung for the next pair') : 'Nobody reached the greens';
+  CQH.win.classList.toggle('draw', !f.w); CQH.win.classList.toggle('lost', !!lost);
+  CQH.win.hidden = false; CQH.win.classList.remove('on'); void CQH.win.offsetWidth; CQH.win.classList.add('on'); CQH.winT = 3.6;
+}
+const _cqM = new V3();
+function updateDuelFx(fdt) {
+  placeCabbage(fdt);
+  const D = DUEL, a = duelFighter(D.aid), b = duelFighter(D.bid), near = duelNear();
+  if (D.ph === 'intro' || D.ph === 'go') wallMat.opacity = 0.05 + Math.sin(realClock * 4) * 0.02;
+  // the duelists' coloured foot rings
+  if (CQS.feet && D.ph !== 'idle') [a, b].forEach((f, i) => { const m = CQS.feet[i]; m.visible = !!f && !f.dead; if (f) { m.position.set(f.root.position.x, f.root.position.y + 0.05, f.root.position.z); m.rotation.y += fdt * (i ? -1.2 : 1.2); } });
+  // the finale: the greens fly into the winner's mouth, get chewed, spat out in a burst of leaves; the envelope is held up
+  const F = D.fin;
+  if (F && F.k === 'grab' && D.ph === 'end') {
+    const w = duelFighter(F.w);
+    F.t += fdt;
+    if (w && F.cab) {
+      w.fwd(tA); _cqM.set(w.root.position.x + tA.x * 1.0, w.root.position.y + 1.75, w.root.position.z + tA.z * 1.0);
+      if (F.t < 0.35) { const k = ease(F.t / 0.35); F.cab.lerp(_cqM, k); F.cab.y += Math.sin(k * PI) * 0.4 * (1 - k); }
+      else if (!F.spit) {
+        F.cab.copy(_cqM); F.s = Math.max(0.3, 1 - (F.t - 0.35) * 0.75) * (1 + Math.sin(F.t * 22) * 0.06);
+        if (Math.random() < fdt * 8) emit('leaf', _cqM, { n: 2, colors: ['#7cc544', '#3d9a2c', '#d6efa0'], speed: 3, up: 2, size: 0.12 });
+        if (F.t >= 1.3) {
+          F.spit = true;
+          emit('leaf', _cqM, { n: GFX.fx >= 2 ? 60 : 34, colors: ['#7cc544', '#4fa83a', '#a8dc6a', '#d6efa0', '#f1fac8'], speed: 7, up: 7, grav: -7, size: 0.26, life: 1.9, dir: tA.clone(), dirSpeed: 3 });
+          emit('stars', _cqM, { n: 18, colors: ['#ffd24a', '#ff4d3d', '#fff3b5'], speed: 7 });
+          ring(tB.set(w.root.position.x, w.root.position.y, w.root.position.z), '#7cc544', 3.2, 0.5, w.root.position.y + 1.6);
+          if (near) { DRUMS.gong(); shake(w.root.position, 0.35); }
+          if (w === player) { fovKick = Math.max(fovKick, 6); speedLines(0.5, 0.35); }
+        }
+      }
+      if (CAB.env && F.spit) {   // the red envelope held up over the winner, spinning, sparkling
+        F.env += fdt; const k = ease(Math.min(1, F.env / 0.5));
+        CAB.env.visible = true; CAB.envCord.visible = false; CAB.head.visible = true; CAB.head.scale.setScalar(CQ.cs);
+        CAB.head.position.set(w.root.position.x, w.root.position.y + lerp(2.2, 4.0, k), w.root.position.z);
+        CAB.head.rotation.set(0, F.env * 4, 0); CAB.env.position.set(0, 0, 0); CAB.env.rotation.set(0, 0, Math.sin(F.env * 3) * 0.15);
+        for (const ch of CAB.head.children) if (ch !== CAB.env) ch.visible = false;
+        if (Math.random() < fdt * 6) emit('stars', tB.set(w.root.position.x, w.root.position.y + 3.2, w.root.position.z), { n: 1, speed: 2 });
+      }
+    }
+  } else if (CAB.head) for (const ch of CAB.head.children) ch.visible = true;
+  // music: the band plays for everyone near the ring, louder for the duelists and watchers
+  const lv = (SETTINGS.drums ?? 0.8) * (near ? (duelSide(player) || D.watch ? 1 : clamp(1 - (Math.hypot(camera.position.x - DUEL.x, camera.position.z - DUEL.z) - 14) / 30, 0.2, 1)) : 0);
+  if (D.ph === 'intro') DRUMS.play('intro'); else if (D.ph === 'go') DRUMS.play('duel');
+  const heat = D.ph === 'go' ? Math.max(cqProg(a), cqProg(b), D.t > CQ.max - 15 ? 0.6 : 0) : 0;
+  DRUMS.tick(heat, lv);
+  updateDuelHud(fdt, a, b, near);
+}
+function updateDuelHud(fdt, a, b, near) {
+  const D = DUEL, me = player && duelSide(player) === 1;
+  // the duel panel: both names, how high each one is, the clock
+  const show = near && D.ph !== 'idle';
+  cqSet(CQH.hud, 'hide', !show);
+  if (show) {
+    cqSet(CQH.an, 'text', D.an); cqSet(CQH.bn, 'text', D.bn);
+    const pa = cqProg(a), pb = cqProg(b);
+    cqSet(CQH.ab, 'w', (Math.round(pa * 50) / 50).toFixed(2)); cqSet(CQH.bb, 'w', (Math.round(pb * 50) / 50).toFixed(2));
+    cqSet(CQH.ah, 'text', a ? (a.dead ? 'K.O.' : Math.max(0, a.pos.y).toFixed(1) + ' m') : '…'); cqSet(CQH.bh, 'text', b ? (b.dead ? 'K.O.' : Math.max(0, b.pos.y).toFixed(1) + ' m') : '…');
+    const left = D.ph === 'go' ? Math.max(0, Math.ceil(CQ.max - D.t)) : D.ph === 'intro' ? CQ.max : 0;
+    cqSet(CQH.tm, 'text', D.ph === 'end' ? (D.w ? 'WON' : 'DRAW') : Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0'));
+    CQH.hud.classList.toggle('hot', D.ph === 'go' && Math.max(cqProg(a), cqProg(b)) > 0.75);
+  }
+  // intro: names, then 3 · 2 · 1 · PICK!
+  if (CQH.introT > 0) {
+    CQH.introT -= fdt;
+    const txt = D.ph === 'intro' ? String(Math.max(1, Math.ceil(CQ.intro - D.t))) : D.ph === 'go' ? 'PICK!' : '';
+    if (CQH.cd.textContent !== txt) { CQH.cd.textContent = txt; CQH.cd.classList.remove('cqpop'); void CQH.cd.offsetWidth; CQH.cd.classList.add('cqpop'); }
+    CQH.intro.classList.toggle('go', D.ph === 'go');
+    if (CQH.introT <= 0 || D.ph === 'end' || D.ph === 'idle') { CQH.intro.hidden = true; CQH.introT = 0; }
+  }
+  if (CQH.winT > 0) { CQH.winT -= fdt; if (CQH.winT <= 0) { CQH.win.classList.remove('on'); CQH.win.hidden = true; } }
+  $('#slots').classList.toggle('duel', me && D.ph !== 'idle');
+  // the chip up top: what the ring wants from you, or who is duelling (with Watch)
+  const inR = player && !player.dead && inRing(player);
+  let key = '', txt = '';
+  if ((D.ph === 'intro' || D.ph === 'go') && !me) { const l = D.ph === 'go' ? Math.max(0, Math.ceil(CQ.max - D.t)) : CQ.max; key = 'on' + (D.watch ? 'w' : '') + l + D.an + D.bn; txt = Math.floor(l / 60) + ':' + String(l % 60).padStart(2, '0') + ' · ' + D.an + ' vs ' + D.bn; }
+  else if (D.ph === 'idle' && inR) {
+    const guestOld = NET.mode === 'client' && !D.hostOk;
+    const n = fighters.filter((f) => !f.dead && !f.isDummy && !f.lantern && inRing(f)).length;
+    key = guestOld ? 'old' : D.cool > 0 ? 'cool' : n > 2 ? 'crowd' : n === 2 && D.pair ? 'pair' : 'wait';
+    txt = { old: "This room's host can't run cabbage duels", cool: 'The greens are being hung again…', crowd: 'Cabbage duel: two dancers only', pair: 'Duel starting…', wait: 'Cabbage duel: waiting for a challenger' }[key];
+  }
   if (key === duelChip.key) return;
-  duelChip.key = key;
-  duelChip.el.hidden = !key;
+  duelChip.key = key; duelChip.el.hidden = !key;
   if (!key) return;
-  duelChip.txt.textContent = key === 'crowd' ? 'Duel ring: 2 fighters only' : left + 's · ' + DUEL.a.name + ' vs ' + DUEL.b.name;
-  $('#duelWatch').hidden = key === 'crowd' || duelSide(player) === 1;
-  $('#duelWatch').textContent = watching ? 'Stop watching' : 'Watch';
+  duelChip.txt.textContent = txt;
+  $('#duelWatch').hidden = !key.startsWith('on');
+  $('#duelWatch').textContent = D.watch ? 'Stop watching' : 'Watch';
 }
 $('#duelWatch').addEventListener('click', (e) => { e.currentTarget.blur(); DUEL.watch = !DUEL.watch && DUEL.on; duelChip.key = ''; });
-// spectator camera: over the shoulder of the first duelist, framing both
+// spectator camera: from in front of the ring, framing the poles, both dancers and the greens
 const _dc = new V3(), _dm = new V3();
 function duelCamera(fdt) {
   if (!DUEL.watch || !DUEL.on || fpv) return false;
   if (held.up || held.down || held.left || held.right || TOUCH.fw || TOUCH.st || PAD.fw || PAD.st) { DUEL.watch = false; duelChip.key = ''; return false; }
-  const A = DUEL.a.root.position, Bp = DUEL.b.root.position;
-  _dm.addVectors(A, Bp).multiplyScalar(0.5); _dm.y += 1.2;
-  let dx = Bp.x - A.x, dz = Bp.z - A.z; const d = Math.hypot(dx, dz) || 1; dx /= d; dz /= d;
-  _dc.set(A.x - dx * 6 - dz * 2, A.y + 3.3, A.z - dz * 6 + dx * 2);
-  camera.position.lerp(_dc, 1 - Math.exp(-fdt * 5));
+  const a = duelFighter(DUEL.aid), b = duelFighter(DUEL.bid);
+  _dm.set(CQ_CAB.x, 4.2, CQ_CAB.z);
+  let n = 1; for (const f of [a, b]) if (f) { _dm.x += f.root.position.x; _dm.y += f.root.position.y + 1.2; _dm.z += f.root.position.z; n++; }
+  _dm.divideScalar(n);
+  _dc.set(DUEL.x + CQ_F.x * 13.5, 6.4, DUEL.z + CQ_F.z * 13.5);
+  camera.position.lerp(_dc, 1 - Math.exp(-fdt * 4));
   camera.lookAt(_dm);
   return true;
 }
@@ -7153,6 +7831,18 @@ const ANIMS = {
   uppercut(P, p, f, V, k = pk(p)) { P.armR[0] -= 3.0 * k; P.armR[2] += 0.3 * k; P.torso[0] -= 0.35 * k; P.legL[0] -= 0.4 * Math.max(0, k); V.y += 0.35 * Math.max(0, k); },
   downslam(P, p, f) { const w = (f.anim && f.anim.wf) || 0.2, s = p < w ? ease(p / w) : 1 - ease((p - w) / (1 - w) * 2.2); P.armL[0] -= 2.9 * s; P.armR[0] -= 2.9 * s; if (p > w) P.torso[0] += 0.5 * (1 - s); },
   roar(P, p) { const k = p < 0.25 ? ease(p / 0.25) : p > 0.8 ? 1 - ease((p - 0.8) / 0.2) : 1; P.armL[2] += 1.3 * k; P.armR[2] -= 1.3 * k; P.armL[0] -= 0.4 * k; P.armR[0] -= 0.4 * k; P.head[0] -= 0.5 * k; P.torso[0] -= 0.25 * k; if (P.jaw) P.jaw[0] += 0.7 * k; },
+  // cabbage-duel kicks (leg forward is -x; k runs -0.35 in the chamber, 1 at the hit, back to 0)
+  kickR(P, p, f, V, k = pk(p)) { const s = Math.max(0, k), c = Math.max(0, -k) * 2.5; P.legR[0] -= 2.0 * s + 0.9 * c; P.legL[0] += 0.3 * s; P.torso[0] -= 0.4 * s; P.armL[2] += 0.75 * s; P.armR[2] -= 0.55 * s; P.armL[0] -= 0.35 * s; P.head[0] += 0.15 * s; V.y += 0.06 * s; },
+  kickL(P, p, f, V, k = pk(p)) { const s = Math.max(0, k), c = Math.max(0, -k) * 2.5; P.legL[0] -= 2.0 * s + 0.9 * c; P.legR[0] += 0.3 * s; P.torso[0] -= 0.4 * s; P.armR[2] -= 0.75 * s; P.armL[2] += 0.55 * s; P.armR[0] -= 0.35 * s; P.head[0] += 0.15 * s; V.y += 0.06 * s; },
+  roundKick(P, p, f, V, k = pk(p)) { const s = Math.max(0, k), c = Math.max(0, -k) * 2.5; P.legR[0] -= 1.45 * s + 0.7 * c; P.legR[2] -= 1.15 * s; P.torso[1] -= 0.85 * s - 0.3 * c; P.torso[2] += 0.3 * s; P.armL[2] += 1.0 * s; P.armR[2] -= 0.4 * s; V.ry -= 0.5 * s; },
+  spinKick(P, p, f, V) {   // spinning back kick: a full turn on the standing leg, the kicking leg out flat
+    const w = (f.anim && f.anim.wf) || 0.2, s = strikeP(p, f), out = s > 0 ? Math.sin(Math.min(1, s * 1.25) * PI) : 0;
+    V.ry = s > 0 ? -TAU * ease(Math.min(1, s * 1.25)) : 0.35 * ease(p / Math.max(0.01, w)); V.snap = true;
+    P.legR[0] -= 1.5 * out + (s > 0 ? 0 : 0.7 * ease(p / w)); P.legR[2] -= 1.3 * out; P.torso[2] += 0.4 * out; P.armL[2] += 1.1 * out; P.armR[2] -= 1.1 * out; V.y += 0.12 * out;
+  },
+  flyKick(P, p, f, V, k = pk(p)) { const s = Math.max(0, k); P.legR[0] -= 1.8 * s; P.legL[0] += 0.9 * s; P.torso[0] -= 0.4 * s; P.armL[2] += 0.9 * s; P.armR[2] -= 0.9 * s; V.rx -= 0.25 * s; },
+  riseKick(P, p, f, V, k = pk(p)) { const s = Math.max(0, k); P.legR[0] -= 2.8 * s; P.legL[0] += 0.2 * s; P.torso[0] -= 0.6 * s; P.armL[2] += 0.9 * s; P.armR[2] -= 0.9 * s; V.y += 0.3 * s; },
+  axeKick(P, p, f) { const w = (f.anim && f.anim.wf) || 0.2, s = p < w ? ease(p / w) : 1 - ease((p - w) / (1 - w) * 2.2); P.legR[0] -= 2.9 * s; P.torso[0] -= 0.4 * s - (p > w ? 0.35 * (1 - s) : 0); P.armL[2] += 0.8 * s; P.armR[2] -= 0.8 * s; },
 };
 // render-side: pose blending and the interpolated transform (called once per drawn frame)
 const _V = { rx: 0, ry: 0, rz: 0, y: 1, sy: 1, sxz: 1, snap: false };
@@ -7181,6 +7871,12 @@ function animateFighter(f, fdt) {
     else { e.t += adt; EMOTES[e.k].pose(P, V, e.t); }
   }
   if (f.tro && f.tro.black) blackPose(f, P, V, upright, hs);
+  if (f.cqEat > 0) {   // the cabbage duel's winner: jaws wide, chew, chew, then spit the leaves out
+    f.cqEat -= adt; const t = 1.6 - f.cqEat;
+    if (P.jaw) P.jaw[0] += t < 0.35 ? 1.0 * ease(t / 0.35) : t < 1.25 ? 0.45 + Math.sin(t * 24) * 0.35 : 1.1 * (1 - ease((t - 1.25) / 0.35));
+    P.head[0] += t < 0.35 ? -0.35 * ease(t / 0.35) : t < 1.25 ? Math.sin(t * 24) * 0.08 : 0.45 * Math.sin(Math.min(1, (t - 1.25) / 0.35) * PI);
+    if (upright) { P.armL[2] += 0.6; P.armR[2] -= 0.6; }
+  }
   if (f.anim) {
     f.anim.t += adt; const p = f.anim.t / f.anim.dur;
     if (p >= 1) f.anim = null;
@@ -7285,10 +7981,15 @@ function updateFighter(f, dt, I) {
   if (I.dash && f.busy && !f.dead && !f.held && canEvasive(f)) { doEvasive(f, I); take(I, 'dash'); }
   if (f.carry && f.busy) dropCarry(f);
   const busy = f.busy, bstun = f.blockstun > 0;
-  // block: holding F guards the front; the first PARRY.window after raising it parries (if F was up for PARRY.rearm)
-  const wantBlock = !busy && !f.action && !!I.block && f.blockBreak <= 0 && !f.carry;
+  // block: holding F guards the front; the first PARRY.window after raising it parries (if F was up for PARRY.rearm).
+  // Only a fresh press arms the parry: F held through a stun (or an action) raises a plain guard when it ends.
+  const bIn = !!I.block;
+  if (bIn && !f.bIn) { f.bPress = gameTime; f.bArm = gameTime - (f.bUp ?? -9) >= PARRY.rearm; }
+  if (!bIn && f.bIn) f.bUp = gameTime;
+  f.bIn = bIn;
+  const wantBlock = !busy && !f.action && bIn && f.blockBreak <= 0 && !f.carry;
   const nowBlock = bstun ? f.blocking : wantBlock;
-  if (nowBlock && !f.blocking) { f.blockStart = gameTime; f.parryArmed = gameTime - f.blockEnd >= PARRY.rearm; }
+  if (nowBlock && !f.blocking) { f.blockStart = gameTime; f.parryArmed = !!f.bArm && gameTime - f.bPress <= INPUT_BUFFER + 0.05 && gameTime - f.blockEnd >= PARRY.rearm; }
   if (!nowBlock && f.blocking) f.blockEnd = gameTime;
   f.blocking = nowBlock;
   const canMove = !busy && (!f.action || f.action.moveMul !== undefined);
@@ -7310,7 +8011,8 @@ function updateFighter(f, dt, I) {
     f.vel.x *= Math.exp(-fr * dt); f.vel.z *= Math.exp(-fr * dt);
   }
   if (!busy && !bstun) {
-    if (f.action && f.action.onPress) for (let i = 0; i < 4; i++) if (I.abil[i] && f.action.onPress(i)) takeAbil(I, i);
+    const kicks = duelKicks(f);   // a cabbage duel: kicks, dashes, block and jumps only
+    if (f.action && f.action.onPress && !kicks) for (let i = 0; i < 4; i++) if (I.abil[i] && f.action.onPress(i)) takeAbil(I, i);
     // skill tech: a side dash can cut an M1's recovery, but only after that M1 connected
     const a0 = f.action;
     if (I.dash && a0 && a0.name === 'm1' && a0.hitLanded && a0.t >= a0.strike && f.dashCd <= 0) {
@@ -7326,6 +8028,7 @@ function updateFighter(f, dt, I) {
     if (!f.action) {
       let acted = false;
       if (I.dash) { acted = doDash(f, I); if (acted) take(I, 'dash'); }
+      if (kicks) { if (I.grab) take(I, 'grab'); if (I.ult) take(I, 'ult'); for (let i = 0; i < 4; i++) if (I.abil[i]) takeAbil(I, i); }
       if (!acted && I.grab) { acted = grabOrThrow(f); take(I, 'grab'); }
       if (!acted && I.ult && f.ult >= 100) { doUlt(f); acted = true; take(I, 'ult'); }
       if (!acted) for (let i = 0; i < 4; i++) if (I.abil[i] && useAbility(f, i)) { acted = true; takeAbil(I, i); break; }
@@ -7783,7 +8486,7 @@ function aiPickTarget(b, ai) {
   if (L && !L.dead && !L.invuln() && distH(b, L) < 34 && Math.random() < 0.45) { ai.target = L; return; }   // contest the Golden Lantern
   let best = null, bd = 34, human = null, hd = 34;
   for (const o of fighters) {
-    if (o === b || o.dead || o.lantern) continue;
+    if (o === b || o.dead || o.lantern || duelSide(o) !== duelSide(b)) continue;   // never someone on the other side of the duel wall
     // someone well above (a high platform, a pole top, the Pillar) counts as further away: bots prefer who they can reach
     const d = distH(b, o) + Math.max(0, o.pos.y - b.pos.y - 2) * 4; if (d < bd) { bd = d; best = o; }
     if (!o.ai && !o.isDummy && d < hd) { hd = d; human = o; }
@@ -7799,8 +8502,10 @@ function aiIntent(b, dt) {
     if (ai.evAt > 0 && now >= ai.evAt && canEvasive(b)) { I.dash = true; ai.evAt = -1; I.byaw = b.yaw + rand(-1, 1); }
     return I;
   }
+  if (duelSide(b) === 1) return DUEL.ph === 'go' ? duelBotIntent(b, I, P, dt) : I;   // the cabbage duel
+  if (duelBotWalk(b, I)) return I;   // answering a challenge: off to the ring
   ai.retarget -= dt;
-  if (ai.retarget <= 0 || !ai.target || ai.target.dead || !fighters.includes(ai.target)) aiPickTarget(b, ai);
+  if (ai.retarget <= 0 || !ai.target || ai.target.dead || !fighters.includes(ai.target) || duelSide(ai.target) !== duelSide(b)) aiPickTarget(b, ai);
   const p = ai.target;
   if (!p) {   // nobody around: wander
     ai.wpT -= dt;
@@ -7884,6 +8589,7 @@ function aiIntent(b, dt) {
 // On raised ground (the course's decks, beams and poles) a bot also hops: up toward a target standing a little
 // higher close by, and when it has been pushing against something without moving for a moment.
 function botSteer(b, I) {
+  if (duelSide(b) === 1) return I;   // a duelist bot picks its own way up the poles
   const m = I.move, len = Math.hypot(m.x, m.z), ai = b.ai;
   if (!ai || b.dead || len < 0.05) { if (ai) ai.stk = 0; return I; }
   let dx = m.x / len, dz = m.z / len;
@@ -8002,7 +8708,7 @@ function netSendHit(att, tgt, dmg, o, seq, rr) {
   const own = ownerOf(tgt.id);
   if (NET.mode === 'host') sendTo(NET.conns.get(own), msg); else sendTo(NET.host, msg);
 }
-function reidLocal() { for (const f of fighters) if (!f.remote) f.id = NET.me + ':' + f.localKey; }
+function reidLocal() { const old = []; for (const f of fighters) if (!f.remote) { old.push([f.id, f]); f.id = NET.me + ':' + f.localKey; } duelRekey(old); }
 function localNPCs() { return fighters.filter((f) => !f.remote && f !== player); }
 // the public lobby has no bots, only the training dummy (?bots=1..3 in the URL adds bots for testing / benchmarks)
 function spawnNPCs() {
@@ -8108,10 +8814,18 @@ function nearestRecent(f, x, z) {   // closest horizontal distance from (x, z) t
   for (let j = 0; j < 32; j++) if (gameTime - H.t[j] <= NETI.hist) best = Math.min(best, Math.hypot(H.p[j * 3] - x, H.p[j * 3 + 2] - z));
   return best;
 }
+// what a remote hit may ask for at most (the largest real move is well inside these)
+const NETCAP = { d: 40, kb: 60, up: [-45, 30], ragdoll: 2, stun: 2.5, flatten: 2.5, float: 1.5, rr: 40 };
 function applyNetHit(m) {
   const tgt = fighters.find((x) => x.id === m.tid && !x.remote);
   if (!tgt) return;
-  const o = deO(m.o || {});
+  if (typeof m.d !== 'number' || !Number.isFinite(m.d)) return;
+  m.d = clamp(m.d, 0, NETCAP.d);
+  if (m.rr !== undefined) m.rr = typeof m.rr === 'number' && Number.isFinite(m.rr) ? clamp(m.rr, 0, NETCAP.rr) : 0;
+  const o = deO(m.o && typeof m.o === 'object' ? m.o : {});
+  for (const k of ['kb', 'ragdoll', 'stun', 'flatten', 'float']) if (own(o, k)) o[k] = typeof o[k] === 'number' && Number.isFinite(o[k]) ? clamp(o[k], 0, NETCAP[k]) : 0;
+  if (own(o, 'up')) o.up = typeof o.up === 'number' && Number.isFinite(o.up) ? clamp(o.up, NETCAP.up[0], NETCAP.up[1]) : 0;
+  if (o.from && !(o.from.isVector3 && Number.isFinite(o.from.x) && Number.isFinite(o.from.z))) delete o.from;
   const att = fighters.find((x) => x.id === m.aid) || { id: m.aid, name: null, remote: true, pos: o.from || tgt.pos, def: { fx: 'dust' }, awaken: 0, ult: 0, fwd: (v) => v.set(0, 0, 1) };
   const from = o.from || att.pos;
   let r, ko = false;
@@ -8182,8 +8896,13 @@ function applyFx(list) {
 }
 function onData(m, from) {
   if (!m || typeof m !== 'object') return;
-  if (NET.mode === 'host' && m.t !== 'hit' && m.t !== 'hr' && m.t !== 'ar') broadcast(m, from);
+  // a host relays a guest's snapshot only for that guest's own fighters (nobody can speak for someone else's)
+  if (NET.mode === 'host' && m.t === 'st' && Array.isArray(m.e)) m.e = m.e.filter((e) => e && typeof e.i === 'string' && ownerOf(e.i) === from);
+  // the room's own business (arena, duel state, duel asks, hits) is never relayed as it came
+  if (NET.mode === 'host' && m.t !== 'hit' && m.t !== 'hr' && m.t !== 'ar' && m.t !== 'du' && m.t !== 'dq') broadcast(m, from);
   if (m.t === 'ar') { arenaFromHost(m, from); return; }
+  if (m.t === 'du') { duelFromHost(m, from); return; }
+  if (m.t === 'dq') { duelAsk(m, from); return; }
   if (m.t === 'st' && Array.isArray(m.e)) {
     const ts = typeof m.ts === 'number' ? m.ts : netNow();
     if (m.e.length) noteClock(ownerOf(m.e[0].i), ts);
@@ -8265,6 +8984,7 @@ function randCode() { const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s = ''; f
 function leaveRoom(msg) {
   try { if (NET.peer) NET.peer.destroy(); } catch (e) { /* already closed */ }
   const wasClient = NET.mode === 'client';
+  if (wasClient) duelReset();   // the host's duel stays with the host
   NET.mode = 'offline'; NET.peer = null; NET.host = null; NET.conns.clear(); NET.code = ''; NET.me = 'local'; NET.fx = [];
   removePuppets(() => true);
   for (const p of projs) if (p.ghost) p.dead = true;
@@ -8285,7 +9005,7 @@ async function hostArena(want) {
   const to = setTimeout(() => { if (NET.mode === 'offline') netFail(); }, 9000);
   peer.on('open', (id) => { clearTimeout(to); NET.mode = 'host'; NET.me = id; NET.code = code; reidLocal(); setRoomUI(); setRoomBusyButtons(false); });
   peer.on('connection', (conn) => {
-    conn.on('open', () => { NET.conns.set(conn.peer, conn); sendTo(conn, { t: 'ar', a: ARENA || 'course' }); updateRoomCount(); addFeed(null, 'A player joined'); });
+    conn.on('open', () => { NET.conns.set(conn.peer, conn); sendTo(conn, { t: 'ar', a: ARENA || 'course' }); duelSend(conn); updateRoomCount(); addFeed(null, 'A player joined'); });
     conn.on('data', (d) => onData(d, conn.peer));
     conn.on('close', () => dropPeer(conn.peer));
     conn.on('error', () => dropPeer(conn.peer));
@@ -8306,7 +9026,7 @@ async function joinArena(raw, tries = 0) {
     const conn = peer.connect('scbg-' + code.toLowerCase(), { serialization: 'json', reliable: true });
     let early = null;   // the host names its arena as soon as its side opens, which can beat this side's 'open'
     conn.on('open', () => {
-      clearTimeout(to); NET.mode = 'client'; NET.host = conn; NET.code = code; NET.me = peer.id; NET.arena = null;
+      clearTimeout(to); duelReset(); NET.mode = 'client'; NET.host = conn; NET.code = code; NET.me = peer.id; NET.arena = null;
       clearLocalNPCs(); reidLocal(); setRoomUI(); setRoomBusyButtons(false); $('#joinCode').blur(); showArena();
       if (early) arenaFromHost(early, conn.peer);
       // a host that names no arena (an older build) is in the park
@@ -8387,7 +9107,7 @@ function buildHelp() {
     ['k', kb('lock'), 'Lock on · press again for the next target'],
     ['k', kb('shift') + ' · ' + kb('fpv'), 'Shift-lock · first-person view'],
     ['k', kb('emote'), 'Emote wheel: hold, aim, let go (or tap, then click)'],
-    ['k', '1v1 ring', 'Two fighters inside start a duel · Watch it from the chip up top'],
+    ['', 'Cabbage duel', 'Step into the ring under the hanging lettuce: two dancers race up the poles, kicking, and the first to touch the greens wins · Watch it from the chip up top'],
     ['k', 'Esc', 'Free the mouse (click the arena to lock it again)'],
     ['k', 'Controller', 'RT M1 · LT block · A jump · B dash · X Y RB LB moves · ↑ awaken · ↓ grab · ← emotes · → lock'],
     ['t', 'Left stick', 'Move · drag right side to turn, pinch to zoom'],
@@ -8470,7 +9190,7 @@ function showGfx() {
 showGfx();
 $('#optGfx').addEventListener('change', (e) => {
   const v = e.target.value; GFX.pick = v; SETTINGS.gfx = v; store.set('settings', SETTINGS);
-  GFX.prScale = 1; GFXW.warm = 5; applyGfx(v === 'auto' ? autoGfxLevel() : v); rebuildArena(); e.target.blur();
+  GFX.prScale = 1; GFXW.warm = 5; applyGfx(v === 'auto' ? autoGfxLevel() : v); rebuildArena(); duelStageGfx(); e.target.blur();
 });
 $('#optBots').addEventListener('change', (e) => { SETTINGS.bots = e.target.value; store.set('settings', SETTINGS); updateBotUI(); e.target.blur(); });
 $('#keysReset').addEventListener('click', () => { for (const [k, , d] of BIND_DEFS) BIND[k] = d; reindexBinds(); store.set('binds', BIND); refreshKeyLabels(); buildHelp(); buildKeyList(); });
@@ -8713,6 +9433,16 @@ $('#optArena').addEventListener('change', (e) => {
   if (v !== 'transcended' || KILLS.n >= KILL.trans) { ARENA_PASS = null; SETTINGS.arena = v; store.set('settings', SETTINGS); }   // another pick also ends an ascension
   syncArena(); e.target.blur();
 });
+// Settings > Volume (everything) and Lion-dance drums (the cabbage duel's band), 0 to 100 %, kept between visits
+{
+  const pct = (v, d) => { const n = Number(v); return typeof v === 'number' && Number.isFinite(n) ? clamp(n, 0, 1) : d; };
+  SETTINGS.vol = pct(SETTINGS.vol, 1); SETTINGS.drums = pct(SETTINGS.drums, 0.8); SFX.setVolume(SETTINGS.vol);
+  for (const [id, k] of [['#optVol', 'vol'], ['#optDrums', 'drums']]) {
+    const el = $(id); el.value = String(Math.round(SETTINGS[k] * 100));
+    el.addEventListener('input', () => { SETTINGS[k] = clamp(Number(el.value) / 100 || 0, 0, 1); if (k === 'vol') SFX.setVolume(SETTINGS.vol); });
+    el.addEventListener('change', () => { store.set('settings', SETTINGS); SFX.init(); el.blur(); });
+  }
+}
 // mute is remembered between visits; a #mute hash in the URL always starts muted (handy for testing)
 function showMute(m) { $('#muteWave').style.display = m ? 'none' : ''; $('#muteBtn').setAttribute('aria-label', m ? 'Unmute sound' : 'Mute sound'); }
 function toggleMute() { const m = SFX.toggle(); SETTINGS.muted = m; store.set('settings', SETTINGS); showMute(m); }
@@ -8861,7 +9591,9 @@ function simStep(dt) {
   for (const f of fighters) if (!f.remote) { stepList.push(f); f.prevPos.copy(f.pos); f.prevYaw = f.yaw; }
   for (const f of stepList) {
     if (f.lantern || !fighters.includes(f)) continue;
-    updateFighter(f, dt, f === player ? playerIntent() : botSteer(f, aiIntent(f, dt)));
+    const I = f === player ? playerIntent() : botSteer(f, aiIntent(f, dt));
+    if (duelHold(f)) clearIntent(I);   // the duel's drum roll: on the mark, hands down
+    updateFighter(f, dt, I);
   }
   separateAll();
   pillarStep(dt);
@@ -8892,7 +9624,7 @@ function frame(t) {
     if (cloudMesh) cloudMesh.rotation.y += fdt * 0.004;
     arenaFrame(fdt);
     updateLock(fdt); animateLantern(fdt);
-    updateCamera(fdt); updateSpeedLines(fdt); updateHUD(fdt); updateEventChip(); pillarHud(); updateDuelHud(fdt); updateNums(fdt); updateTags();
+    updateCamera(fdt); updateSpeedLines(fdt); updateHUD(fdt); updateEventChip(); pillarHud(); updateDuelFx(fdt); updateNums(fdt); updateTags();
     netTick(fdt);
     RIG_U.uTime.value = realClock % 1000;
     fitShadow(); gfxWatch(fdt); mythFrame();
@@ -9045,6 +9777,6 @@ if (/[?&]dev=1/.test(location.search)) window.__scbg = { SFX, fighters, get play
   applyState, packF, netNow, PORTRAITS,
   KILLS, KILL, setKills, creditKill, trophySet, trophyFull, TRO_CACHE, blackEnter, blackFlourish, transcend, TRANS, selectArena, syncArena, wantArena, ascendTo, descend, get ARENA_PASS() { return ARENA_PASS; }, ARENAS, ARENA_IDS, get ARENA() { return ARENA; }, get ARENA_SET() { return ARENA_SET; }, blocks, cans, DUEL, arenaFromHost, hostArena, joinArena, leaveRoom, sky, sun, hemi,
   koSeen, kCredit, kHit, TRAIL, applyNetHit, applyHitReply, applyFx, onData, pendingHits, botKills, souls, KO, respawn, switchCharacter,
-  PILLAR, blackClimber, pillarTry, colTop, groundAt, spotClear, homeArena, CO, get camPull() { return camPull; }, get camYaw() { return camYaw; }, set camYaw(v) { camYaw = +v || 0; } };
+  PILLAR, blackClimber, pillarTry, colTop, groundAt, spotClear, homeArena, CO, CQ, CQ_POLES, CQ_CAB, CAB, KICK, DRUMS, cabTouch, duelFromHost, duelAsk, duelStart, duelFinish, duelFighter, duelSide, duelMsg, setLock, get camPull() { return camPull; }, get camYaw() { return camYaw; }, set camYaw(v) { camYaw = +v || 0; } };
 })();
 </script>
