@@ -229,6 +229,12 @@ button:focus-visible,input:focus-visible{outline:2px solid #fff;outline-offset:2
 #evChip i{width:8px;height:8px;border-radius:50%;background:var(--ult-full);box-shadow:0 0 8px var(--ult-full)}
 #evChip.live{border-color:rgba(255,207,58,.75);color:#fff6cf;box-shadow:0 0 14px rgba(255,207,58,.35)}
 #evChip.live i{animation:pulse .6s ease-in-out infinite alternate}
+#pillChip{display:inline-flex;align-items:center;gap:8px;max-width:100%;height:26px;padding:0 12px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#f3ddd0;white-space:nowrap;border-color:rgba(200,22,31,.6)}
+#pillChip[hidden]{display:none}
+#pillChip span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+#pillChip i{flex:none;width:8px;height:8px;border-radius:50%;background:#c8161f;box-shadow:0 0 8px #c8161f}
+#pillChip.go{border-color:rgba(255,207,58,.8);color:#fff6cf;box-shadow:0 0 14px rgba(255,207,58,.35)}
+#pillChip.go i{background:var(--ult-full);box-shadow:0 0 8px var(--ult-full);animation:pulse .6s ease-in-out infinite alternate}
 #duelChip{display:inline-flex;align-items:center;gap:8px;max-width:100%;height:30px;padding:0 4px 0 12px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#ffe1dc;white-space:nowrap;pointer-events:auto;border-color:rgba(255,90,74,.6)}
 #duelChip[hidden]{display:none}
 #duelChip span{min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -244,7 +250,7 @@ button:focus-visible,input:focus-visible{outline:2px solid #fff;outline-offset:2
 #lockHud .tg{font-size:9px;letter-spacing:.22em;color:#ffb3a9}
 @media (max-height:500px){
   #topc{width:min(250px,calc(100vw - 24px));gap:4px}
-  #evChip{height:22px;padding:0 10px;font-size:10px}
+  #evChip,#pillChip{height:22px;padding:0 10px;font-size:10px}
   #lockHud{padding:4px 8px 5px;gap:3px}
   #lockHud .lh span{font-size:12px}
   #lockHud .hp{height:14px}
@@ -382,6 +388,7 @@ body.touch .mini{height:52px}
 
   <div id="topc">
     <div id="evChip" class="glass" hidden><i></i><span id="evTxt">Golden Lantern</span></div>
+    <div id="pillChip" class="glass" hidden><i></i><span id="pillTxt"></span></div>
     <div id="duelChip" class="glass" hidden><i></i><span id="duelTxt"></span><button type="button" class="sbtn" id="duelWatch">Watch</button></div>
     <div id="lockHud" class="glass" hidden>
       <div class="lh"><span id="lockName">Target</span><small id="lockChar"></small></div>
@@ -390,7 +397,7 @@ body.touch .mini{height:52px}
   </div>
 
   <div id="trans" role="dialog" aria-label="Transcended" hidden>
-    <div class="tc"><span class="tg" lang="zh">超凡</span><strong>Transcended</strong><small>1000 K.O.s · a realm beyond the park awaits</small>
+    <div class="tc"><span class="tg" lang="zh">超凡</span><strong>Transcended</strong><small>1000 K.O.s · a realm beyond the courtyard awaits</small>
       <button type="button" class="sbtn pri" id="transGo">Continue</button></div>
   </div>
   <div id="speedFx" aria-hidden="true"></div>
@@ -441,7 +448,7 @@ body.touch .mini{height:52px}
     <label class="opt"><span>Face</span><select id="optFace"></select></label>
     <label class="opt"><span>Form</span><select id="optForm"><option value="black">Black form</option><option value="normal">Normal</option></select></label>
     <p class="note" id="formNote"></p>
-    <label class="opt"><span>Arena</span><select id="optArena"><option value="transcended">Transcended realm</option><option value="park">Park</option></select></label>
+    <label class="opt"><span>Arena</span><select id="optArena"><option value="course">Lion-dance course</option><option value="park">Park</option><option value="transcended">Transcended realm</option></select></label>
     <p class="note" id="arenaNote"></p>
     <label class="opt"><span>Graphics</span><select id="optGfx"><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
     <p class="note" id="gfxNote"></p>
@@ -2511,6 +2518,741 @@ function buildTranscended() {
       glowTex.dispose(); skyTex.dispose();
     },
   };
+}
+
+// ---- the lion-dance training course (the main arena) --------------------------------------------------------
+// A walled festival courtyard in red lacquer and gold. The Golden Lantern medallion sits in the open middle and
+// the duel ring keeps its corner; the three training grounds fill the other corners: a wooden fort of ramps and
+// decks, a sand pit crossed by balance beams and tightropes between platforms, and a field of plum-blossom poles.
+// At the far end stands the Pillar, the map's landmark: red lacquer, gold bands and a gold dragon, a glowing top
+// under a beam of light. Nobody can stand on it (its collider is a wall at every height) except the local player
+// in the Black form shown on their lion (50+ K.O.s), who runs up it from the glowing pad at its foot (Jump) and
+// ascends to the transcended realm from the top (see PILLAR below).
+// Everything static is baked into a few merged vertex-coloured meshes (rounded "plastic" blocks, Roblox style),
+// the lanterns are instanced, contact shading is baked into the AO layer, and the lot is freed on the way out.
+const CO = { wall: 60.2, pillar: { x: 0, z: 44, top: 33, pad: 3.3 } };
+// a unit wedge: floor from x -0.5 to 0.5 (z -0.5 to 0.5), its top sloping from y 0 at x = -0.5 up to y 1 at x = 0.5
+function wedgeGeo() {
+  const a = [-0.5, 0, -0.5], b = [0.5, 0, -0.5], c = [0.5, 0, 0.5], d = [-0.5, 0, 0.5], e = [0.5, 1, -0.5], f = [0.5, 1, 0.5];
+  const tri = [a, c, b, a, d, c, b, c, f, b, f, e, a, e, f, a, f, d, a, b, e, d, f, c];
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(tri.flat(), 3)); g.computeVertexNormals();
+  return g;
+}
+function buildCourse() {
+  const lo = GFX.level === 'low', md = GFX.level === 'medium', SEG = lo ? 0.6 : md ? 0.8 : 1, R = taRand(20261029), rr = (a, b) => a + R() * (b - a);
+  envSet(ENV0);
+  const root = new THREE.Group(); root.name = 'course'; scene.add(root);
+  const ani = Math.min(lo ? 2 : 8, renderer.capabilities.getMaxAnisotropy());
+  const G = {
+    box: new THREE.BoxGeometry(1, 1, 1),
+    cyl: new THREE.CylinderGeometry(1, 1, 1, Math.round(20 * SEG)),
+    cylS: new THREE.CylinderGeometry(1, 1, 1, Math.round(12 * SEG)),
+    sph: new THREE.SphereGeometry(1, Math.round(14 * SEG), Math.round(10 * SEG)),
+    sphL: new THREE.SphereGeometry(1, 8, 6),
+    ico: new THREE.IcosahedronGeometry(1, 1),
+    wedge: wedgeGeo(),
+    torus: new THREE.TorusGeometry(0.95, 0.1, 6, lo ? 18 : 28),
+    ring: new THREE.TorusGeometry(0.22, 0.05, 5, 12),
+  };
+  const PAL = { red: '#c8161f', redD: '#8e0f17', redL: '#e0343a', gold: '#f2b632', goldD: '#c98a1c', wood: '#b0743a', woodL: '#cf9356', woodD: '#7a4a22',
+    stone: '#ddd3c2', stoneD: '#a99c88', white: '#f6efe2', teal: '#1f8a78', blue: '#2b5fae', green: '#3f9a4a', ink: '#2a2422', sand: '#e6c88f' };
+  const S = taKit(), Gd = taKit(), Gl = taKit(), Far = taKit(), Rf = taKit();
+  const tops = [];   // light glows: [x, y, z, colour, size]
+  const hang = [];   // lantern anchors: [x, y, z, tangent x, tangent z, phase]
+  const BV = new Map();
+  const bev = (w, h, d, r) => { const k = w.toFixed(3) + '|' + h.toFixed(3) + '|' + d.toFixed(3) + '|' + r.toFixed(3); let g = BV.get(k); if (!g) { g = bevelBox(w, h, d, r); BV.set(k, g); } return g; };
+  // a rounded block w x h x d centred at (x, y, z); o: r (corner radius), ry or rot, pm (parent matrix), ao
+  const blk = (kit, c, x, y, z, w, h, d, o = {}) => {
+    const r = o.r === undefined ? Math.min(0.09, w / 4, h / 4, d / 4) : Math.min(o.r, w / 2.2, h / 2.2, d / 2.2), rot = o.rot || (o.ry ? [0, o.ry, 0] : null);
+    // rounded edges where they show: big blocks on Low, all but the smallest above it, far scenery on High only
+    if (r > 0.01 && Math.min(w, h, d) >= (lo ? 0.6 : 0.2) && (kit !== Far || !(lo || md))) kit.put(bev(w, h, d, r), c, [x, y, z], null, rot, o.pm, o.ao);
+    else kit.put(G.box, c, [x, y, z], [w, h, d], rot, o.pm, o.ao);
+  };
+  const M4 = (x, y, z, ry) => new THREE.Matrix4().compose(new V3(x, y, z), new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), ry || 0), new V3(1, 1, 1));
+  const wood = lam('#9a6232'), stoneM = concreteChunk;   // collider materials (debris colour on a Wall Splat)
+  const solid = (x, y0, z, w, h, d, o = {}) => {
+    const b = addStatic(x, y0, z, w, h, d, o.mat || wood);
+    for (const k of ['foot', 'cam', 'thin', 'gate']) if (o[k] !== undefined) b[k] = o[k];
+    return b;
+  };
+  const aoR = (x, z, w, d, a = 0.45) => AO.push(['r', x, z, w, d, 0, a]);
+  const aoC = (x, z, r, a = 0.4) => AO.push(['c', x, z, r, a]);
+  const glowTex = canvasTex(64, 64, (g) => {
+    const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,255,255,.55)'); gr.addColorStop(0.6, 'rgba(255,255,255,.14)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  });
+  const brush = '"Ma Shan Zheng","KaiTi","STKaiti","Songti SC","Noto Serif CJK SC","WenQuanYi Zen Hei",serif';
+
+  // ---- ground: warm stone slabs inside the walls, lawn outside ----
+  const floorTex = canvasTex(lo ? 256 : 512, lo ? 256 : 512, (g, w) => {
+    const n = 4, s = w / n;
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      const v = rr(-9, 9), warm = rr(-4, 4);
+      g.fillStyle = `rgb(${Math.round(214 + v + warm)},${Math.round(198 + v)},${Math.round(172 + v - warm)})`; g.fillRect(i * s, j * s, s, s);
+      for (let k = 0; k < 7; k++) {
+        const x = i * s + rr(0, s), y = j * s + rr(0, s), r = rr(0.1, 0.4) * s, c = g.createRadialGradient(x, y, 0, x, y, r), dark = R() < 0.5;
+        c.addColorStop(0, dark ? 'rgba(140,110,80,.08)' : 'rgba(255,248,232,.1)'); c.addColorStop(1, 'rgba(0,0,0,0)');
+        g.save(); g.beginPath(); g.rect(i * s, j * s, s, s); g.clip(); g.fillStyle = c; g.fillRect(x - r, y - r, r * 2, r * 2); g.restore();
+      }
+      const b = Math.max(2, s * 0.02);
+      g.fillStyle = 'rgba(255,250,238,.4)'; g.fillRect(i * s + b, j * s + b, s - 2 * b, b); g.fillRect(i * s + b, j * s + b, b, s - 2 * b);
+      g.fillStyle = 'rgba(110,84,56,.22)'; g.fillRect(i * s + b, j * s + s - 2 * b, s - 2 * b, b); g.fillRect(i * s + s - 2 * b, j * s + b, b, s - 2 * b);
+    }
+    g.fillStyle = '#93805f'; const gw = Math.max(2, w / 170);
+    for (let k = 0; k <= n; k++) { g.fillRect(k * s - gw / 2, 0, gw, w); g.fillRect(0, k * s - gw / 2, w, gw); }
+    for (let k = 0; k < w * 6; k++) { g.fillStyle = R() < 0.5 ? 'rgba(255,250,236,.3)' : 'rgba(110,90,66,.2)'; g.fillRect(R() * w, R() * w, 1.5, 1.5); }
+  });
+  floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping; floorTex.repeat.set(124 / 8, 124 / 8); floorTex.anisotropy = ani;
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(124, 124), new THREE.MeshLambertMaterial({ map: floorTex }));
+  floor.rotation.x = -PI / 2; floor.receiveShadow = true; root.add(floor);
+  const lawn = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshLambertMaterial({ map: grassTex }));
+  lawn.rotation.x = -PI / 2; lawn.position.y = -0.03; lawn.receiveShadow = !lo; root.add(lawn);
+  // flat decals over the floor: one quad each, drawn just above it
+  const decal = (tex, x, z, w, d, o = {}) => {
+    const m = new THREE.Mesh(o.geo || new THREE.PlaneGeometry(w, d), new THREE.MeshLambertMaterial({ map: tex, transparent: !!o.alpha, depthWrite: !o.alpha, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }));
+    m.rotation.x = -PI / 2; m.position.set(x, 0.008, z); m.receiveShadow = true; m.matrixAutoUpdate = false; m.updateMatrix(); root.add(m); return m;
+  };
+  // the lantern medallion in the middle: red and gold rings, cloud scrolls, an eight-petal flower
+  const medTex = canvasTex(lo ? 512 : 1024, lo ? 512 : 1024, (g, N) => {
+    const k = N / 19; g.translate(N / 2, N / 2);
+    const disc = (r, c) => { g.fillStyle = c; g.beginPath(); g.arc(0, 0, r * k, 0, TAU); g.fill(); };
+    const ring = (r, lw, c) => { g.strokeStyle = c; g.lineWidth = lw * k; g.beginPath(); g.arc(0, 0, r * k, 0, TAU); g.stroke(); };
+    disc(9.4, '#a8141c'); disc(8.6, '#c41e24'); ring(9.2, 0.18, '#f2b632'); ring(8.7, 0.08, '#ffd77a');
+    g.strokeStyle = '#f2b632'; g.lineWidth = 0.12 * k; g.lineCap = 'round';
+    for (let i = 0; i < 24; i++) {
+      g.save(); g.rotate((i / 24) * TAU); g.translate(0, -7.75 * k);
+      for (const sx of [-1, 1]) { g.beginPath(); g.arc(sx * 0.42 * k, 0, 0.34 * k, sx > 0 ? PI : 0, sx > 0 ? PI * 2.6 : -PI * 1.6, sx < 0); g.stroke(); }
+      g.beginPath(); g.moveTo(-0.85 * k, 0.45 * k); g.quadraticCurveTo(0, 0.8 * k, 0.85 * k, 0.45 * k); g.stroke(); g.restore();
+    }
+    ring(6.7, 0.14, '#f2b632'); disc(6.55, '#b0161d');
+    for (const [n, r0, r1, fill, rot] of [[16, 1.6, 6.2, '#d8343a', 0], [8, 1.2, 4.8, '#f2b632', PI / 8]]) {
+      for (let i = 0; i < n; i++) {
+        g.save(); g.rotate((i / n) * TAU + rot); const wd = (r1 - r0) * (n === 8 ? 0.42 : 0.3);
+        g.beginPath(); g.moveTo(0, -r0 * k); g.quadraticCurveTo(wd * k, -(r0 + r1) * 0.5 * k, 0, -r1 * k); g.quadraticCurveTo(-wd * k, -(r0 + r1) * 0.5 * k, 0, -r0 * k);
+        g.fillStyle = fill; g.fill(); g.strokeStyle = n === 8 ? '#9a5a10' : '#f2b632'; g.lineWidth = 0.07 * k; g.stroke(); g.restore();
+      }
+    }
+    disc(1.5, '#f2b632'); disc(1.15, '#c41e24'); disc(0.55, '#ffd77a');
+  });
+  medTex.anisotropy = ani;
+  decal(medTex, 0, 0, 0, 0, { geo: new THREE.CircleGeometry(9.5, lo ? 40 : 64), alpha: true });
+  // the pole field's red training mat with a gold border
+  const matTex = canvasTex(512, 512, (g, w) => {
+    g.fillStyle = '#b3161e'; g.fillRect(0, 0, w, w);
+    g.strokeStyle = 'rgba(80,0,8,.35)'; g.lineWidth = 3;
+    for (let x = -w; x < w * 2; x += 32) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + w, w); g.stroke(); g.beginPath(); g.moveTo(x + w, 0); g.lineTo(x, w); g.stroke(); }
+    for (let i = 0; i < 3000; i++) { g.fillStyle = R() < 0.5 ? 'rgba(255,120,120,.08)' : 'rgba(60,0,0,.1)'; g.fillRect(R() * w, R() * w, 2, 2); }
+    g.fillStyle = '#e8a92a'; g.fillRect(0, 0, w, 18); g.fillRect(0, w - 18, w, 18); g.fillRect(0, 0, 18, w); g.fillRect(w - 18, 0, 18, w);
+    g.strokeStyle = '#ffd77a'; g.lineWidth = 3; g.strokeRect(28, 28, w - 56, w - 56);
+  });
+  matTex.anisotropy = ani;
+  decal(matTex, 35, 35, 30, 30);
+  // the beam course's raked sand pit in a timber frame
+  const sandTex = canvasTex(512, 512, (g, w) => {
+    g.fillStyle = PAL.sand; g.fillRect(0, 0, w, w);
+    for (let i = 0; i < 9000; i++) { g.fillStyle = R() < 0.5 ? 'rgba(255,240,200,.25)' : 'rgba(150,110,60,.18)'; g.fillRect(R() * w, R() * w, 2, 2); }
+    g.strokeStyle = 'rgba(160,120,70,.22)'; g.lineWidth = 2;
+    for (let y = 30; y < w - 20; y += 9) { g.beginPath(); g.moveTo(24, y); for (let x = 24; x <= w - 24; x += 16) g.lineTo(x, y + Math.sin(x * 0.03 + y) * 1.5); g.stroke(); }
+    g.fillStyle = '#8a5a2c'; g.fillRect(0, 0, w, 16); g.fillRect(0, w - 16, w, 16); g.fillRect(0, 0, 16, w); g.fillRect(w - 16, 0, 16, w);
+    g.fillStyle = 'rgba(255,220,170,.35)'; g.fillRect(0, 0, w, 3); g.fillRect(0, 0, 3, w);
+  });
+  sandTex.anisotropy = ani;
+  decal(sandTex, -35, -35, 32, 32);
+  // the fort's deck of boards
+  const boardTex = canvasTex(256, 256, (g, w) => {
+    const n = 8, s = w / n;
+    for (let i = 0; i < n; i++) { const v = rr(-14, 14); g.fillStyle = `rgb(${Math.round(176 + v)},${Math.round(122 + v * 0.8)},${Math.round(70 + v * 0.5)})`; g.fillRect(0, i * s, w, s);
+      for (let k = 0; k < 30; k++) { g.fillStyle = 'rgba(90,50,20,.12)'; g.fillRect(R() * w, i * s + R() * s, rr(10, 60), 1); }
+      g.fillStyle = 'rgba(70,40,16,.55)'; g.fillRect(0, i * s, w, 2); g.fillRect((i * 97) % w, i * s, 2, s); }
+  });
+  boardTex.wrapS = boardTex.wrapT = THREE.RepeatWrapping; boardTex.repeat.set(4, 4); boardTex.anisotropy = ani;
+  decal(boardTex, 36, -37, 32, 30);
+
+  // ---- the courtyard wall: stone footing, red plaster, a white frieze and glazed gold tiles ----
+  const tileTex = canvasTex(128, 128, (g, w, h) => {
+    for (let x = 0; x < w; x += 32) {
+      const gr = g.createLinearGradient(x, 0, x + 32, 0);
+      gr.addColorStop(0, '#9a6418'); gr.addColorStop(0.18, '#e2a634'); gr.addColorStop(0.5, '#ffd770'); gr.addColorStop(0.82, '#d9992a'); gr.addColorStop(1, '#8c5a14');
+      g.fillStyle = gr; g.fillRect(x, 0, 32, h);
+    }
+    g.fillStyle = 'rgba(110,64,10,.35)'; for (let y = 0; y < h; y += 32) g.fillRect(0, y, w, 3);
+  });
+  tileTex.wrapS = tileTex.wrapT = THREE.RepeatWrapping; tileTex.anisotropy = ani;
+  const WL = CO.wall, sides = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+  const cope = (len) => { const g = new THREE.PlaneGeometry(len, 1.15), U = g.attributes.uv; for (let i = 0; i < U.count; i++) U.setXY(i, U.getX(i) * len / 0.8, U.getY(i) * 1.15 / 0.7); return g; };
+  const wallSeg = (pm, u0, u1) => {
+    const L = u1 - u0, c = (u0 + u1) / 2;
+    blk(S, PAL.stoneD, c, 0.45, 0, L, 0.9, 1.7, { pm, ao: true, r: 0.06 });
+    blk(S, PAL.red, c, 2.45, 0, L, 3.1, 1.2, { pm, r: 0.05 });
+    blk(S, PAL.white, c, 3.8, 0, L, 0.4, 1.28, { pm, r: 0.04 });
+    blk(Gd, PAL.gold, c, 3.58, 0, L, 0.06, 1.32, { pm, r: 0 });
+    const cg = cope(L + 0.6), sl = 0.42;
+    for (const s of [-1, 1]) Rf.put(cg, '#ffffff', [c, 4.25 - 0.575 * Math.sin(sl), s * 0.575 * Math.cos(sl)], null, [-PI / 2 + sl, s > 0 ? 0 : PI, 0], pm);
+    blk(S, '#8a1a12', c, 4.32, 0, L + 0.6, 0.24, 0.32, { pm, r: 0.05 });
+  };
+  for (const [nx, nz] of sides) {
+    const ry = nz ? 0 : PI / 2, pm = M4(nx * WL, 0, nz * WL, ry), inS = -(nz || nx);
+    if (nz < 0) { wallSeg(pm, -WL - 0.6, -4.6); wallSeg(pm, 4.6, WL + 0.6); } else wallSeg(pm, -WL - 0.6, WL + 0.6);
+    for (let u = -48; u <= 48; u += 12) {
+      if (nz < 0 && u === 0) continue;
+      blk(S, PAL.redD, u, 2.0, inS * 0.72, 0.8, 4.0, 0.42, { pm, ao: true });
+      blk(Gd, PAL.gold, u, 3.98, inS * 0.74, 0.92, 0.16, 0.5, { pm });
+      blk(Gd, PAL.gold, u, 0.95, inS * 0.74, 0.92, 0.1, 0.5, { pm });
+      const w = new V3(u, 0, inS * 1.1).applyMatrix4(pm); hang.push([w.x, 3.75, w.z, nz ? 1 : 0, nz ? 0 : 1, rr(0, TAU)]);
+    }
+    for (let wu = -42; wu <= 42; wu += 12) {   // moon windows between the posts: a gold ring round red lattice
+      if (nz < 0 && Math.abs(wu) < 7) continue;
+      Gd.put(G.torus, PAL.gold, [wu, 2.35, inS * 0.62], null, null, pm);
+      S.put(G.cylS, '#3b1a12', [wu, 2.35, inS * 0.6], [0.92, 0.04, 0.92], [PI / 2, 0, 0], pm);
+      for (const k of [-0.5, 0, 0.5]) { blk(S, '#c9483a', wu + k, 2.35, inS * 0.63, 0.07, 1.6 - Math.abs(k) * 0.9, 0.05, { pm, r: 0 }); blk(S, '#c9483a', wu, 2.35 + k, inS * 0.63, 1.6 - Math.abs(k) * 0.9, 0.07, 0.05, { pm, r: 0 }); }
+    }
+    AO.push(['r', nx * (WL - 0.9), nz * (WL - 0.9), nz ? WL * 2 : 0.8, nz ? 0.8 : WL * 2, 0, 0.35]);
+  }
+  const roofTop = (rf, pm, x, y, z) => { Rf.put(rf.top, '#ffffff', [x, y, z], null, null, pm); S.put(rf.under, PAL.redD, [x, y, z], null, null, pm); S.put(rf.band, '#7a1d14', [x, y, z], null, null, pm); };
+  // corner pavilions on the wall corners
+  const roofP = taRoof(3.3, 3.3, 2.1, 0.85, lo ? 8 : 14, lo ? 8 : 14), roofG = taRoof(5.6, 1.7, 1.7, 0.7, lo ? 14 : 24, lo ? 6 : 10);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const pm = M4(sx * WL, 0, sz * WL, 0);
+    blk(S, PAL.stoneD, 0, 0.7, 0, 5.4, 1.4, 5.4, { pm, ao: true });
+    blk(S, PAL.white, 0, 1.5, 0, 5.0, 0.2, 5.0, { pm });
+    for (const [px, pz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { S.put(G.cyl, PAL.red, [px * 2.0, 3.6, pz * 2.0], [0.26, 4.2, 0.26], null, pm); Gd.put(G.cyl, PAL.gold, [px * 2.0, 5.55, pz * 2.0], [0.3, 0.2, 0.3], null, pm); }
+    blk(S, PAL.teal, 0, 5.85, 0, 4.6, 0.4, 4.6, { pm }); blk(Gd, PAL.gold, 0, 6.08, 0, 4.66, 0.06, 4.66, { pm, r: 0 });
+    roofTop(roofP, pm, 0, 6.15, 0);
+    Gd.put(G.sphL, PAL.gold, [0, 8.45, 0], [0.32, 0.32, 0.32], null, pm); Gd.put(G.cylS, PAL.gold, [0, 8.1, 0], [0.12, 0.6, 0.12], null, pm);
+    tops.push([sx * WL, 4.4, sz * WL, '#ffcf7a', 3]);
+  }
+  // the gate behind the start: red columns, painted beams, a plaque and closed doors studded with gold
+  {
+    const pm = M4(0, 0, -WL, 0);
+    for (const s of [-1, 1]) {
+      S.put(G.cyl, PAL.marble || PAL.white, [s * 4.9, 0.4, 0], [0.75, 0.8, 0.75], null, pm, true);
+      S.put(G.cyl, PAL.red, [s * 4.9, 3.9, 0], [0.44, 7.2, 0.44], null, pm, true);
+      Gd.put(G.cyl, PAL.gold, [s * 4.9, 6.9, 0], [0.5, 0.24, 0.5], null, pm);
+    }
+    blk(S, PAL.teal, 0, 7.2, 0, 11, 0.6, 0.7, { pm }); blk(S, PAL.blue, 0, 6.3, 0, 9.4, 0.4, 0.6, { pm });
+    for (const y of [7.5, 6.92, 6.52]) blk(Gd, PAL.gold, 0, y, 0, 11.04, 0.06, 0.74, { pm, r: 0 });
+    roofTop(roofG, pm, 0, 7.55, 0);
+    blk(Gd, PAL.gold, -5.9, 9.6, 0, 0.5, 0.9, 0.4, { pm }); blk(Gd, PAL.gold, 5.9, 9.6, 0, 0.5, 0.9, 0.4, { pm });
+    for (const s of [-1, 1]) {
+      blk(S, '#a3121a', s * 2.25, 2.7, 0.15, 4.4, 5.4, 0.3, { pm, r: 0.05 });
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 6; j++) Gd.put(lo ? G.box : G.sphL, PAL.gold, [s * 2.25 + (i - 1.5) * 0.9, 0.9 + j * 0.75, 0.33], lo ? [0.16, 0.16, 0.08] : [0.1, 0.1, 0.08], null, pm);
+      Gd.put(G.ring, PAL.gold, [s * 0.45, 2.7, 0.34], null, null, pm);
+    }
+    const plTex = canvasTex(256, 128, (g, w, h) => {
+      g.fillStyle = '#c99a32'; g.fillRect(0, 0, w, h); g.fillStyle = '#7e0e14'; g.fillRect(10, 10, w - 20, h - 20);
+      g.strokeStyle = '#f3c75a'; g.lineWidth = 3; g.strokeRect(16, 16, w - 32, h - 32);
+      g.fillStyle = '#f6cf63'; g.font = '700 70px ' + brush; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('舞獅', w / 2, h / 2 + 4);
+    });
+    const plMat = new THREE.MeshLambertMaterial({ map: plTex }), pl = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), plMat);
+    pl.position.set(0, 6.72, -WL + 0.32); root.add(pl);
+  }
+
+  // ---- lantern masts round the plaza ----
+  const MAST = 10.5, mastTop = [];
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const x = sx * MAST, z = sz * MAST;
+    blk(S, PAL.stone, x, 0.25, z, 1.1, 0.5, 1.1, { ao: true });
+    S.put(G.cyl, PAL.red, [x, 4.8, z], [0.17, 9.0, 0.17], null, null, true);
+    for (const y of [1.2, 8.6]) Gd.put(G.cyl, PAL.gold, [x, y, z], [0.22, 0.16, 0.22]);
+    Gd.put(G.sphL, PAL.gold, [x, 9.45, z], [0.3, 0.3, 0.3]);
+    solid(x, 0, z, 0.5, 9.4, 0.5, { mat: stoneM }); aoC(x, z, 0.8, 0.35);
+    tops.push([x, 9.45, z, '#ffd27a', 1.6]); mastTop.push(new V3(x, 9.0, z));
+  }
+
+  // ---- the Pillar ----
+  const PC = CO.pillar, PX = PC.x, PZ = PC.z, TOP = PC.top;
+  blk(S, PAL.stoneD, PX, 0.15, PZ, 9.4, 0.3, 9.4, { ao: true, r: 0.06 }); solid(PX, 0, PZ, 9.4, 0.3, 9.4, { mat: stoneM });
+  blk(S, PAL.white, PX, 0.45, PZ, 6.6, 0.3, 6.6, { r: 0.06 }); solid(PX, 0, PZ, 6.6, 0.6, 6.6, { mat: stoneM });
+  for (const [hw, y] of [[4.72, 0.31], [3.32, 0.61]]) for (const [nx, nz] of sides) blk(Gd, PAL.gold, PX + nx * hw, y, PZ + nz * hw, nx ? 0.08 : hw * 2 + 0.08, 0.04, nz ? 0.08 : hw * 2 + 0.08, { r: 0 });
+  aoR(PX, PZ, 9.4, 9.4, 0.4);
+  S.put(G.cyl, PAL.red, [PX, (0.6 + TOP - 1) / 2, PZ], [1.5, TOP - 1.6, 1.5], null, null, true);
+  Gd.put(G.cyl, PAL.gold, [PX, 0.85, PZ], [1.9, 0.5, 1.9]); Gd.put(G.cyl, PAL.goldD, [PX, 1.2, PZ], [1.7, 0.2, 1.7]);
+  for (let y = 3.6; y < TOP - 2; y += 3.6) { Gd.put(G.cyl, PAL.gold, [PX, y, PZ], [1.58, 0.28, 1.58]); Gd.put(G.cyl, PAL.goldD, [PX, y + 0.24, PZ], [1.54, 0.08, 1.54]); }
+  {   // a gold dragon winding up the shaft (the climber's path)
+    const pts = [], N = 60;
+    for (let i = 0; i <= N; i++) { const t = i / N, a = t * TAU * 2.75 + 0.6, r = 1.62 + Math.sin(t * PI * 22) * 0.04; pts.push(new V3(PX + Math.sin(a) * r, 2.2 + t * (TOP - 5), PZ + Math.cos(a) * r)); }
+    const body = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), lo ? 120 : 260, 0.18, lo ? 5 : 8, false);
+    Gd.raw(body, null, PAL.gold);
+    const end = pts[N], head0 = pts[N - 1];
+    Gd.put(G.sph, PAL.gold, [end.x, end.y + 0.1, end.z], [0.36, 0.3, 0.42]);
+    S.put(G.sphL, PAL.red, [end.x + (end.x - head0.x) * 0.6, end.y + 0.25, end.z + (end.z - head0.z) * 0.6], [0.16, 0.16, 0.16]);
+    for (const s of [-1, 1]) Gd.put(G.cylS, PAL.gold, [end.x + s * 0.18, end.y + 0.42, end.z], [0.04, 0.4, 0.04], [0, 0, s * 0.5]);
+  }
+  S.put(G.cyl, PAL.redD, [PX, TOP - 0.85, PZ], [1.72, 0.5, 1.72]);
+  Gd.put(G.cyl, PAL.gold, [PX, TOP - 0.45, PZ], [2.0, 0.3, 2.0]);
+  Gd.put(G.cyl, PAL.gold, [PX, TOP - 0.13, PZ], [2.15, 0.26, 2.15]);
+  for (let i = 0; i < 14; i++) { const a = (i / 14) * TAU; Gd.put(G.sph, PAL.goldD, [PX + Math.sin(a) * 1.82, TOP - 1.05, PZ + Math.cos(a) * 1.82], [0.3, 0.42, 0.18], [0.5, a, 0]); }
+  Gl.put(new THREE.RingGeometry(1.2, 1.45, lo ? 24 : 40), '#fff0b0', [PX, TOP + 0.012, PZ], null, [-PI / 2, 0, 0]);
+  tops.push([PX, TOP + 0.3, PZ, '#ffe08a', 6], [PX, 1.0, PZ, '#ffcf6a', 4]);
+  solid(PX, 0, PZ, 2.84, TOP, 2.84, { mat: stoneM, gate: blackClimber, cam: true });
+  // the spring at its foot, the light above it, a floating halo and the "?" for everyone else
+  const padTex = canvasTex(256, 256, (g) => {
+    g.translate(128, 128);
+    const gr = g.createRadialGradient(0, 0, 50, 0, 0, 128); gr.addColorStop(0, 'rgba(255,220,140,0)'); gr.addColorStop(0.55, 'rgba(255,214,120,.65)'); gr.addColorStop(0.75, 'rgba(255,240,190,.9)'); gr.addColorStop(1, 'rgba(255,200,100,0)');
+    g.fillStyle = gr; g.fillRect(-128, -128, 256, 256);
+    g.fillStyle = 'rgba(255,248,220,.95)';
+    for (let i = 0; i < 12; i++) { g.save(); g.rotate((i / 12) * TAU); g.beginPath(); g.moveTo(0, -122); g.lineTo(7, -96); g.lineTo(-7, -96); g.closePath(); g.fill(); g.restore(); }
+  });
+  const padMat = new THREE.MeshBasicMaterial({ map: padTex, color: '#ff8a3a', transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+  const pad = new THREE.Mesh(new THREE.RingGeometry(1.6, PC.pad, lo ? 32 : 56, 1).rotateX(-PI / 2), padMat);
+  { const P = pad.geometry.attributes.position, U = pad.geometry.attributes.uv; for (let i = 0; i < P.count; i++) U.setXY(i, P.getX(i) / (PC.pad * 2) + 0.5, 0.5 - P.getZ(i) / (PC.pad * 2)); }
+  pad.position.set(PX, 0.62, PZ); pad.renderOrder = 2; root.add(pad);
+  const beamTex = canvasTex(8, 128, (g, w, h) => {   // bright at the foot, fading out up the column
+    const gr = g.createLinearGradient(0, h, 0, 0); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  });
+  const beamMat = new THREE.MeshBasicMaterial({ map: beamTex, color: '#ffc870', transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false, toneMapped: false });
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.7, 90, lo ? 12 : 20, 1, true), beamMat);
+  beam.position.set(PX, TOP + 45.5, PZ); beam.renderOrder = 3; root.add(beam);
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(2.7, 0.1, 6, lo ? 28 : 48), new THREE.MeshBasicMaterial({ color: '#ffe39a', toneMapped: false }));
+  halo.position.set(PX, TOP + 3.4, PZ); halo.rotation.x = PI / 2; root.add(halo);
+  const signTex = (glyph, ring, ink) => canvasTex(128, 128, (g) => {
+    g.translate(64, 64); g.fillStyle = 'rgba(40,10,6,.55)'; g.beginPath(); g.arc(0, 0, 58, 0, TAU); g.fill();
+    g.fillStyle = ring; g.beginPath(); g.arc(0, 0, 54, 0, TAU); g.fill(); g.fillStyle = '#7e0e14'; g.beginPath(); g.arc(0, 0, 46, 0, TAU); g.fill();
+    g.fillStyle = ink; g.font = '900 78px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(glyph, 0, 5);
+  });
+  const qTex = signTex('?', '#f2b632', '#ffe6a0'), upTex = signTex('↑', '#fff3c4', '#ffffff');
+  const sign = new THREE.Sprite(new THREE.SpriteMaterial({ map: qTex, transparent: true, depthWrite: false }));
+  sign.scale.set(1.5, 1.5, 1); sign.position.set(PX, 3.6, PZ - 3.6); sign.renderOrder = 5; root.add(sign);
+  {   // a stone stele in front with the rule written on it
+    const sx = PX - 3.4, sz = PZ - 6.4;
+    blk(S, PAL.stoneD, sx, 0.3, sz, 2.4, 0.6, 1.2, { ao: true }); blk(S, PAL.stone, sx, 1.85, sz, 1.9, 2.6, 0.42, { r: 0.08 });
+    blk(S, PAL.redD, sx, 3.3, sz, 2.2, 0.36, 0.56, { r: 0.08 }); blk(Gd, PAL.gold, sx, 3.52, sz, 2.24, 0.06, 0.6, { r: 0 });
+    solid(sx, 0, sz, 2.4, 3.5, 1.2, { mat: stoneM });
+    const stTex = canvasTex(256, 320, (g, w, h) => {
+      g.fillStyle = '#8e0f17'; g.fillRect(0, 0, w, h); g.strokeStyle = '#f2b632'; g.lineWidth = 6; g.strokeRect(10, 10, w - 20, h - 20);
+      g.fillStyle = '#f6cf63'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.font = '900 88px system-ui, sans-serif'; g.fillText('?', w / 2, 74);
+      g.font = '800 30px system-ui, sans-serif'; g.fillText('ONLY A', w / 2, 150); g.fillText('BLACK LION', w / 2, 186); g.fillText('CAN CLIMB', w / 2, 222);
+      g.font = '700 26px ' + brush; g.fillText('黑獅登天', w / 2, 272);
+    });
+    const st = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 2.0), new THREE.MeshLambertMaterial({ map: stTex }));
+    st.position.set(sx, 1.9, sz - 0.215); st.rotation.y = PI; root.add(st);
+  }
+  PILLAR.on = true; PILLAR.x = PX; PILLAR.z = PZ; PILLAR.top = TOP; PILLAR.pad = PC.pad; PILLAR.done = false;
+
+  // ---- plum-blossom poles: a 7 x 7 field rising toward the middle, small round tops to hop between ----
+  {
+    const cx = 35, cz = 35, sp = 2.9;
+    for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) {
+      if ((i === 3 && (j === 0 || j === 6)) || (j === 3 && (i === 0 || i === 6))) continue;   // walk-in lanes
+      const x = cx + (i - 3) * sp, z = cz + (j - 3) * sp, m = Math.min(i, j, 6 - i, 6 - j);
+      if (i === 3 && j === 3) {   // the drum platform in the middle
+        const h = 3.9;
+        S.put(G.cyl, PAL.redD, [x, h / 2 - 0.15, z], [1.1, h - 0.3, 1.1], null, null, true);
+        S.put(G.cyl, PAL.woodL, [x, h - 0.15, z], [1.18, 0.3, 1.18]); Gd.put(G.cyl, PAL.gold, [x, h - 0.33, z], [1.22, 0.08, 1.22]); Gd.put(G.cyl, PAL.gold, [x, 0.4, z], [1.16, 0.12, 1.16]);
+        solid(x, 0, z, 2.0, h, 2.0, { cam: true }); aoC(x, z, 1.4, 0.45);
+        continue;
+      }
+      const h = 1.15 + m * 0.75 + rr(-0.18, 0.18), col = (i + j) % 3 === 0 ? PAL.redL : PAL.red;
+      blk(S, PAL.stone, x, 0.12, z, 0.95, 0.24, 0.95, { ao: true, r: 0.05 });
+      S.put(G.cylS, col, [x, (h - 0.12) / 2 + 0.12, z], [0.28, h - 0.3, 0.28], null, null, true);
+      Gd.put(G.cylS, PAL.gold, [x, 0.4, z], [0.32, 0.1, 0.32]); Gd.put(G.cylS, PAL.gold, [x, h - 0.42, z], [0.32, 0.1, 0.32]);
+      S.put(G.cyl, PAL.woodL, [x, h - 0.09, z], [0.44, 0.18, 0.44]); Gd.put(G.cyl, PAL.goldD, [x, h - 0.2, z], [0.46, 0.05, 0.46]);
+      solid(x, 0, z, 0.76, h, 0.76, { thin: true }); aoC(x, z, 0.65, 0.4);   // the whole top holds you (air drift makes hops hard enough)
+    }
+    // a gold-roped edge marks the field
+    for (const [px, pz] of [[cx - 10.4, cz - 10.4], [cx + 10.4, cz - 10.4], [cx - 10.4, cz + 10.4], [cx + 10.4, cz + 10.4]]) {
+      S.put(G.cylS, PAL.redD, [px, 0.9, pz], [0.14, 1.8, 0.14]); Gd.put(G.sphL, PAL.gold, [px, 1.88, pz], [0.2, 0.2, 0.2]);
+      solid(px, 0, pz, 0.32, 1.9, 0.32, { thin: true }); tops.push([px, 1.9, pz, '#ffd27a', 1.2]);
+    }
+  }
+
+  // ---- the wooden fort: decks and ramps of boards ----
+  const plankCols = ['#b0743a', '#a86c34', '#bb7d40', '#a2672f'];
+  // a deck w x d, h high, centred on (x, z): red skirt, gold trim, a top of boards (solid: no walking under)
+  const deck = (x, z, w, d, h, along) => {
+    blk(S, PAL.red, x, (h - 0.2) / 2, z, w, h - 0.2, d, { ao: true, r: 0.08 });
+    blk(S, PAL.redD, x, 0.2, z, w + 0.1, 0.4, d + 0.1, { r: 0.06 });
+    for (const [nx, nz] of sides) blk(Gd, PAL.gold, x + nx * (w / 2 + 0.02), h - 0.36, z + nz * (d / 2 + 0.02), nx ? 0.06 : w + 0.1, 0.1, nz ? 0.06 : d + 0.1, { r: 0 });
+    const n = Math.round((along ? d : w) / 0.6), pw = (along ? d : w) / n;
+    for (let k = 0; k < n; k++) {
+      const o = -(along ? d : w) / 2 + pw * (k + 0.5);
+      blk(S, plankCols[k % 4], along ? x : x + o, h - 0.1, along ? z + o : z, along ? w + 0.12 : pw - 0.05, 0.2, along ? pw - 0.05 : d + 0.12, { r: 0.04 });
+    }
+    // lattice panels on the skirt
+    for (const [nx, nz] of sides) {
+      const L = nz ? w : d, cnt = Math.max(1, Math.floor(L / 2.6));
+      for (let k = 0; k < cnt; k++) {
+        const u = -L / 2 + (L / cnt) * (k + 0.5), px = x + (nz ? u : nx * (w / 2 + 0.03)), pz = z + (nz ? nz * (d / 2 + 0.03) : u);
+        const ox = nx * 0.03, oz = nz * 0.03;   // a gold frame, a dark red panel standing just proud of it
+        blk(Gd, PAL.goldD, px, h * 0.48, pz, nz ? 1.6 : 0.05, Math.max(0.4, h - 1.3), nz ? 0.05 : 1.6, { r: 0 });
+        blk(S, PAL.redD, px + ox, h * 0.48, pz + oz, nz ? 1.4 : 0.05, Math.max(0.3, h - 1.5), nz ? 0.05 : 1.4, { r: 0 });
+      }
+    }
+    solid(x, 0, z, w, h, d, { cam: true }); aoR(x, z, w, d, 0.5);
+  };
+  // a ramp over [x0, x1] x [z0, z1] rising along `ax` toward +1 / -1 (`sg`) from y0 to y1
+  const ramp = (x0, x1, z0, z1, ax, sg, y0, y1) => {
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, L = ax ? z1 - z0 : x1 - x0, W = ax ? x1 - x0 : z1 - z0;
+    const ry = ax ? (sg > 0 ? -PI / 2 : PI / 2) : (sg > 0 ? 0 : PI), dx = Math.cos(ry), dz = -Math.sin(ry), H = y1 - y0, th = Math.atan2(H, L);
+    if (y0 > 0.01) blk(S, PAL.red, cx, y0 / 2, cz, ax ? W : L, y0, ax ? L : W, { r: 0.06 });
+    S.put(G.wedge, PAL.redD, [cx, y0, cz], [L, H, W], [0, ry, 0]);
+    const SL = Math.hypot(L, H), n = Math.max(3, Math.round(SL / 0.55)), pl = SL / n;
+    for (let k = 0; k < n; k++) {
+      const u = -L / 2 + (L / n) * (k + 0.5), y = y0 + H * (k + 0.5) / n;
+      blk(S, plankCols[k % 4], cx + dx * u, y - 0.06, cz + dz * u, pl - 0.05, 0.14, W - 0.1, { rot: [0, ry, th], r: 0.04 });
+    }
+    for (const s of [-1, 1]) {   // red stringers with a gold edge
+      const ox = ax ? s * (W / 2 - 0.04) : 0, oz = ax ? 0 : s * (W / 2 - 0.04);
+      blk(S, PAL.red, cx + ox, y0 + H / 2 - 0.04, cz + oz, SL, 0.26, 0.12, { rot: [0, ry, th], r: 0.04 });
+      blk(Gd, PAL.gold, cx + ox, y0 + H / 2 + 0.07, cz + oz, SL, 0.05, 0.13, { rot: [0, ry, th], r: 0 });
+    }
+    const c0 = sg > 0 ? (ax ? z0 : x0) : (ax ? z1 : x1), c1 = sg > 0 ? (ax ? z1 : x1) : (ax ? z0 : x0);
+    addRamp(x0, x1, z0, z1, ax, c0, c1, y0, y1, 0, wood);
+    if (y0 < 0.01) aoR(cx, cz, ax ? W : L * 0.6, ax ? L * 0.6 : W, 0.25); else aoR(cx, cz, ax ? W : L, ax ? L : W, 0.4);
+  };
+  deck(36, -36, 8, 8, 3.0, false);
+  deck(47, -37, 5, 5, 5.2, true);
+  deck(47, -48.5, 4, 4, 1.6, false);
+  ramp(24, 32, -38, -34, 0, 1, 0, 3.0);          // up from the plaza side
+  ramp(34, 38, -32, -24, 1, -1, 0, 3.0);         // up from the centre lane
+  ramp(40, 44.5, -38.5, -35.5, 0, 1, 3.0, 5.2);  // deck to the high deck
+  ramp(33, 37, -48, -40, 1, 1, 0, 3.0);          // down the back
+  ramp(22, 26, -51, -47.5, 0, 1, 0, 1.3);        // two kickers facing each other
+  ramp(29, 33, -51, -47.5, 0, -1, 0, 1.3);
+  for (const [x, z] of [[31.6, -31.6], [40.4, -31.6], [31.6, -40.4], [44.2, -34.2]]) {   // lantern posts at the deck corners
+    const ox = Math.sign(x - 36) * 0.5;   // an arm reaching out from the post, the lantern on its end
+    S.put(G.cylS, PAL.redD, [x, 1.75, z], [0.13, 3.5, 0.13]); Gd.put(G.box, PAL.gold, [x, 3.55, z], [0.36, 0.12, 0.36]);
+    blk(S, PAL.redD, x + ox / 2, 3.4, z, 0.6, 0.1, 0.1, { r: 0 });
+    hang.push([x + ox, 3.4, z, 1, 0, rr(0, TAU)]); solid(x, 0, z, 0.3, 3.6, 0.3, { thin: true });
+  }
+
+  // ---- the beam course: nine platforms over the sand, joined by narrow beams and two tightropes ----
+  {
+    const X = [-24, -36, -48], Z = [-24, -36, -48];
+    const HT = [[2.3, 2.6, 3.0], [2.4, 2.8, 3.4], [2.6, 3.1, 3.8]];   // HT[j][i]: z row j, x column i
+    const half = (i, j) => (i === 1 && j === 1 ? 2.1 : 1.6);
+    for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) {
+      const x = X[i], z = Z[j], h = HT[j][i], hw = half(i, j), w = hw * 2;
+      blk(S, PAL.stoneD, x, h * 0.25, z, w, h * 0.5, w, { ao: true, r: 0.08 });
+      blk(S, PAL.red, x, h * 0.66, z, w - 0.12, h * 0.32, w - 0.12, { r: 0.06 });
+      blk(S, PAL.woodL, x, h - 0.13, z, w + 0.16, 0.26, w + 0.16, { r: 0.06 });
+      for (const [nx, nz] of sides) blk(Gd, PAL.gold, x + nx * (hw + 0.09), h - 0.3, z + nz * (hw + 0.09), nx ? 0.05 : w + 0.2, 0.07, nz ? 0.05 : w + 0.2, { r: 0 });
+      Gd.put(G.cylS, PAL.gold, [x, h * 0.66, z + (hw - 0.03)], [0.34, 0.06, 0.34], [PI / 2, 0, 0]);
+      solid(x, 0, z, w + 0.16, h, w + 0.16, { cam: true, mat: stoneM }); aoR(x, z, w, w, 0.5);
+    }
+    const rope = (i0, j0, i1, j1) => (i0 === 2 && j0 === 1 && i1 === 2 && j1 === 2) || (i0 === 1 && j0 === 2 && i1 === 2 && j1 === 2);
+    const link = (i0, j0, i1, j1) => {
+      const ax = i0 === i1 ? 1 : 0, a = ax ? Z[j0] : X[i0], b = ax ? Z[j1] : X[i1], sg = Math.sign(b - a);
+      const e0 = a + sg * (half(i0, j0) + 0.08), e1 = b - sg * (half(i1, j1) + 0.08), y0 = HT[j0][i0], y1 = HT[j1][i1];
+      const isRope = rope(i0, j0, i1, j1), W = isRope ? 0.16 : 0.4, th = isRope ? 0.16 : 0.26, cxz = ax ? X[i0] : Z[j0];
+      const lo0 = Math.min(e0, e1), hi0 = Math.max(e0, e1), L = hi0 - lo0, mid = (lo0 + hi0) / 2, yl = sg > 0 ? y0 : y1, yh = sg > 0 ? y1 : y0;
+      const slope = Math.atan2(yh - yl, L), ry = ax ? -PI / 2 : 0, SL = Math.hypot(L, yh - yl);
+      const px = ax ? cxz : mid, pz = ax ? mid : cxz, ym = (yl + yh) / 2 - th / 2;
+      if (isRope) {
+        Gd.put(G.cylS, PAL.gold, [px, ym + 0.02, pz], [0.08, SL + 0.3, 0.08], [0, ry, slope - PI / 2]);
+        for (const [e, y] of [[lo0, yl], [hi0, yh]]) S.put(G.sphL, PAL.redL, [ax ? cxz : e, y - 0.12, ax ? e : cxz], [0.16, 0.16, 0.16]);
+      } else {
+        blk(S, PAL.woodL, px, ym, pz, SL + 0.2, th, W, { rot: [0, ry, slope], r: 0.06 });
+        blk(Gd, PAL.gold, px, ym - th / 2 + 0.03, pz, SL + 0.22, 0.05, W + 0.04, { rot: [0, ry, slope], r: 0 });
+        for (let k = 1; k < 4; k++) { const u = lo0 + (L * k) / 4, y = yl + ((yh - yl) * k) / 4 - th / 2; blk(S, PAL.red, ax ? cxz : u, y, ax ? u : cxz, ax ? W + 0.06 : 0.14, th + 0.06, ax ? 0.14 : W + 0.06, { r: 0.02 }); }
+      }
+      const bx0 = ax ? cxz - W / 2 : lo0, bx1 = ax ? cxz + W / 2 : hi0, bz0 = ax ? lo0 : cxz - W / 2, bz1 = ax ? hi0 : cxz + W / 2;
+      addRamp(bx0, bx1, bz0, bz1, ax, lo0, hi0, yl, yh, Math.min(yl, yh) - th, wood).foot = isRope ? 0.22 : 0.3;
+    };
+    for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) { if (i < 2) link(i, j, i + 1, j); if (j < 2) link(i, j, i, j + 1); }
+    // stairs up to the three platforms that face the plaza
+    const stairs = (x0, z, ax, sgn, h) => {   // steps climbing toward -sgn along ax, starting at coordinate x0 (outer foot)
+      const n = Math.ceil(h / 0.36), rise = h / n;
+      for (let k = 0; k < n; k++) {
+        const c = x0 - sgn * (k + 0.5) * 0.5, top = rise * (k + 1);
+        const px = ax ? z : c, pz = ax ? c : z, w = ax ? 2.0 : 0.5, d = ax ? 0.5 : 2.0;
+        blk(S, k % 2 ? PAL.woodL : PAL.wood, px, top / 2, pz, w, top, d, { r: 0.05 });
+        solid(px, 0, pz, w, top, d);
+      }
+      aoR(ax ? z : x0 - sgn * n * 0.25, ax ? x0 - sgn * n * 0.25 : z, ax ? 2 : n * 0.5, ax ? n * 0.5 : 2, 0.35);
+    };
+    stairs(-22.4 + 0.5 * Math.ceil(2.3 / 0.36), -24, 0, 1, 2.3);
+    stairs(-22.4 + 0.5 * Math.ceil(2.4 / 0.36), -36, 0, 1, 2.4);
+    stairs(-22.4 + 0.5 * Math.ceil(2.6 / 0.36), -36, 1, 1, 2.6);
+    // low balance logs on the sand
+    for (const [x, z, ax, L] of [[-30, -30, 0, 4.2], [-42, -42, 1, 4.2], [-30, -42, 0, 4.2], [-42, -30, 1, 4.2]]) {
+      S.put(G.cylS, PAL.wood, [x, 0.42, z], [0.22, L, 0.22], ax ? [PI / 2, 0, 0] : [0, 0, PI / 2]);
+      for (const s of [-1, 1]) blk(S, PAL.woodD, ax ? x : x + s * (L / 2 - 0.4), 0.15, ax ? z + s * (L / 2 - 0.4) : z, 0.5, 0.3, 0.5, { r: 0.05 });
+      const b = solid(x, 0, z, ax ? 0.44 : L, 0.64, ax ? L : 0.44); b.foot = 0.3; aoR(x, z, ax ? 0.5 : L, ax ? L : 0.5, 0.3);
+    }
+  }
+
+  // ---- the drum stage by the duel ring ----
+  {
+    const x = -44, z = 44;
+    blk(S, PAL.redD, x, 0.18, z, 8, 0.36, 8, { ao: true, r: 0.06 }); solid(x, 0, z, 8, 0.36, 8);
+    for (const [nx, nz] of sides) blk(Gd, PAL.gold, x + nx * 4.02, 0.3, z + nz * 4.02, nx ? 0.06 : 8.1, 0.06, nz ? 0.06 : 8.1, { r: 0 });
+    // the drum cart and its drum
+    blk(S, PAL.red, x, 0.85, z, 2.6, 0.9, 2.6, { r: 0.08 });
+    for (const [px, pz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) S.put(G.cylS, PAL.ink, [x + px * 1.3, 0.62, z + pz * 0.9], [0.28, 0.14, 0.28], [0, 0, PI / 2]);
+    S.put(G.cyl, PAL.red, [x, 1.95, z], [1.15, 1.3, 1.15]); S.put(G.cyl, '#ecd6a8', [x, 2.62, z], [1.12, 0.04, 1.12]);
+    for (const y of [1.36, 2.55]) for (let i = 0, n = lo ? 10 : 20; i < n; i++) { const a = (i / n) * TAU; Gd.put(G.sphL, PAL.gold, [x + Math.sin(a) * 1.17, y, z + Math.cos(a) * 1.17], [0.06, 0.06, 0.06]); }
+    for (const s of [-1, 1]) S.put(G.cylS, PAL.woodD, [x + s * 0.4, 2.85, z - 0.2], [0.04, 0.9, 0.04], [0.6, 0, s * 0.5]);
+    solid(x, 0, z, 2.6, 2.65, 2.6); aoR(x, z, 2.6, 2.6, 0.5);
+    // cymbal stands and two banner poles
+    for (const [px, pz] of [[x + 2.4, z - 1.6], [x - 1.6, z - 2.4]]) {
+      S.put(G.cylS, PAL.ink, [px, 0.95, pz], [0.05, 1.3, 0.05]); Gd.put(G.cyl, PAL.gold, [px, 1.65, pz], [0.38, 0.05, 0.38], [0.25, 0, 0]);
+    }
+    for (const [px, pz, c] of [[x + 3.4, z + 3.4, '#f2c230'], [x - 3.4, z - 3.4 + 7.2, '#e0343a']]) {
+      S.put(G.cylS, PAL.redD, [px, 3.0, pz], [0.09, 6.0, 0.09]); Gd.put(G.sphL, PAL.gold, [px, 6.05, pz], [0.17, 0.17, 0.17]);
+      blk(S, c, px + 0.62, 4.5, pz, 1.1, 2.6, 0.04, { r: 0 }); blk(S, PAL.redD, px + 0.62, 5.85, pz, 1.2, 0.12, 0.08, { r: 0 });
+      solid(px, 0.36, pz, 0.24, 5.8, 0.24, { thin: true });
+    }
+  }
+
+  // ---- lanterns strung over the plaza, from the masts to the Pillar and out to the corners ----
+  const strings = [];
+  const mp = (sx, sz) => mastTop.find((v) => Math.sign(v.x) === sx && Math.sign(v.z) === sz);
+  strings.push([mp(-1, -1), mp(1, -1)], [mp(1, -1), mp(1, 1)], [mp(1, 1), mp(-1, 1)], [mp(-1, 1), mp(-1, -1)]);
+  strings.push([mp(-1, 1), new V3(PX - 1.55, 15, PZ - 0.4)], [mp(1, 1), new V3(PX + 1.55, 15, PZ - 0.4)]);
+  for (const [a, b] of strings) {
+    const span = a.distanceTo(b), sag = 0.07 * span, pts = [];
+    const at = (t) => new V3(lerp(a.x, b.x, t), lerp(a.y, b.y, t) - sag * 4 * t * (1 - t), lerp(a.z, b.z, t));
+    for (let i = 0; i <= 12; i++) pts.push(at(i / 12));
+    S.raw(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), lo ? 10 : 18, 0.035, 3, false), null, '#4a1c12');
+    const n = Math.max(2, Math.floor(span / (lo ? 4.6 : 3.2))), tx = (b.x - a.x) / span, tz = (b.z - a.z) / span;
+    for (let k = 1; k <= n; k++) { const p = at(k / (n + 1)); hang.push([p.x, p.y, p.z, tx, tz, rr(0, TAU)]); }
+  }
+  const lk = taKit(), lkc = taKit();
+  const lb = new THREE.LatheGeometry([[0.04, -1.08], [0.3, -1.01], [0.42, -0.78], [0.45, -0.6], [0.42, -0.42], [0.3, -0.19], [0.04, -0.12]].map((p) => new THREE.Vector2(p[0], p[1])), lo ? 6 : 10);
+  { const P = lb.attributes.position, col = [], c = new THREE.Color(), hot = new THREE.Color('#ff8a3c'), cool = new THREE.Color('#b3160c'); for (let i = 0; i < P.count; i++) { c.copy(cool).lerp(hot, 1 - Math.min(1, Math.abs(P.getY(i) + 0.6) / 0.5)); col.push(c.r, c.g, c.b); } lb.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); }
+  lk.raw(lb, null, '#ffffff');
+  const capG = lo ? G.box : G.cylS, cw = lo ? 0.36 : 0.22;
+  lkc.put(capG, PAL.gold, [0, -0.13, 0], [cw, 0.09, cw]); lkc.put(capG, PAL.gold, [0, -1.08, 0], [cw, 0.09, cw]);
+  lkc.put(G.box, '#ffcf3a', [0, -1.36, 0], [0.1, 0.45, 0.1]);
+  const nL = hang.length, lanMats = [new THREE.MeshBasicMaterial({ vertexColors: true }), lo ? new THREE.MeshLambertMaterial({ vertexColors: true }) : new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 50, specular: '#4a3a20' })];
+  const lanBody = new THREE.InstancedMesh(lk.geo(), lanMats[0], nL), lanCap = new THREE.InstancedMesh(lkc.geo(), lanMats[1], nL);
+  lanBody.castShadow = lanCap.castShadow = !lo;
+  const _lq = new THREE.Quaternion(), _lp = new V3(), _ls = new V3(1, 1, 1), _lm = new THREE.Matrix4(), _lax = new V3();
+  const placeLanterns = (t) => {
+    for (let i = 0; i < nL; i++) {
+      const h = hang[i], sw = t === null ? 0 : Math.sin(t * 1.25 + h[5]) * 0.07 + Math.sin(t * 2.1 + h[5] * 1.7) * 0.025;
+      _lq.setFromAxisAngle(_lax.set(h[3], 0, h[4]), sw); _lm.compose(_lp.set(h[0], h[1], h[2]), _lq, _ls);
+      lanBody.setMatrixAt(i, _lm); lanCap.setMatrixAt(i, _lm);
+    }
+    lanBody.instanceMatrix.needsUpdate = lanCap.instanceMatrix.needsUpdate = true;
+  };
+  placeLanterns(null); root.add(lanBody, lanCap);
+  for (const h of hang) tops.push([h[0], h[1] - 0.6, h[2], '#ff6a2a', 2.2]);
+
+  // ---- beyond the wall: blossom trees, a town of tiled roofs, green hills, two pagodas, clouds ----
+  const blossom = ['#f7a8c4', '#ffc4d8', '#fff0f4', '#f28fb2'];
+  for (const [nx, nz] of sides) for (let u = -56; u <= 56; u += rr(7, 10)) {
+    if (nz < 0 && Math.abs(u) < 9) continue;
+    const d = rr(63.5, 70), x = nz ? u : nx * d, z = nz ? nz * d : u, h = rr(2.6, 3.6), s = rr(1.0, 1.45), ry = rr(0, TAU);
+    Far.put(G.box, '#5a3a26', [x, h / 2, z], [0.8, h, 0.8], [0, ry, 0]);
+    blk(Far, blossom[(u | 0) & 3], x, h + 1.0 * s, z, 3.6 * s, 2.2 * s, 3.6 * s, { ry, r: 0.25 });
+    blk(Far, blossom[((u | 0) + 1) & 3], x + 0.3, h + 2.7 * s, z - 0.2, 2.6 * s, 1.6 * s, 2.6 * s, { ry: ry + 0.5, r: 0.2 });
+    blk(Far, blossom[((u | 0) + 2) & 3], x - 0.2, h + 3.8 * s, z + 0.2, 1.4 * s, 1.0 * s, 1.4 * s, { ry: ry + 0.9, r: 0.15 });
+  }
+  const roofT = taRoof(4.5, 3.0, 1.9, 0.7, 8, 6);
+  for (let i = 0; i < (lo ? 22 : 34); i++) {
+    const a = (i / (lo ? 22 : 34)) * TAU + rr(-0.05, 0.05), d = rr(82, 98), x = Math.cos(a) * d, z = Math.sin(a) * d, h = rr(5, 9), ry = Math.atan2(x, z) + rr(-0.3, 0.3);
+    const pm = M4(x, 0, z, ry);
+    Far.put(G.box, i % 3 ? '#efe2cc' : '#d9b48a', [0, h / 2, 0], [8.4, h, 5.6], null, pm);
+    Far.put(G.box, '#7a2a1c', [0, h - 0.4, 0], [8.6, 0.4, 5.8], null, pm);
+    Far.put(roofT.top, i % 4 ? '#3f4e5e' : '#c99a32', [0, h, 0], null, null, pm); Far.put(roofT.band, '#2b3540', [0, h, 0], null, null, pm);
+  }
+  for (let i = 0; i < 22; i++) {
+    const a = (i / 22) * TAU + rr(-0.08, 0.08), d = rr(120, 150), w = rr(30, 50), h = rr(10, 20);
+    Far.put(G.ico, ['#6f9f55', '#5f914a', '#7aa95e'][i % 3], [Math.cos(a) * d, -h * 0.3, Math.sin(a) * d], [w, h, w * rr(0.7, 1)], [0, rr(0, TAU), 0]);
+  }
+  for (const [a, d] of [[0.35, 128], [2.6, 140]]) {
+    const x = Math.sin(a) * d, z = Math.cos(a) * d, pm = M4(x, 0, z, a);
+    let y = 0;
+    Far.put(G.box, PAL.stone, [0, 0.8, 0], [12, 1.6, 12], null, pm); y = 1.6;
+    for (let i = 0; i < 7; i++) {
+      const w = 8.4 - i * 0.8, rf = taRoof(w / 2 + 1.15, w / 2 + 1.15, 0.9, 0.5, 6, 6, 0.25);
+      Far.put(G.box, i % 2 ? '#b0281e' : '#9a221a', [0, y + 1.1, 0], [w, 2.2, w], null, pm);
+      Far.put(rf.top, PAL.gold, [0, y + 2.2, 0], null, null, pm); Far.put(rf.under, PAL.redD, [0, y + 2.2, 0], null, null, pm);
+      y += 2.75;
+    }
+    Far.put(G.cylS, PAL.gold, [0, y + 2.4, 0], [0.18, 4.8, 0.18], null, pm);
+  }
+  const cloudK = taKit();
+  for (let i = 0; i < 16; i++) {
+    const a = rr(0, TAU), d = rr(110, 240), y = rr(62, 96), cx = Math.cos(a) * d, cz = Math.sin(a) * d, s = rr(0.8, 1.5);
+    for (let k = 0; k < 4; k++) cloudK.put(G.box, '#ffffff', [cx + rr(-9, 9) * s, y + rr(-1.5, 2.5), cz + rr(-5, 5) * s], [rr(10, 18) * s, rr(3, 6) * s, rr(7, 12) * s], [0, a, 0]);
+  }
+
+  // ---- bake the kits into meshes ----
+  const matS = lo ? new THREE.MeshLambertMaterial({ vertexColors: true }) : new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 28, specular: '#3a3026' });
+  const matG = lo ? new THREE.MeshLambertMaterial({ vertexColors: true }) : new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 60, specular: '#8a6a30' });
+  const matR = lo ? new THREE.MeshLambertMaterial({ map: tileTex }) : new THREE.MeshPhongMaterial({ map: tileTex, shininess: 55, specular: '#7a5a20' });
+  const mk = (kit, mat, cast, recv, uv, order = 0, split = false) => {
+    if (!kit.parts.length) return;
+    for (const g of split ? kit.sides(uv) : [kit.geo(uv)]) { const m = new THREE.Mesh(g, mat); m.castShadow = cast; m.receiveShadow = recv; m.matrixAutoUpdate = false; m.renderOrder = order; root.add(m); }
+  };
+  mk(S, matS, true, true, false, 0, true); mk(Gd, matG, true, true, false, 0, true); mk(Rf, matR, !lo, true, true, 0, true);
+  mk(Far, new THREE.MeshLambertMaterial({ vertexColors: true }), false, false, false, 1);
+  mk(cloudK, new THREE.MeshLambertMaterial({ vertexColors: true, emissive: '#8fa3b8', fog: false }), false, false, false, 1);
+  const clouds = root.children[root.children.length - 1];
+  mk(Gl, new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }), false, false);
+
+  // ---- glows: one point sprite per light ----
+  let glowPts;
+  {
+    const pos = new Float32Array(tops.length * 3), col = new Float32Array(tops.length * 3), c = new THREE.Color();
+    tops.forEach((t, i) => { pos.set([t[0], t[1], t[2]], i * 3); c.set(t[3]).multiplyScalar(t[4] / 3.6); col.set([c.r, c.g, c.b], i * 3); });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    glowPts = new THREE.Points(g, new THREE.PointsMaterial({ size: 3.0, map: glowTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, toneMapped: false }));
+    glowPts.renderOrder = 4; root.add(glowPts);
+  }
+
+  // baked contact shading for everything on the floor (and the duel ring)
+  AO.push(...DUEL_AO); buildAO({ patches: false });
+
+  // nothing above is drawn on its own: drop the building blocks
+  for (const k in G) G[k].dispose();
+  for (const g of BV.values()) g.dispose();
+  for (const rf of [roofP, roofG, roofT]) { rf.top.dispose(); rf.under.dispose(); rf.band.dispose(); }
+
+  const gfx = () => { glowPts.material.size = GFX.fx >= 2 ? 3.0 : 2.4; if (GFX.fx < 2) placeLanterns(null); };
+  gfx();
+  let padK = 0, fxT = 0;
+  return {
+    gfx, detail: GFX.level,
+    tick(fdt) {
+      const t = realClock, fx = GFX.fx, p = player;
+      if (fx >= 2 && !reduceMotion) placeLanterns(t);
+      clouds.rotation.y = t * 0.004;
+      halo.rotation.z = t * 0.4; halo.position.y = TOP + 3.4 + Math.sin(t * 1.3) * 0.25;
+      beamMat.opacity = (lo ? 0.2 : 0.26) + Math.sin(t * 2.1) * 0.04;
+      // the pad wakes for a Black lion close by: brighter, warmer, an updraft of embers, an arrow instead of "?"
+      const ready = !!p && blackClimber(p) && Math.hypot(p.pos.x - PX, p.pos.z - PZ) < 10;
+      padK = damp(padK, ready ? 1 : 0, 4, fdt);
+      padMat.opacity = 0.3 + padK * (0.55 + Math.sin(t * 6) * 0.15);
+      padMat.color.setRGB(1, 0.54 + padK * 0.36, 0.23 + padK * 0.45);
+      pad.rotation.y = t * (0.2 + padK * 1.2);
+      const want = ready ? upTex : qTex; if (sign.material.map !== want) { sign.material.map = want; sign.material.needsUpdate = true; }
+      sign.position.y = 3.6 + Math.sin(t * 2.4) * 0.18;
+      if (ready && fx >= 2 && (fxT += fdt) > (fx >= 3 ? 0.06 : 0.12)) {
+        fxT = 0; const a = rand(0, TAU), r = rand(1.7, 3.1);
+        emit('ember', tA.set(PX + Math.sin(a) * r, 0.7, PZ + Math.cos(a) * r), { n: 1, up: 7, speed: 0.4, life: 1.1 });
+      }
+    },
+    cleanup() {
+      PILLAR.on = false; PILLAR.done = false;
+      qTex.dispose(); upTex.dispose();
+    },
+  };
+}
+// ---- the Pillar (course arena) -------------------------------------------------------------------------------
+// Only the local player wearing the Black form (50+ K.O.s, the form actually shown: f.tro.black) can get on it.
+// Its collider's gate (blackClimber) makes it a wall at every height for everyone else: bots (whatever tier they
+// wear), remote puppets, ragdolls, dashes, launches and anyone standing on a deck or another fighter are pushed
+// off its sides and never stand on its top. A Black lion on the glowing ring at its foot presses Jump to run up
+// it (an action that follows the gold dragon round the shaft; a hit knocks them off). Standing on the top starts
+// the ascension: a column of light, then ascendTo('transcended'). Offline or as the room's host the arena
+// changes (guests follow the host, as with any host arena); a guest cannot move the room, so a guest's ascension
+// is kept as their pass for when they leave the room or host one (see ascendTo), and they are told so.
+const PILLAR = { on: false, x: 0, z: 44, top: 33, pad: 3.3, done: false, asc: null, beam: null, chipKey: '' };
+function blackClimber(f) { return !!f && f === player && !f.remote && !f.dead && !!(f.tro && f.tro.black); }
+function pillarDist(f) { return Math.hypot(f.pos.x - PILLAR.x, f.pos.z - PILLAR.z); }
+// Jump on the ring at the foot: the climb replaces the jump (called from updateFighter)
+function pillarTry(f) {
+  if (!PILLAR.on || !blackClimber(f) || !f.onGround || f.pos.y > 1.2 || f.carry || f.held || pillarDist(f) > PILLAR.pad) return false;
+  pillarClimb(f); return true;
+}
+function pillarClimb(f) {
+  const P = PILLAR, a0 = Math.atan2(f.pos.x - P.x, f.pos.z - P.z), y0 = f.pos.y, R0 = 2.05, dur = 2.5, spin = 1.25 * TAU, k1 = 0.84;
+  audioAt(f.pos); SFX.jump(); SFX.drum();
+  ring(tA.set(f.pos.x, f.pos.y, f.pos.z), '#ffd27a', 3.6, 0.5, f.pos.y + 0.1);
+  emit('stars', center(f, tC), { n: 14, speed: 6, up: 6 });
+  if (f === player) { fovKick = Math.max(fovKick, 8); speedLines(0.6, 1.4); }
+  let fxT = 0, yaw = f.yaw;
+  f.startAction({
+    name: 'pclimb', pclimb: true, dur, noGravity: true, lockFacing: true,
+    update(a, dt) {
+      const u = Math.min(1, a.t / dur);
+      let ang, rad, y;
+      if (u < k1) { const s = u / k1, e = s * s * (3 - 2 * s) * 0.3 + s * 0.7; ang = a0 + spin * e; rad = R0; y = y0 + (P.top + 0.9 - y0) * e; }
+      else { const s = (u - k1) / (1 - k1); ang = a0 + spin; rad = R0 * (1 - s); y = P.top + 0.9 + Math.sin(s * PI) * 0.5 - 0.6 * s; }
+      const tx = P.x + Math.sin(ang) * rad, tz = P.z + Math.cos(ang) * rad;
+      f.vel.set((tx - f.pos.x) / dt, (y - f.pos.y) / dt, (tz - f.pos.z) / dt);
+      if (u < k1) yaw = ang + PI / 2; else if (rad > 0.4) yaw = Math.atan2(P.x - f.pos.x, P.z - f.pos.z);
+      f.yaw = yaw;
+      if ((fxT += dt) > 0.07) { fxT = 0; emit('ember', tC.set(f.pos.x, f.pos.y + 0.3, f.pos.z), { n: 2, up: -1, speed: 1.5, life: 0.8 }); }
+    },
+    visual(V) { V.rx = 0.35; },
+    end(a, cancel) {
+      if (!cancel) { f.vel.set(0, -2, 0); ring(tA.set(P.x, P.top, P.z), '#fff0b0', 3, 0.5, P.top + 0.05); emit('stars', center(f, tC), { n: 16, speed: 7, up: 4 }); }
+      else { f.vel.x *= 0.3; f.vel.z *= 0.3; f.vel.y = Math.min(f.vel.y, 4); }
+    },
+  });
+}
+// every simulation step: a Black lion standing on the top ascends (once per visit to the top)
+function pillarStep(dt) {
+  if (PILLAR.asc) { ascendStep(dt); return; }
+  const p = player;
+  if (!PILLAR.on || !p) return;
+  const onTop = blackClimber(p) && p.onGround && p.pos.y > PILLAR.top - 0.25 && pillarDist(p) < 2.3;
+  if (!onTop) { PILLAR.done = false; return; }
+  if (!PILLAR.done && !p.action && !p.busy) ascendStart(p);
+}
+function ascendStart(p) {
+  PILLAR.asc = { t: 0, s: 0 }; PILLAR.done = true;
+  audioAt(p.pos); SFX.gong(); screenFlash('#ffe2a0', 0.45); fovKick = Math.max(fovKick, 10); speedLines(0.8, 2.2); rumble(0.4, 0.8, 400);
+  const B = PILLAR.beam = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.6, 70, 20, 1, true), new THREE.MeshBasicMaterial({ color: '#ffe2a0', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false, toneMapped: false }));
+  B.renderOrder = 3; B.position.set(p.pos.x, p.pos.y + 35, p.pos.z); scene.add(B);
+  p.startAction({
+    name: 'ascend', dur: 2.0, noGravity: true, invuln: true, lockFacing: true,
+    update(a) { p.vel.set(0, a.t < 1.6 ? 2.2 : 0.4, 0); },
+    visual(V, a) { V.rx = -0.25 * Math.min(1, a.t * 2); },
+  });
+  addFeed(null, p.name + ' reached the top of the Pillar', '');
+}
+function ascendEnd() {
+  const B = PILLAR.beam; if (B) { scene.remove(B); B.geometry.dispose(); B.material.dispose(); PILLAR.beam = null; }
+  PILLAR.asc = null;
+}
+function ascendStep(dt) {
+  const A = PILLAR.asc, p = player;
+  A.t += dt;
+  if (!p || p.dead || !fighters.includes(p) || !p.action || p.action.name !== 'ascend') {   // knocked out of it: no ascension
+    if (A.t < 1.95) { ascendEnd(); return; }
+  }
+  const k = Math.min(1, A.t / 0.4);
+  if (PILLAR.beam) { PILLAR.beam.position.set(p.pos.x, p.pos.y + 35, p.pos.z); PILLAR.beam.material.opacity = 0.5 * k; PILLAR.beam.scale.set(1 + Math.sin(A.t * 11) * 0.1, 1, 1 + Math.sin(A.t * 11) * 0.1); }
+  if (Math.floor(A.t / 0.3) >= A.s && A.t < 1.8) {
+    A.s++;
+    ringFx(tB.set(p.pos.x, p.pos.y, p.pos.z), A.s % 2 ? '#ffd27a' : '#ff8a2a', 3 + A.s * 0.9, 0.7);
+    emit('stars', tC.set(p.pos.x, p.pos.y + rand(0.5, 2.5), p.pos.z), { n: GFX.fx >= 2 ? 8 : 4, speed: 5, up: 6 });
+    if (A.s === 3) SFX.lantern();
+  }
+  if (A.t < 1.95) return;
+  ascendEnd();
+  if (p.action && p.action.name === 'ascend') p.endAction(true);
+  p.vel.set(0, 0, 0);
+  if (NET.mode === 'client') {   // a guest cannot move the room: the pass waits for when they leave it
+    ascendTo('transcended');
+    showBanner('Ascension', 'Only the host can take the room up');
+    addFeed(null, 'Leave the room or host one to enter the transcended realm', '');
+    return;
+  }
+  screenFlash('#fff4d0', 1);
+  ascendTo('transcended');
+  const s = spawnPoint();
+  p.pos.set(s.x, 16, s.z); p.onGround = false; p.iframes = Math.max(p.iframes, 2); p.snap();
+  camT.set(p.pos.x, p.pos.y + 1.7, p.pos.z);
+  ringFx(tB.set(s.x, 0, s.z), '#ffd27a', 6, 1.2);
+  addFeed(null, p.name + ' ascended', '');
+}
+// the hint chip near the Pillar
+function pillarHud() {
+  const p = player; let key = '';
+  if (PILLAR.on && p && !p.dead) {
+    if (PILLAR.asc) key = 'asc';
+    else if (PILLAR.done && NET.mode === 'client' && p.pos.y > PILLAR.top - 1) key = 'guest';
+    else if (pillarDist(p) < 7.5 && p.pos.y < 3) key = blackClimber(p) ? 'go' : KILLS.n >= KILL.black ? 'form' : 'locked';
+  }
+  if (key === PILLAR.chipKey) return;
+  PILLAR.chipKey = key;
+  const el = $('#pillChip'); el.hidden = !key; el.classList.toggle('go', key === 'go' || key === 'asc');
+  if (!key) return;
+  $('#pillTxt').textContent = key === 'go' ? (TOUCH.on ? 'Tap Jump on the glowing ring to climb' : 'Jump (' + keyName(BIND.jump) + ') on the glowing ring to climb')
+    : key === 'asc' ? 'Ascending…'
+    : key === 'guest' ? 'Only the host can take the room up'
+    : key === 'form' ? 'Only a Black lion can climb this · wear the Black form'
+    : 'Only a Black lion can climb this · ' + KILL.black + ' K.O.s';
 }
 
 // =====================================================================
@@ -6546,6 +7288,7 @@ function updateFighter(f, dt, I) {
       if (!acted && I.grab) { acted = grabOrThrow(f); take(I, 'grab'); }
       if (!acted && I.ult && f.ult >= 100) { doUlt(f); acted = true; take(I, 'ult'); }
       if (!acted) for (let i = 0; i < 4; i++) if (I.abil[i] && useAbility(f, i)) { acted = true; takeAbil(I, i); break; }
+      if (!acted && I.jump && pillarTry(f)) { take(I, 'jump'); acted = true; }   // a Black lion at the Pillar's foot climbs instead
       if (!acted && I.jump && f.onGround) { f.vel.y = JUMP; f.onGround = false; f.pos.y += 0.02; SFX.jump(); take(I, 'jump'); acted = true; }
       if (!acted && I.m1 && f.m1Lock <= 0 && !f.blocking) { if (f.carry) throwCan(f); else doM1(f, I); take(I, 'm1'); }
     }
@@ -7454,7 +8197,7 @@ async function hostArena(want) {
   const to = setTimeout(() => { if (NET.mode === 'offline') netFail(); }, 9000);
   peer.on('open', (id) => { clearTimeout(to); NET.mode = 'host'; NET.me = id; NET.code = code; reidLocal(); setRoomUI(); setRoomBusyButtons(false); });
   peer.on('connection', (conn) => {
-    conn.on('open', () => { NET.conns.set(conn.peer, conn); sendTo(conn, { t: 'ar', a: ARENA || 'park' }); updateRoomCount(); addFeed(null, 'A player joined'); });
+    conn.on('open', () => { NET.conns.set(conn.peer, conn); sendTo(conn, { t: 'ar', a: ARENA || 'course' }); updateRoomCount(); addFeed(null, 'A player joined'); });
     conn.on('data', (d) => onData(d, conn.peer));
     conn.on('close', () => dropPeer(conn.peer));
     conn.on('error', () => dropPeer(conn.peer));
@@ -7811,15 +8554,16 @@ function updateTrans(fdt) {
     syncArena();
   }
 }
-// Arenas: the park, and the transcended realm for players with 1000+ K.O.s (offline and in rooms they host;
-// Settings > Arena picks either). A room's guests always fight in the host's arena, whatever their own count.
+// Arenas: the lion-dance course (the main map), the old park, and the transcended realm for players with 1000+
+// K.O.s (offline and in rooms they host; Settings > Arena picks one). A room's guests always fight in the host's
+// arena, whatever their own count; an older guest that does not know the course falls back to the park.
 // Switching frees everything the old arena built (geometries, materials, textures, colliders).
-const ARENAS = { park: { name: 'Park', build: buildPark }, transcended: { name: 'Transcended realm', build: buildTranscended } };
+const ARENAS = { course: { name: 'Lion-dance course', build: buildCourse }, park: { name: 'Park', build: buildPark }, transcended: { name: 'Transcended realm', build: buildTranscended } };
 let ARENA = null, ARENA_SET = null;   // the arena now standing, and what its build made
 let ARENA_PASS = null;                // an arena gameplay sent this player to (ascendTo), whatever their count
 // o.host: the room's host chose it; o.pass: gameplay granted it (ascendTo). Either lifts the K.O. requirement.
 function selectArena(key, o) {
-  if (!ARENA_IDS.includes(key) || !own(ARENAS, key) || (key === 'transcended' && KILLS.n < KILL.trans && !(o && (o.host || o.pass)))) key = 'park';
+  if (!ARENA_IDS.includes(key) || !own(ARENAS, key) || (key === 'transcended' && KILLS.n < KILL.trans && !(o && (o.host || o.pass)))) key = 'course';
   if (key === ARENA) { showArena(); return ARENA; }
   const first = !ARENA;
   if (ARENA_SET) { if (ARENA_SET.out.cleanup) ARENA_SET.out.cleanup(); arenaFree(ARENA_SET.objs); dropColliders(ARENA_SET.cols); ARENA_SET = null; }
@@ -7829,23 +8573,30 @@ function selectArena(key, o) {
   showArena();
   return ARENA;
 }
-// the arena this player should be in now: the host's in a room, else their own choice once transcended
+// this player's own pick (Settings > Arena): the course by default; the realm once transcended unless they
+// picked the course or the park (players who reached 1000 before the course existed keep the realm)
+function homeArena() {
+  const a = SETTINGS.arena;
+  if (KILLS.n >= KILL.trans && a !== 'park' && a !== 'course') return 'transcended';
+  return a === 'park' ? 'park' : 'course';
+}
+// the arena this player should be in now: the host's in a room, else an ascension, else their own pick
 function wantArena() {
-  if (NET.mode === 'client') return NET.arena || ARENA || 'park';
+  if (NET.mode === 'client') return NET.arena || ARENA || 'course';
   if (ARENA_PASS) return ARENA_PASS;
-  return KILLS.n >= KILL.trans && SETTINGS.arena !== 'park' ? 'transcended' : 'park';
+  return homeArena();
 }
 function syncArena() { return selectArena(wantArena(), { host: NET.mode === 'client', pass: NET.mode !== 'client' && !!ARENA_PASS }); }
-// For gameplay (e.g. a pillar-climb ascension): ascendTo('transcended') sends this player there whatever their
-// K.O. count, offline or in a room they host (guests then follow, as with any host arena); ascendTo('park') or
-// descend() ends it. A guest keeps the host's arena, but the pass waits for when they leave. It lasts for this
-// visit only and does not change who gets the realm by default. Returns the arena now standing.
+// For gameplay (the Pillar's ascension): ascendTo('transcended') sends this player there whatever their K.O.
+// count, offline or in a room they host (guests then follow, as with any host arena); descend() goes back to the
+// course. A guest keeps the host's arena, but the pass waits for when they leave. It lasts for this visit only and
+// does not change the player's own pick. Returns the arena now standing.
 function ascendTo(id) {
   if (typeof id !== 'string' || !ARENA_IDS.includes(id) || !own(ARENAS, id)) return ARENA;
-  ARENA_PASS = id === 'park' ? null : id;
+  ARENA_PASS = id === homeArena() ? null : id;
   return NET.mode === 'client' ? (showArena(), ARENA) : syncArena();
 }
-function descend() { return ascendTo('park'); }
+function descend() { return ascendTo('course'); }
 function arenaFrame(fdt) { if (ARENA_SET && ARENA_SET.out.tick) ARENA_SET.out.tick(fdt); }
 function arenaGfx() { if (ARENA_SET && ARENA_SET.out.gfx) ARENA_SET.out.gfx(); }
 // a level picked in Settings rebuilds the standing arena at that level's detail (the Auto watchdog only trims
@@ -7855,21 +8606,23 @@ function rebuildArena() {
   if (ARENA_SET.out.cleanup) ARENA_SET.out.cleanup(); arenaFree(ARENA_SET.objs); dropColliders(ARENA_SET.cols);
   ARENA_SET = arenaCapture(ARENAS[ARENA].build);
 }
-// the count can also fall (the dev hook): a player below 1000 goes back to the park
-function arenaKills() { if (KILLS.n < KILL.trans && ARENA === 'transcended' && NET.mode !== 'client' && !ARENA_PASS) selectArena('park'); else showArena(); }
+// the count can also fall (the dev hook): a player below 1000 leaves the realm unless they ascended there
+function arenaKills() { if (KILLS.n < KILL.trans && ARENA === 'transcended' && NET.mode !== 'client' && !ARENA_PASS) selectArena(homeArena()); else showArena(); }
 function showArena() {
   const sel = $('#optArena'), n = KILLS.n, guest = NET.mode === 'client', pass = !guest && ARENA_PASS;
   if (!sel) return;
-  sel.value = guest ? ARENA || 'park' : pass || (n >= KILL.trans && SETTINGS.arena !== 'park' ? 'transcended' : 'park');
-  sel.disabled = guest || (n < KILL.trans && !pass);
+  sel.value = guest ? ARENA || 'course' : pass || homeArena();
+  sel.disabled = guest;
+  sel.querySelector('option[value="transcended"]').disabled = n < KILL.trans && pass !== 'transcended';
   $('#arenaNote').textContent = guest ? 'In a room you fight in the host’s arena.'
-    : pass ? 'You ascended here. Pick the park to go back down.'
-    : n < KILL.trans ? 'The transcended realm opens at ' + KILL.trans + ' K.O.s (' + (KILL.trans - n) + ' to go).'
+    : pass === 'transcended' && n < KILL.trans ? 'You ascended here from the Pillar. Pick another arena to go back down.'
+    : n < KILL.trans ? 'The transcended realm opens at ' + KILL.trans + ' K.O.s (' + (KILL.trans - n) + ' to go), or climb the Pillar as a Black lion.'
       : 'Where you fight offline and in rooms you host; guests see it too.';
 }
 $('#optArena').addEventListener('change', (e) => {
-  if (e.target.value === 'park') ARENA_PASS = null;   // going back down also ends an ascension
-  if (KILLS.n >= KILL.trans) { SETTINGS.arena = e.target.value === 'park' ? 'park' : 'transcended'; store.set('settings', SETTINGS); }
+  const v = e.target.value;
+  if (v !== 'course' && v !== 'park' && v !== 'transcended') return;
+  if (v !== 'transcended' || KILLS.n >= KILL.trans) { ARENA_PASS = null; SETTINGS.arena = v; store.set('settings', SETTINGS); }   // another pick also ends an ascension
   syncArena(); e.target.blur();
 });
 // mute is remembered between visits; a #mute hash in the URL always starts muted (handy for testing)
@@ -7993,6 +8746,7 @@ function simStep(dt) {
     updateFighter(f, dt, f === player ? playerIntent() : botSteer(f, aiIntent(f, dt)));
   }
   separateAll();
+  pillarStep(dt);
   audioAt(null);
   updateProjs(dt); updateTraps(dt); updateCans(dt); updateBlocks(dt);
   updateLantern(dt);
@@ -8020,7 +8774,7 @@ function frame(t) {
     if (cloudMesh) cloudMesh.rotation.y += fdt * 0.004;
     arenaFrame(fdt);
     updateLock(fdt); animateLantern(fdt);
-    updateCamera(fdt); updateSpeedLines(fdt); updateHUD(fdt); updateEventChip(); updateDuelHud(fdt); updateNums(fdt); updateTags();
+    updateCamera(fdt); updateSpeedLines(fdt); updateHUD(fdt); updateEventChip(); pillarHud(); updateDuelHud(fdt); updateNums(fdt); updateTags();
     netTick(fdt);
     RIG_U.uTime.value = realClock % 1000;
     fitShadow(); gfxWatch(fdt); mythFrame();
@@ -8149,7 +8903,7 @@ buildDuelRing();
 DUEL_AO.push(...AO.splice(0));   // baked into whichever arena stands
 for (const [x, z] of [[-26, -12], [-26, 12], [26, -12], [26, 12], [-12, -26], [12, -26], [-12, 26], [12, 26], [-18, 0], [18, 0]]) addCan(x, z);
 NET.arena = null;
-syncArena();   // the park, or the transcended realm for a player with 1000+ K.O.s
+syncArena();   // the course, or the player's own pick (the park, or the transcended realm at 1000+ K.O.s)
 player = new Fighter('lion', { name: 'Player_' + ((Math.random() * 9000 + 1000) | 0), localKey: 'P', noTag: true });
 player.pos.set(0, 0, -14); player.yaw = 0; player.snap();
 sun.shadow.camera.layers.enable(1);   // first-person hides your model from the view but keeps its shadow
