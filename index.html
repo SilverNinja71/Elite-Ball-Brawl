@@ -3187,9 +3187,9 @@ function pillarStep(dt) {
   if (PILLAR.asc) { ascendStep(dt); return; }
   const p = player;
   if (!PILLAR.on || !p) return;
-  const onTop = blackClimber(p) && p.onGround && p.pos.y > PILLAR.top - 0.25 && pillarDist(p) < 2.3;
-  if (!onTop) { PILLAR.done = false; return; }
-  if (!PILLAR.done && !p.action && !p.busy) ascendStart(p);
+  const up = pillarDist(p) < 2.6 && p.pos.y > PILLAR.top - 0.5;   // on the top or just above it
+  if (!up) { PILLAR.done = false; return; }   // leaving the top re-arms it
+  if (!PILLAR.done && blackClimber(p) && p.onGround && !p.action && !p.busy) ascendStart(p);
 }
 function ascendStart(p) {
   PILLAR.asc = { t: 0, s: 0 }; PILLAR.done = true;
