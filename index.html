@@ -2441,9 +2441,9 @@ const LDPAINT = (() => {
     {
       const [X, Y, W, H] = LDA.LID; clip(LDA.LID);
       g.fillStyle = C('lid'); g.fillRect(X, Y, W, H);
-      g.fillStyle = C('p2'); g.fillRect(X, Y + H * 0.35, W, H * 0.15);
-      g.fillStyle = gold; g.fillRect(X, Y + H * 0.5, W, H * 0.06);
-      g.fillStyle = C('ink'); g.fillRect(X, Y + H * 0.56, W, H * 0.44);
+      g.fillStyle = C('p2'); g.fillRect(X, Y + H * 0.74, W, H * 0.08);
+      g.fillStyle = gold; g.fillRect(X, Y + H * 0.82, W, H * 0.07);
+      g.fillStyle = C('ink'); g.fillRect(X, Y + H * 0.89, W, H * 0.11);
       g.restore();
     }
     // ---- CHEEK: white swirl, colourful heart ----
@@ -2937,7 +2937,7 @@ const LDH = {
   mouth: [1.86, 1.0],                                      // the mouth opening: below this polar angle, within this front angle
   hinge: [0, 0.37, -0.1],
   eye: { th: 0.97, ph: 0.47, r: 0.205, yaw: 0.42, pitch: -0.08, sink: 0.05 },
-  lid: { open: -1.05, shut: 0.5 },
+  lid: { open: -0.8, shut: 1.05 },
   cape: [0, 0.3, -0.42],
 };
 // the shell surface: the ellipsoid with a swelling forehead, a snout and puffed cheeks; s(th, ph) -> point
@@ -6929,7 +6929,7 @@ function buildCharMenu() {
   if (!buildCharMenu.done) { buildCharMenu.done = true; setTimeout(charPortraits, 400); }
   else charPortraits();
 }
-// character-select portraits: each warrior is built once, rendered head-and-shoulders under its own warm key
+// character-select portraits: each dancer is built once, rendered head-and-shoulders under its own warm key
 // and rim lights into a small render target, and kept as an image (no live 3D in the menu)
 const PORTRAITS = {};
 function charPortraits() {
@@ -6939,7 +6939,7 @@ function charPortraits() {
     ps.add(new THREE.HemisphereLight(0xc9d2e4, 0x2a2018, 0.55));
     const key = new THREE.DirectionalLight(0xffe2b8, 1.7); key.position.set(-2, 3, 3); ps.add(key);
     const rim = new THREE.DirectionalLight(0xff9a50, 1.6); rim.position.set(3, 2, -3); ps.add(rim);
-    cam.position.set(0.75, 1.92, 2.75); cam.lookAt(0, 1.72, 0);
+    cam.position.set(1.15, 2.6, 5.2); cam.lookAt(0, 2.22, 0);   // head and shoulders: the lion head, its antennae and the dancer's arms
     const lv = GFX.level, det = MYTH_U.uDetail.value, cc = renderer.getClearColor(new THREE.Color()), ca = renderer.getClearAlpha();
     GFX.level = 'high'; MYTH_U.uDetail.value = 1;
     MYTH_U.uRimDir.value.set(0.7, 0.3, -0.6).normalize();
