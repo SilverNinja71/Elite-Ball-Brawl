@@ -2338,11 +2338,12 @@ const LDPAINT = (() => {
       const gr = g.createLinearGradient(0, Y, 0, Y + H); gr.addColorStop(0, C('shellHi')); gr.addColorStop(0.55, C('shell')); gr.addColorStop(1, C('shellLo'));
       g.fillStyle = gr; g.fillRect(X, Y, W, H);
       // scales over the crown and the back of the head, each outlined in gold leaf
-      for (let row = 0; row < 9; row++) for (let i = -1; i < 34; i++) {
+      for (let row = 0; row < 21; row++) for (let i = -1; i < 34; i++) {
         const th = 0.12 + row * 0.11, ph = PI - (i + (row & 1) * 0.5) * 0.2;   // starting at the back
         const x = px(((ph + PI) % TAU) - PI), y = py(th);
         const front = Math.cos(((ph + PI) % TAU) - PI);
-        if (front > -0.05 && th > 0.25) continue;   // the forehead and face stay clear for the paintwork
+        if (front > (th > 1.0 ? -0.45 : -0.05) && th > 0.25) continue;   // the forehead and face stay clear for the paintwork
+        if (th > LDH.th1 - 0.12) continue;
         g.beginPath(); g.arc(x, y, 15, 0, PI); g.fillStyle = row & 1 ? C('shell2') : C('shell'); g.fill();
         lineW(3); g.strokeStyle = gold; g.stroke();
       }
@@ -2941,7 +2942,7 @@ const LDH = {
   nose: [1.4, 0.12, [0.3, 0.17, 0.24]],                 // snout bulb: polar angle on the shell, lift, radii
   eye: { th: 0.92, ph: 0.5, r: 0.25, yaw: 0.4, pitch: -0.1, sink: 0.035 },
   lid: { open: -0.8, shut: 1.05 },
-  cape: [0, 0.3, -0.42],
+  cape: [0, 0.3, -0.42], capeW: 1.04,                  // cape mount at the nape; full cape width (about the head's)
 };
 // the shell surface: the ellipsoid with a swelling forehead, a snout and puffed cheeks; s(th, ph) -> point
 function ldShellPt(th, ph, out = new V3()) {
@@ -3079,7 +3080,7 @@ function lionHead(rig, pal, o = {}) {
     ...[1, -1].map((s) => [gTube('ldlip' + s, [...Array(8)].map((_, i) => { const a = -0.12 + i / 7 * 1.34; return [s * Math.sin(a) * 0.62, 0.41 + (Math.max(0, a) / 1.22) ** 2 * 0.1, 0.05 + Math.cos(a) * 0.68]; }), 0.16, 0.1, 16, 10), FU(pal.lip), 0, 0, 0, null, 0.1, { droop: 0.3 }]),
     [gTube('ldcheekL', ldPath([[2.1, 1.62, 0.0], [1.75, 1.68, 0.02], [1.4, 1.7, 0.02], [1.05, 1.66, 0.01]]), 0.05, 0.035, 16, 8), FU(pal.rim), 0, 0, 0, null, 0.08, { droop: 0.3 }],
     [gTube('ldcheekR', ldPath([[2.1, -1.62, 0.0], [1.75, -1.68, 0.02], [1.4, -1.7, 0.02], [1.05, -1.66, 0.01]]), 0.05, 0.035, 16, 8), FU(pal.rim), 0, 0, 0, null, 0.08, { droop: 0.3 }],
-    [gTube('ldnape', [...Array(13)].map((_, i) => { const ph = 1.0 + (TAU - 2.0) * i / 12, p = ldShellPt(LDH.th1 - 0.06, ph), n = ldShellN(LDH.th1 - 0.06, ph); return [p.x + n.x * 0.02, p.y - 0.01, p.z + n.z * 0.02]; }), 0.06, 0.06, 28, 6), FU(pal.rim), 0, 0, 0, null, 0.09, { droop: 0.7 }],
+    [gTube('ldnape', [...Array(13)].map((_, i) => { const ph = 1.0 + (TAU - 2.0) * i / 12, p = ldShellPt(LDH.th1 - 0.06, ph), n = ldShellN(LDH.th1 - 0.06, ph); return [p.x + n.x * 0.03, p.y - 0.01, p.z + n.z * 0.03]; }), 0.08, 0.08, 28, 6), FU(pal.rim), 0, 0, 0, null, 0.12, { droop: 0.7 }],
     [gSph(0.1, 14, 10), FU(pal.lip), 0.57, 0.31, 0.27, null, 0.09],
     [gSph(0.1, 14, 10), FU(pal.lip), -0.57, 0.31, 0.27, null, 0.09],
   ]);
@@ -3145,7 +3146,7 @@ function lionCape(rig, pal, o = {}) {
   const C = o.pivot || piv(rig.capeRoot); C.userData.anim = true;
   if (!o.pivot) { C.rotation.x = 0.22; }
   const PA = spP('CAPE', 0.62), GN = NEON(SURF.gold(pal.gold)), FU = SURF.fur(pal.capeFur);
-  const W = 0.92, L1 = o.short ? 0.5 : 0.6;
+  const W = o.short ? 0.92 : LDH.capeW, L1 = o.short ? 0.5 : 0.6;   // about the head's width, as on a real lion
   P(C, gPlate(W, L1, 0.03, 1.1, 1.12, true, 10, 3), PA, 0, 0, 0, { r: [0, PI, 0] });
   rig.capeTop = C;
   // a fur edge along the hem: the plates bend round a circle of radius R (their edges curl towards the body, +z)
@@ -3514,7 +3515,7 @@ function buildTrophies(rig, fit, list, ck) {
     skullAt(A, list, slot++, p, d, UP, s, BONE);
   }
   // ---- 25-36: skulls along the cape's hem, centre first ----
-  const capeH = rig.capeLow, hemY = fit.short ? -0.5 : -0.55, W = fit.short ? 0.92 * 1.12 : 0.92 * 1.12 * 1.15, R = fit.short ? 0.92 / 1.1 : 0.92 * 1.12 / 1.1;
+  const CW = fit.short ? 0.92 : LDH.capeW, capeH = rig.capeLow, hemY = fit.short ? -0.5 : -0.55, W = fit.short ? CW * 1.12 : CW * 1.12 * 1.15, R = fit.short ? CW / 1.1 : CW * 1.12 / 1.1;
   for (let k = 0; k < 12; k++) {
     const side = k % 2 ? -1 : 1, x = side * (Math.floor(k / 2) * 2 + 1) * 0.04 * (W / 0.96), a = x / R, s = 0.068;
     const p = new V3(Math.sin(a) * R, hemY + 0.1, R * (1 - Math.cos(a)) - 0.04 - s * 0.35);
