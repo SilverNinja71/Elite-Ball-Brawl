@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- fonts load without blocking the first paint; Ma Shan Zheng only ships the two glyphs the game uses (阿娟) -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&text=%E9%98%BF%E5%A8%9F%E8%B6%85%E5%87%A1%E9%BB%91%E5%A4%A9%E9%96%80%E9%87%87%E9%9D%92%E7%A6%8F&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&text=%E9%98%BF%E5%A8%9F%E8%B6%85%E5%87%A1%E9%BB%91%E5%A4%A9%E9%96%80%E9%87%87%E9%9D%92%E7%A6%8F%E9%A3%9E%E9%BE%99%E5%86%B0%E9%B2%A4%E6%96%B9%E9%94%A4%E6%AD%BB%E6%BB%9A&display=swap" media="print" onload="this.media='all'">
 <style>
 /* Layout: full-bleed live arena. Roblox-style glass buttons top-left, room panel top-right, TSB hotbar stack bottom-center. Single dark-glass look by design. */
 :root{
@@ -206,6 +206,25 @@ button:focus-visible,input:focus-visible{outline:2px solid #fff;outline-offset:2
 @media (prefers-reduced-motion:reduce){#speedFx{display:none}}
 #hitFlash{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at 50% 50%,rgba(255,255,255,0) 38%,var(--hf,#fff) 135%);mix-blend-mode:screen}
 @media (prefers-reduced-motion:reduce){#hitFlash{display:none}}
+/* finisher cutscene: letterbox bars, the move's title card and the skip hint; the rest of the HUD steps aside */
+#finUI{position:absolute;inset:0;pointer-events:none;z-index:6}
+#finUI .bar{position:absolute;left:0;right:0;height:max(11vh,40px);background:#000;transition:transform .32s cubic-bezier(.2,.8,.2,1)}
+#finUI .bar.t{top:0;transform:translateY(-101%)}
+#finUI .bar.b{bottom:0;transform:translateY(101%)}
+#finUI.on .bar{transform:none}
+#finUI.black .bar.t{box-shadow:inset 0 -2px 0 #d4a537}
+#finUI.black .bar.b{box-shadow:inset 0 2px 0 #d4a537}
+#finUI .ttl{position:absolute;left:max(20px,env(safe-area-inset-left,0px));bottom:calc(max(11vh,40px) + 12px);max-width:calc(100vw - 40px);display:grid;justify-items:start;gap:1px;opacity:0;transform:translateX(-24px);transition:opacity .25s,transform .35s cubic-bezier(.2,.9,.3,1.2);text-shadow:0 3px 0 #000}
+#finUI.cut .ttl{opacity:1;transform:none}
+#finUI .ttl .cg{font-family:var(--brush);font-size:min(46px,11vw);line-height:1;color:#ff4a3a}
+#finUI .ttl small{font-size:11px;font-weight:800;letter-spacing:.28em;text-transform:uppercase;color:#ffcf3a}
+#finUI .ttl strong{font-size:min(30px,7vw);font-weight:800;text-transform:uppercase;line-height:1.05}
+#finUI.black .ttl .cg{color:#ffcf3a}
+#finUI.black .ttl strong{color:#ffe7a8}
+#finUI .skip{position:absolute;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(max(11vh,40px) / 2 - 8px);font-size:12px;font-weight:700;color:#cfd3da;opacity:0;transition:opacity .3s}
+#finUI.canskip .skip{opacity:.85}
+body.fin-cine #topbar,body.fin-cine #room,body.fin-cine #feed,body.fin-cine #tsb,body.fin-cine #help,body.fin-cine #topc,body.fin-cine #touch,body.fin-cine #combo,body.fin-cine #tags,body.fin-cine #cross,body.fin-cine #banner{opacity:0!important;pointer-events:none!important;transition:opacity .2s}
+@media (prefers-reduced-motion:reduce){#finUI .bar,#finUI .ttl{transition:none}}
 /* emote wheel (B): 8 slots round a ring; mouse direction or a click picks one */
 #emoteWheel{position:absolute;left:50%;top:50%;width:min(330px,86vw);height:min(330px,86vw);transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(10,14,24,.2) 0 30%,rgba(10,14,24,.66) 31% 69%,transparent 70%);pointer-events:auto;z-index:8}
 #emoteWheel button{position:absolute;width:74px;height:54px;transform:translate(-50%,-50%);border-radius:12px;border:1px solid var(--line);background:rgba(0,0,0,.5);color:#fff;font-weight:800;font-size:11px;letter-spacing:.04em;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer}
@@ -453,6 +472,7 @@ body.touch .mini{height:52px}
   </div>
   <div id="speedFx" aria-hidden="true"></div>
   <div id="hitFlash" aria-hidden="true"></div>
+  <div id="finUI" hidden><i class="bar t"></i><i class="bar b"></i><div class="ttl"><span class="cg" lang="zh" id="finCg"></span><small id="finS">Finisher</small><strong id="finT"></strong></div><span class="skip" id="finSkip"></span></div>
   <div id="emoteWheel" role="menu" aria-label="Emotes" hidden><div class="mid">Emotes<br>B / tap</div></div>
   <div id="touch" hidden>
     <div id="stickZone"><div id="stickBase" aria-hidden="true"><i id="stickKnob"></i></div></div>
@@ -501,6 +521,8 @@ body.touch .mini{height:52px}
     <p class="note" id="formNote"></p>
     <label class="opt"><span>Arena</span><select id="optArena"><option value="course">Lion-dance course</option><option value="park">Park</option><option value="transcended">Transcended realm</option></select></label>
     <p class="note" id="arenaNote"></p>
+    <label class="opt"><span>Finishers</span><select id="optFin"><option value="on">On</option><option value="mine">Only mine</option><option value="off">Off</option></select></label>
+    <p class="note" id="finNote"></p>
     <label class="opt"><span>Volume</span><input type="range" id="optVol" min="0" max="100" step="5" aria-label="Volume"></label>
     <label class="opt"><span>Lion-dance drums</span><input type="range" id="optDrums" min="0" max="100" step="5" aria-label="Lion-dance drums volume"></label>
     <label class="opt"><span>Graphics</span><select id="optGfx"><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
@@ -1145,7 +1167,7 @@ for (const k of Object.keys(SFX)) {
 // silences it at once and nothing is scheduled while muted.
 // ---------------------------------------------------------------------
 const DRUMS = (() => {
-  let bus = null, mode = '', next = 0, step = 0, heat = 0, t0 = 0, gain = 0;
+  let bus = null, mode = '', next = 0, step = 0, heat = 0, t0 = 0, gain = 0, fbus = null, dest = null, finN = 0;
   function ready() {
     const c = SFX._ctx(); if (!c || !SFX._out() || !SFX._noise()) return null;
     if (!bus) { bus = c.createGain(); bus.gain.value = 0; bus.connect(SFX._out()); }
@@ -1154,7 +1176,7 @@ const DRUMS = (() => {
   function env(c, t, node, peak, a, d) {
     const g = c.createGain(); g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
-    node.connect(g); g.connect(bus);
+    node.connect(g); g.connect(dest || bus);
   }
   function osc(c, t, type, f0, f1, dur, peak, a = 0.004) {
     const o = c.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t);
@@ -1222,6 +1244,22 @@ const DRUMS = (() => {
     },
     gong() { const c = ready(); if (c && !SFX.isMuted()) { V.gong(c, c.currentTime + 0.02, true); V.cha(c, c.currentTime + 0.02, true); } },
     stop() { if (mode !== 'out') mode = ''; },
+    // finishers: one-off figures on their own bus at `level` (the duel's bus follows the ring, this one the finisher)
+    fin(kind, level) {
+      const c = ready(); if (!c || SFX.isMuted()) return false;
+      if (!fbus) { fbus = c.createGain(); fbus.connect(SFX._out()); }
+      fbus.gain.setValueAtTime(clamp(level, 0, 1) * 0.95, c.currentTime);
+      dest = fbus; const t = c.currentTime + 0.02;
+      try {
+        if (kind === 'roll') { let tt = t; for (let i = 0; i < 16; i++) { V.drum(c, tt, i % 4 === 0 || i > 12); tt += Math.max(0.045, 0.1 - i * 0.004); } V.cha(c, tt, false); }
+        else if (kind === 'cut') { V.drum(c, t, true); V.cha(c, t, false); V.rim(c, t + 0.08); V.drum(c, t + 0.16, false); }
+        else if (kind === 'hit') { V.drum(c, t, true); V.cha(c, t, true); V.gong(c, t + 0.01, true); V.drum(c, t + 0.12, true); }
+        else if (kind === 'ko') { V.drum(c, t, true); V.drum(c, t + 0.14, true); V.cha(c, t + 0.14, true); }
+        else if (kind === 'black') { V.gong(c, t + 0.05, true); V.cha(c, t + 0.3, true); V.drum(c, t + 0.3, true); }
+      } finally { dest = null; }
+      finN++; return true;
+    },
+    get finN() { return finN; },
     // heat: 0..1 how close a duelist is to the greens · level: 0..1 the Drums volume times nearness
     tick(h, level) {
       const c = SFX._ctx(); if (!c || !bus) return;
@@ -5781,10 +5819,10 @@ class Fighter {
   snap() { this.prevPos.copy(this.pos); this.prevYaw = this.yaw; }   // teleports skip interpolation
   fwd(o) { return (o || new V3()).set(Math.sin(this.yaw), 0, Math.cos(this.yaw)); }
   right(o) { return (o || new V3()).set(-Math.cos(this.yaw), 0, Math.sin(this.yaw)); }
-  get busy() { return this.stun > 0 || this.ragdoll > 0 || this.flatten > 0 || this.held || this.dead || this.frozen > 0; }
+  get busy() { return this.stun > 0 || this.ragdoll > 0 || this.flatten > 0 || this.held || this.dead || this.frozen > 0 || !!this.exe; }
   speedMul() { let m = 1; if (this.awaken > 0 && this.def.ultSpeed) m *= this.def.ultSpeed; if (this.slowT > 0) m *= 0.6; return m; }
   atkSpeed() { return this.awaken > 0 && this.def.ultAtk ? this.def.ultAtk : 1; }
-  invuln() { if (this.remote) return this.netInv || this.dead; return this.iframes > 0 || (this.action && this.action.invuln) || this.dead; }
+  invuln() { if (this.remote) return this.netInv || this.dead || (!!this.exe && this.exe.v === this); if (this.exe) return true; return this.iframes > 0 || (this.action && this.action.invuln) || this.dead; }
   play(name, dur, real, wf) { this.anim = { name, t: 0, dur, wf: wf || 0 }; }
   startAction(spec) {
     if (this.action) this.endAction(true);
@@ -5866,6 +5904,7 @@ function parried(att, by) {   // the attacker side of a parry (also used when a 
 function hit(att, tgt, dmg, o = {}) {
   if (!tgt || tgt.dead || tgt === att) return false;
   if (duelSide(att) !== duelSide(tgt)) return false;   // nobody hits across the duel wall (either way)
+  if (att && att.exe) return false;                    // a fighter in a finisher lands nothing else
   if (tgt.remote) return hitRemote(att, tgt, dmg, o);
   if (tgt.lantern) return hitLantern(att, tgt, dmg);
   if (tgt.invuln()) return false;
@@ -5903,6 +5942,7 @@ function hit(att, tgt, dmg, o = {}) {
   let amt = dmg * dScale;
   if (tgt.awaken > 0 && tgt.def.ultDmgTaken) amt *= tgt.def.ultDmgTaken;
   amt = Math.round(amt * 100) / 100;
+  const exe = tgt.hp - amt <= 0 && finWant(att, tgt, o);   // a killing blow that becomes a finisher (it K.O.s at its end)
   tgt.hp = Math.max(0, tgt.hp - amt); tgt.lastHurt = now;
   C.n++; C.last = now; C.dmg += amt;
   tgt.evasive = Math.min(EVASIVE.max, tgt.evasive + EVASIVE.perHit);
@@ -5920,6 +5960,7 @@ function hit(att, tgt, dmg, o = {}) {
   emit(o.fx || (att.def ? att.def.fx : 'dust'), hp, { n: o.heavy ? 22 : 12, spark: o.heavy || capped ? 2 : 1 });
   if (amt > 0) popText(hp, fmt(amt), o.crit ? 'crit' : o.heavy ? 'big' : '');
   if (o.heavy || capped) SFX.heavy(); else SFX.hit();
+  if (exe) { finStart(att, tgt); return 'hit'; }
   if (tgt.action && !tgt.action.armor) tgt.endAction(true);
   tgt.comboIdx = 0; tgt.blocking = false; tgt.blockstun = 0; tgt.flinch = 0.114;
   if (tgt.maceArmed > 0) tgt.maceArmed = 0.01;
@@ -6686,7 +6727,7 @@ function duelKnock(f) {
 }
 // who may duel: our own player and bots; a guest's fighter only while its owner keeps saying it stands in the ring
 function duelEligible(f) {
-  if (f.dead || f.isDummy || f.lantern) return false;
+  if (f.dead || f.isDummy || f.lantern || f.exe) return false;
   if (!f.remote) return f === player || !!f.ai;
   const r = DUEL.req.get(ownerOf(f.id));
   return !!(r && r.id === f.id && gameTime - r.t < 1.5);
@@ -7957,6 +7998,7 @@ function take(I, k) { I[k] = false; if (I.player) delete BUF[k]; }   // consume 
 function takeAbil(I, i) { I.abil[i] = false; if (I.player) delete BUF['abil' + i]; }
 function updateFighter(f, dt, I) {
   audioAt(f.pos);
+  if (f.exe) { f.vel.set(0, 0, 0); f.inMove.set(0, 0, 0); return; }   // in a finisher: frozen where it stands (timers wait too)
   if (f.hitstop > 0) { f.hitstop -= dt; f.inMove.copy(I.move); return; }   // frozen by a hit: timers, motion and the action wait
   const cdRate = f.awaken > 0 && f.def.ultCdRate ? f.def.ultCdRate : 1;
   for (let i = 0; i < 4; i++) if (f.cds[i] > 0) f.cds[i] = Math.max(0, f.cds[i] - dt * cdRate);
@@ -8129,7 +8171,7 @@ function separateAll() {
     const a = fighters[i], b = fighters[j];
     if (a.held || b.held || a.submerged || b.submerged || a.dead || b.dead) continue;
     // remote puppets and the anchored Golden Lantern never get pushed here; only the local fighter moves
-    const fa = a.remote || a.lantern, fb = b.remote || b.lantern;
+    const fa = a.remote || a.lantern || !!a.exe, fb = b.remote || b.lantern || !!b.exe;   // nor anyone frozen in a finisher
     if (fa && fb) continue;
     const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z, d = Math.hypot(dx, dz);
     if (d >= 0.95 || Math.abs(a.pos.y - b.pos.y) > 1.8) continue;
@@ -8219,6 +8261,7 @@ function lockMouse() { try { const r = canvas.requestPointerLock && canvas.reque
 const mouseLocked = () => document.pointerLockElement === canvas;
 canvas.addEventListener('mousedown', (e) => {
   if (performance.now() - TOUCH.lastT < 900) return;   // compatibility mouse event after a touch: the touch handlers own it
+  if (FIN.cine || performance.now() - FIN.eatT < 500) return;   // the click that skipped a finisher is not an attack
   SFX.init(); canvas.focus(); closeCharMenu(); closePanel();
   if (e.button === 0) { if (wantsMouseLock() && !mouseLocked()) { lockMouse(); return; } press('m1'); }   // one click = one M1 (no hold-to-repeat)
   if (e.button === 1) { e.preventDefault(); if (lock.t) { setLock(null); SFX.lockOff(); } else cycleLock(); }
@@ -8495,7 +8538,7 @@ function aiPickTarget(b, ai) {
   if (L && !L.dead && !L.invuln() && distH(b, L) < 34 && Math.random() < 0.45) { ai.target = L; return; }   // contest the Golden Lantern
   let best = null, bd = 34, human = null, hd = 34;
   for (const o of fighters) {
-    if (o === b || o.dead || o.lantern || duelSide(o) !== duelSide(b)) continue;   // never someone on the other side of the duel wall
+    if (o === b || o.dead || o.lantern || o.exe || duelSide(o) !== duelSide(b)) continue;   // never someone on the other side of the duel wall
     // someone well above (a high platform, a pole top, the Pillar) counts as further away: bots prefer who they can reach
     const d = distH(b, o) + Math.max(0, o.pos.y - b.pos.y - 2) * 4; if (d < bd) { bd = d; best = o; }
     if (!o.ai && !o.isDummy && d < hd) { hd = d; human = o; }
@@ -8514,7 +8557,7 @@ function aiIntent(b, dt) {
   if (duelSide(b) === 1) return DUEL.ph === 'go' ? duelBotIntent(b, I, P, dt) : I;   // the cabbage duel
   if (duelBotWalk(b, I)) return I;   // answering a challenge: off to the ring
   ai.retarget -= dt;
-  if (ai.retarget <= 0 || !ai.target || ai.target.dead || !fighters.includes(ai.target) || duelSide(ai.target) !== duelSide(b)) aiPickTarget(b, ai);
+  if (ai.retarget <= 0 || !ai.target || ai.target.dead || ai.target.exe || !fighters.includes(ai.target) || duelSide(ai.target) !== duelSide(b)) aiPickTarget(b, ai);
   const p = ai.target;
   if (!p) {   // nobody around: wander
     ai.wpT -= dt;
@@ -8697,7 +8740,7 @@ function serO(o) { const r = {}; for (const k in o) { const v = o[k]; if (v && v
 function deO(o) { const r = {}; for (const k in o) { const v = o[k]; r[k] = Array.isArray(v) && v.length === 3 ? new V3(v[0], v[1], v[2]) : v; } return r; }
 // hitting a fighter owned by another player: predict from what we can see; the owner has the final say ('hr' reply)
 function hitRemote(att, tgt, dmg, o) {
-  if (tgt.netInv) return false;
+  if (tgt.invuln()) return false;
   if (tgt.lantern) { netSendHit(att, tgt, dmg, o); if (att === player && dmg > 0) KOTH.mine += dmg; return 'hit'; }   // the host tallies lantern damage
   let pred = 'hit';
   const from = o.from || att.pos;
@@ -8705,6 +8748,7 @@ function hitRemote(att, tgt, dmg, o) {
     tA.set(from.x - tgt.pos.x, 0, from.z - tgt.pos.z); if (tA.lengthSq() < 1e-4) tA.set(0, 0, 1); tA.normalize();
     if (Math.sin(tgt.yaw) * tA.x + Math.cos(tgt.yaw) * tA.z > 0.05) pred = 'blocked';
   }
+  if (finAsk(att, tgt, dmg)) o = Object.assign({}, o, { fin: 1 });   // this should K.O. them: ask their owner for a finisher
   const seq = ++hitSeq;
   if (att && !att.remote) { pendingHits.set(seq, { m1: !!o.m1, bite: !!o.bite, t: gameTime }); if (pendingHits.size > 64) pendingHits.delete(pendingHits.keys().next().value); }
   netSendHit(att, tgt, dmg, o, seq, o.reach !== undefined ? o.reach : Math.hypot(from.x - tgt.pos.x, from.z - tgt.pos.z));
@@ -8909,7 +8953,11 @@ function onData(m, from) {
   // a host relays a guest's snapshot only for that guest's own fighters (nobody can speak for someone else's)
   if (NET.mode === 'host' && m.t === 'st' && Array.isArray(m.e)) m.e = m.e.filter((e) => e && typeof e.i === 'string' && ownerOf(e.i) === from);
   // the room's own business (arena, duel state, duel asks, hits) is never relayed as it came
-  if (NET.mode === 'host' && m.t !== 'hit' && m.t !== 'hr' && m.t !== 'ar' && m.t !== 'du' && m.t !== 'dq') broadcast(m, from);
+  if (NET.mode === 'host' && m.t !== 'hit' && m.t !== 'hr' && m.t !== 'ar' && m.t !== 'du' && m.t !== 'dq' && m.t !== 'fn') broadcast(m, from);
+  if (m.t === 'fn') {   // a finisher: relayed by the host only from the victim's owner, and only these two fields
+    if (NET.mode === 'host' && typeof m.a === 'string' && typeof m.v === 'string' && m.a.length <= 80 && m.v.length <= 80 && ownerOf(m.v) === from) broadcast({ t: 'fn', a: m.a, v: m.v }, from);
+    finFromNet(m, from); return;
+  }
   if (m.t === 'ar') { arenaFromHost(m, from); return; }
   if (m.t === 'du') { duelFromHost(m, from); return; }
   if (m.t === 'dq') { duelAsk(m, from); return; }
@@ -9297,6 +9345,7 @@ function koSeen(killer, victim) {
   const v = fighters.find((x) => x.remote && x.name === victim && !x.isDummy && !x.lantern);
   if (killer === player.name) {
     if (!v) return;
+    const fc = FIN.credited.get(v.id); if (fc !== undefined && realClock - fc < 6) return;   // our finisher already counted it
     const h = kHit.get(v.id); if (h === undefined || realClock - h > 2.5) return;
     const id = v.id; setTimeout(() => creditKill(fighters.find((x) => x.id === id) || { id }), 1200);   // the 'ko' reply normally lands first
     return;
@@ -9521,12 +9570,754 @@ $('#fpvBtn').addEventListener('click', (e) => { toggleFpv(); e.currentTarget.blu
 function toggleHelp(on) { const h = $('#help'); h.classList.toggle('closed', on === undefined ? !h.classList.contains('closed') : !on); }
 function switchCharacter(key) {
   closeCharMenu();
+  if (player && player.exe) return;   // no switching out of a finisher (it would dodge the K.O.)
   const old = player;
   const nf = new Fighter(key, { id: old.id, name: old.name, localKey: 'P', noTag: true });
   nf.pos.copy(spawnPoint()); nf.yaw = camYaw; nf.snap(); nf.faceMode = shiftLock || fpv ? 'camera' : 'move'; nf.iframes = 0.86;
   fighters[fighters.indexOf(old)] = nf; old.dispose(); player = nf; setFpvView(nf, fpv);
   setupHUD(); emit('wind', center(nf), { n: 20 }); ring(nf.pos, nf.def.color, 3); blackEnter(nf);
   canvas.focus();
+}
+
+// =====================================================================
+// finishers: an execution cutscene on a real killing blow
+// =====================================================================
+// A hit that would take a fighter's HP to 0 (hit() only: never a bleed tick, a wall splat or the chip of a blocked
+// move) becomes a finisher when finWant() allows it. The attacker and the victim freeze, invulnerable to everyone
+// (f.exe holds the record), while the rest of the arena keeps playing; the attacker performs its character's final
+// move and the K.O. lands at its end through KO() as always, so the kill is counted once, the usual way. The local
+// player, when attacker or victim, watches it as a cinematic: letterbox bars, a slow pan up the victim from the
+// kung-fu shoes to the lion mask, a cut to the attacker's final move in slow motion, drums and a gong (skippable
+// after FIN.skipAfter s with any key, a tap or a pad button). Everyone else sees the move happen in the world.
+// Rules (nothing here can dodge damage: the victim is already at 0 HP and its K.O. is certain):
+//  - never in a cabbage duel: a duelist's K.O. ends the duel at once under the duel's own rule (the host's verdict
+//    must not wait 3 s on a cutscene, and the duel stays a readable kick-and-climb contest)
+//  - never on or by a fighter already in a finisher; an attacker gets at most one per FIN.cd seconds
+//  - the attacker must be within FIN.range across and FIN.dy up or down of the victim; otherwise a normal K.O.
+//  - Settings > Finishers: On (every attacker this client runs, bots included; the cinematic as attacker or
+//    victim), Only mine (only the player's own kills; the cinematic only as the attacker), Off (none of ours and no
+//    cinematic). A peer's finisher on our fighter still plays (it is the attacker's call), without the camera.
+// Online: the attacker's client asks with o.fin = 1 on the killing hit; the victim's owner checks it (a real
+// fighter with a playable character, close to where the victim really was, not on cooldown, not in a duel, and
+// the hit lethal by its own numbers) and plays it, telling the room { t: 'fn', a, v }. The attacker's client
+// starts its side only if it asked for that victim within FIN.ask s; the host relays the message only from the
+// victim's owner. Older clients ignore o.fin and the message: a normal K.O.
+const FIN = { range: 6.5, dy: 2.4, cd: 6, stand: 2.3, ask: 1.5, skipAfter: 1, list: [], req: new Map(), by: new Map(), credited: new Map(), heads: [], cine: null, eatT: -1e9, fpv: false };
+const FIN_MODES = ['on', 'mine', 'off'];
+if (!FIN_MODES.includes(SETTINGS.fin)) SETTINGS.fin = 'on';
+// pan: the climb up the victim ends · hit: the impact (slow motion from here) · slow: full speed again ·
+// ko: the K.O. · end: the camera comes back. Reduced motion: shorter, no shake, no screen flash.
+function finTimes(black) {
+  if (reduceMotion) return { pan: 0.6, hit: 1.0, slow: 1.2, ko: 1.3, end: 2.0, rate: 0.5 };
+  return black ? { pan: 1.2, hit: 1.9, slow: 2.55, ko: 2.65, end: 3.45, rate: 0.22 } : { pan: 1.1, hit: 1.75, slow: 2.2, ko: 2.3, end: 3.0, rate: 0.3 };
+}
+// the move's own clock (authored at full speed, the impact at T.hit - T.pan) from the finisher's time t
+function finMoveT(T, t) {
+  const s = t - T.pan, h = T.hit - T.pan;
+  if (s <= h) return s;
+  if (t <= T.slow) return h + (t - T.hit) * T.rate;
+  return h + (T.slow - T.hit) * T.rate + (t - T.slow);
+}
+// ---- who may finish whom ----
+function finOk(att, tgt, slack = 0) {
+  if (!att || !tgt || att === tgt || !att.def || !tgt.def || !att.root || !tgt.root) return false;
+  if (!PLAYABLE.includes(att.key) || tgt.lantern || !fighters.includes(att) || !fighters.includes(tgt)) return false;
+  if (att.dead || tgt.dead || att.exe || tgt.exe) return false;
+  if (duelSide(att) || duelSide(tgt)) return false;   // the cabbage duel keeps its own K.O. rule
+  if (distH(att, tgt) > FIN.range + slack || Math.abs(att.pos.y - tgt.pos.y) > FIN.dy + slack) return false;
+  const last = FIN.by.get(att.id);
+  return last === undefined || realClock - last >= FIN.cd;
+}
+function finMine(att) { const m = SETTINGS.fin; return m === 'on' ? !!att && !att.remote : m === 'mine' ? att === player : false; }
+function finCineOk(R) { const m = SETTINGS.fin; return m === 'on' ? R.a === player || R.v === player : m === 'mine' ? R.a === player : false; }
+// called by hit() on our own fighter when this hit takes it to 0 HP
+function finWant(att, tgt, o) {
+  if (!att || !tgt || tgt.remote) return false;
+  if (!att.remote) return finMine(att) && finOk(att, tgt);
+  if (!o || !own(o, 'fin') || o.fin !== 1) return false;   // a peer's attacker: only when its client asked
+  return finOk(att, tgt, NETI.slack) && nearestRecent(tgt, att.pos.x, att.pos.z) <= FIN.range + NETI.slack;
+}
+// called by hitRemote(): ask the victim's owner for a finisher when this hit should take it to 0 HP
+function finAsk(att, tgt, dmg) {
+  if (!att || att.remote || !finMine(att) || !(typeof tgt.hp === 'number' && tgt.hp - dmg <= 0.05) || !finOk(att, tgt)) return false;
+  FIN.req.set(tgt.id, { a: att.id, t: realClock });
+  if (FIN.req.size > 32) FIN.req.delete(FIN.req.keys().next().value);
+  return true;
+}
+// ---- the record: both clients' sides, and what every viewer draws ----
+function finState(f) {
+  const P = {}, S = {};
+  for (const k in f.pose) { P[k] = [0, 0, 0]; S[k] = f.pose[k].slice(); }
+  return { P, S, V: { rx: f.V.rx, ry: f.V.ry, rz: f.V.rz, y: f.V.y, sy: f.V.sy, sxz: f.V.sxz }, W: { rx: 0, ry: 0, rz: 0, y: 1, sy: 1, sxz: 1, snap: false }, O: { fw: 0, up: 0, sd: 0 }, yaw: f.root.rotation.y, mouth: -1 };
+}
+function finBegin(a, v) {
+  const black = !!(a.tro && a.tro.black), T = finTimes(black);
+  const R = { a, v, ch: a.key, mv: FINMOVES[a.key], black, T, mH: T.hit - T.pan, t: 0, tr: 0, m: 0, koDone: false, skip: false, ev: {}, props: null, mats: [], objs: [],
+    dir: new V3(v.pos.x - a.pos.x, 0, v.pos.z - a.pos.z), ap: a.pos.clone(), vp: v.pos.clone(), dist: distH(a, v), cam: null, sa: null, sv: null };
+  if (R.dir.lengthSq() < 1e-4) a.fwd(R.dir); R.dir.normalize();
+  a.exe = v.exe = R;
+  FIN.by.set(a.id, realClock); if (FIN.by.size > 64) FIN.by.delete(FIN.by.keys().next().value);
+  if (!v.remote) finHold(v, R, true);
+  if (!a.remote) finHold(a, R, false);
+  R.sa = finState(a); R.sv = finState(v);
+  FIN.list.push(R);
+  if (player && (a === player || v === player) && finCineOk(R)) finCineOn(R);
+  finSound(R, 'roll');
+  return R;
+}
+// the owner's side: freeze its fighter where it stands (on the ground), facing the other; the attacker steps in
+// to striking distance when the way is clear
+function finHold(f, R, victim) {
+  if (f.action) f.endAction(true);
+  dropCarry(f);
+  Object.assign(f, { held: false, heldPose: null, anim: null, emote: null, chase: null, blocking: false, stun: 0, ragdoll: 0, flatten: 0, tumble: 0, flinch: 0, hitstop: 0, floatT: 0, frozen: 0, blockstun: 0 });
+  f.vel.set(0, 0, 0);
+  f.pos.y = groundAt(f.pos.x, f.pos.z, f.pos.y + 0.1); f.onGround = true;
+  const d = R.dir;
+  if (victim) { f.hp = 0; f.bleed = null; f.yaw = Math.atan2(-d.x, -d.z); }
+  else {
+    const o = R.v, dd = distH(f, o), want = dd > FIN.stand + 0.3 ? FIN.stand : dd < 1.4 ? 1.6 : dd;
+    if (want !== dd) {
+      const x = o.pos.x - d.x * want, z = o.pos.z - d.z * want;
+      let clear = true;
+      for (let i = 1; i <= 6 && clear; i++) { const k = i / 6; clear = finClear(lerp(f.pos.x, x, k), lerp(f.pos.z, z, k), f.pos.y); }
+      if (clear) { f.pos.x = x; f.pos.z = z; f.pos.y = groundAt(x, z, f.pos.y + 0.6); }
+    }
+    f.yaw = Math.atan2(d.x, d.z);
+  }
+  f.snap();
+}
+function finClear(x, z, y) {
+  for (const b of blocks) {
+    if (b.alive === false || !b.min) continue;
+    if (x > b.min.x - 0.4 && x < b.max.x + 0.4 && z > b.min.z - 0.4 && z < b.max.z + 0.4 && y + 0.3 < b.max.y && y + 1.8 > b.min.y) return false;
+  }
+  return true;
+}
+// the victim's owner (or the only client, offline) starts it and tells the room
+function finStart(a, v) {
+  const R = finBegin(a, v);
+  if (online()) broadcast({ t: 'fn', a: a.id, v: v.id });
+  return R;
+}
+// { t: 'fn', a, v } from the victim's owner (a guest hears it through the host only; the host only from the owner)
+function finFromNet(m, from) {
+  if (!m || typeof m.a !== 'string' || typeof m.v !== 'string' || m.a.length > 80 || m.v.length > 80) return;
+  if (NET.mode === 'host' ? ownerOf(m.v) !== from : !(NET.mode === 'client' && NET.host && from === NET.host.peer)) return;
+  const v = fighters.find((x) => x.id === m.v), a = fighters.find((x) => x.id === m.a);
+  if (!v || !a || !v.remote || ownerOf(m.v) === NET.me) return;
+  if (!a.remote) {   // our own fighter: only when we asked for this very victim a moment ago
+    const q = FIN.req.get(v.id);
+    if (!q || q.a !== a.id || realClock - q.t > FIN.ask) return;
+    FIN.req.delete(v.id);
+  }
+  if (!finOk(a, v, 4)) return;
+  finBegin(a, v);
+}
+// every simulation step: time, the K.O., the end
+function finStep(dt) {
+  for (let i = FIN.list.length - 1; i >= 0; i--) {
+    const R = FIN.list[i], aIn = fighters.includes(R.a), vIn = fighters.includes(R.v);
+    if (!aIn || !vIn) { if (vIn && !R.koDone) finKO(R, false); finEnd(R); continue; }
+    R.t += dt;
+    if (R.skip && R.t < R.T.ko) R.t = R.T.ko;
+    if (R.a.remote && R.v.remote && R.t > 0.6 && !R.a.netInv && !R.koDone) { finEnd(R); continue; }   // its owner never froze it: nothing to show
+    if (!R.koDone && (R.t >= R.T.ko || (R.v.remote && R.v.dead))) finKO(R, true);
+    if (R.t >= R.T.end || (R.skip && R.koDone)) finEnd(R);
+  }
+  for (const [k, q] of FIN.req) if (realClock - q.t > FIN.ask) FIN.req.delete(k);
+}
+function finKO(R, withAtt) {
+  if (R.koDone) return;
+  R.koDone = true; R.koM = R.m;
+  const a = R.a, v = R.v, d = R.dir, L = R.mv.launch;
+  if (v.exe === R) v.exe = null;
+  if (!v.remote) {
+    if (!v.dead) {
+      v.vel.set(d.x * L[0], L[1], d.z * L[0]); v.onGround = false; v.pos.y += 0.05;
+      KO(v, withAtt ? a : null);   // the usual K.O.: the feed, the kill (once), the respawn timer
+    }
+  } else if (withAtt && a === player && !v.isDummy && !v.lantern) {   // a peer's fighter: its owner confirmed it ('fn'), so the K.O. is ours
+    if (creditKill(v)) FIN.credited.set(v.id, realClock);
+  }
+}
+function finEnd(R) {
+  const i = FIN.list.indexOf(R); if (i >= 0) FIN.list.splice(i, 1);
+  if (R.a.exe === R) R.a.exe = null;
+  if (R.v.exe === R) R.v.exe = null;
+  if (R.a.rig && R.a.rig.mouth && R.sa) R.sa.mouth = -1;
+  for (const o of R.objs) if (o.parent) o.parent.remove(o);
+  for (const m of R.mats) m.dispose();
+  R.objs.length = 0; R.mats.length = 0; R.props = null;
+  if (FIN.cine === R) finCineOff();
+}
+function finSkip() {
+  const R = FIN.cine;
+  if (!R || R.tr < FIN.skipAfter || R.skip) return false;
+  R.skip = true; FIN.eatT = performance.now(); finCineOff();
+  return true;
+}
+// ---- the cinematic camera's frame (letterbox, title, skip hint; the rest of the HUD steps aside) ----
+const FINUI = { el: $('#finUI'), t: $('#finT'), s: $('#finS'), cg: $('#finCg'), skip: $('#finSkip') };
+function finCineOn(R) {
+  if (FIN.cine && FIN.cine !== R) finCineOff();
+  FIN.cine = R;
+  const mv = R.mv;
+  FINUI.t.textContent = mv.name; FINUI.cg.textContent = mv.han; FINUI.s.textContent = R.black ? 'Black form finisher' : R.a === player ? 'Finisher' : 'Finished by ' + (R.a.name || 'someone');
+  FINUI.skip.textContent = TOUCH.on ? 'Tap to skip' : 'Press any key to skip';
+  const el = FINUI.el; el.hidden = false; el.classList.remove('on', 'cut', 'canskip'); el.classList.toggle('black', R.black); void el.offsetWidth; el.classList.add('on');
+  document.body.classList.add('fin-cine');
+  if (fpv) { FIN.fpv = true; setFpvView(player, false); }
+  for (const k in BUF) delete BUF[k];
+  if (EW.open) closeEmotes();
+  R.cam = { side: finSide(R), shake: 0, fov: null, cut: false };
+}
+function finCineOff() {
+  const R = FIN.cine; FIN.cine = null;
+  document.body.classList.remove('fin-cine');
+  const el = FINUI.el; el.classList.remove('on', 'cut', 'canskip');
+  setTimeout(() => { if (!FIN.cine) el.hidden = true; }, 380);
+  if (FIN.fpv) { FIN.fpv = false; if (player) setFpvView(player, fpv); }
+  for (const k in BUF) delete BUF[k];
+  if (R && player) camT.set(player.root.position.x, player.root.position.y + 1.7, player.root.position.z);
+}
+function finHud() {
+  const R = FIN.cine; if (!R) return;
+  hudCls(FINUI.el, 'cut', R.tr >= R.T.pan);
+  hudCls(FINUI.el, 'canskip', R.tr >= FIN.skipAfter && !R.skip);
+}
+// the first static thing a segment crosses (0..1 along it; 1 when clear)
+function finSeg(ax, ay, az, bx, by, bz) {
+  const dx = bx - ax, dy = by - ay, dz = bz - az; let t = 1;
+  for (const b of blocks) {
+    if (b.alive === false || !b.min || !(b.static || b.cam)) continue;
+    let t0 = 0, t1 = t;
+    for (let k = 0; k < 3 && t0 <= t1; k++) {
+      const o = k === 0 ? ax : k === 1 ? ay : az, d = k === 0 ? dx : k === 1 ? dy : dz;
+      const lo = (k === 0 ? b.min.x : k === 1 ? b.min.y : b.min.z) - 0.2, hi = (k === 0 ? b.max.x : k === 1 ? b.max.y : b.max.z) + 0.2;
+      if (Math.abs(d) < 1e-6) { if (o < lo || o > hi) t1 = -1; continue; }
+      let u = (lo - o) / d, w = (hi - o) / d; if (u > w) { const q = u; u = w; w = q; }
+      if (u > t0) t0 = u; if (w < t1) t1 = w;
+    }
+    if (t0 <= t1 && t0 > 0.01) t = Math.min(t, t0);
+  }
+  return t;
+}
+// the side of the fight the cut camera films from: the clearer one, else the one nearer the camera already
+function finSide(R) {
+  const mx = (R.ap.x + R.vp.x) / 2, mz = (R.ap.z + R.vp.z) / 2, my = Math.max(R.ap.y, R.vp.y) + 1.4, sx = -R.dir.z, sz = R.dir.x;
+  const score = (s) => finSeg(mx, my, mz, mx + sx * s * 6.4 - R.dir.x * 0.9, my + 0.3, mz + sz * s * 6.4 - R.dir.z * 0.9);
+  const l = score(1), r = score(-1);
+  if (Math.abs(l - r) > 0.05) return l > r ? 1 : -1;
+  return (camera.position.x - mx) * sx + (camera.position.z - mz) * sz >= 0 ? 1 : -1;
+}
+function finCamera(fdt) {
+  const R = FIN.cine; if (!R || !R.cam) return false;
+  const T = R.T, t = R.tr, C = R.cam, d = R.dir, vp = R.vp, ap = R.ap, sx = -d.z, sz = d.x;
+  let fov;
+  if (t < T.pan) {
+    // the pan: in front of the victim and off to one side, from the shoes up to the mask, then a beat on the mask
+    const u = t / T.pan, e = ease(u / 0.8), ang = lerp(0.95, 0.78, e) * C.side, fx = -d.x, fz = -d.z, ca = Math.cos(ang), sa = Math.sin(ang);
+    const dx = fx * ca - fz * sa, dz = fx * sa + fz * ca, dist = lerp(2.0, 3.2, e) - Math.max(0, u - 0.8) * 1.4;
+    let cx = vp.x + dx * dist, cy = vp.y + lerp(0.3, 2.2, e), cz = vp.z + dz * dist;
+    const k = finSeg(vp.x, cy, vp.z, cx, cy, cz); if (k < 1) { cx = vp.x + (cx - vp.x) * Math.max(0.3, k - 0.05); cz = vp.z + (cz - vp.z) * Math.max(0.3, k - 0.05); }
+    camera.position.set(cx, cy, cz);
+    tB.set(vp.x, vp.y + lerp(0.28, 2.38, e), vp.z);
+    fov = lerp(46, 36, e);
+  } else {
+    // the cut: side on to the pair, pushing in through the slow motion, then following the victim's flight
+    const mx = (ap.x + vp.x) / 2, mz = (ap.z + vp.z) / 2, up = R.sa ? R.sa.O.up : 0;
+    let D;
+    if (t < T.hit) D = lerp(6.6, 5.7, ease((t - T.pan) / (T.hit - T.pan)));
+    else if (t < T.slow) D = lerp(5.7, 4.7, ease((t - T.hit) / (T.slow - T.hit)));
+    else D = lerp(4.7, 7.4, ease((t - T.slow) / Math.max(0.1, T.end - T.slow)));
+    let lx = mx, ly = Math.max(ap.y, vp.y) + 1.3 + up * 0.45, lz = mz;
+    if (R.koDone) {   // after the K.O.: keep the flying victim in the shot
+      const f = ease((t - T.ko) / 0.45), V = R.v.root.position;
+      lx = lerp(lx, (mx + V.x) / 2, f); ly = lerp(ly, Math.max(ly, V.y + 1.1), f); lz = lerp(lz, (mz + V.z) / 2, f);
+    }
+    let cx = lx + sx * C.side * D - d.x * 0.9, cy = ly + 0.35 + up * 0.25, cz = lz + sz * C.side * D - d.z * 0.9;
+    const k = finSeg(lx, ly, lz, cx, cy, cz); if (k < 1) { const q = Math.max(0.35, k - 0.04); cx = lx + (cx - lx) * q; cy = ly + (cy - ly) * q; cz = lz + (cz - lz) * q; }
+    camera.position.set(cx, Math.max(0.4, cy), cz);
+    tB.set(lx, ly, lz);
+    fov = t < T.hit ? 50 : t < T.slow ? 41 : 54;
+  }
+  if (C.shake > 0.001) {
+    if (!reduceMotion) camera.position.add(tA.set(rand(-1, 1), rand(-1, 1), rand(-1, 1)).multiplyScalar(C.shake * 0.5));
+    C.shake = Math.max(0, C.shake - fdt * 1.8);
+  }
+  camera.lookAt(tB);
+  const cut = t >= T.pan;
+  C.fov = C.fov === null || cut !== C.cut ? fov : damp(C.fov, fov, 9, fdt); C.cut = cut;   // a cut snaps; within a shot it eases
+  if (Math.abs(C.fov - camera.fov) > 0.01) { camera.fov = C.fov; camera.updateProjectionMatrix(); }
+  shakeAmt = 0; fovKick = 0;
+  return true;
+}
+// ---- sound: the lion-dance band's voices on their own bus (Drums volume; fades with distance unless watched) ----
+function finSound(R, kind) {
+  const lv = (SETTINGS.drums ?? 0.8) * (FIN.cine === R ? 1 : clamp(1 - Math.hypot(camera.position.x - R.vp.x, camera.position.z - R.vp.z) / 45, 0, 1));
+  if (lv > 0.02) DRUMS.fin(kind, lv);
+}
+function finSfx(R, ...names) { audioAt(R.vp); for (const n of names) if (SFX[n]) SFX[n](); audioAt(null); }
+// ---- poses (render-side, every drawn frame, on every client: puppets included) ----
+function finRest(f, s) {
+  const rest = f.def.rest || {};
+  for (const k in s.P) { const r = rest[k], p = s.P[k]; p[0] = r ? r[0] : 0; p[1] = r ? r[1] : 0; p[2] = r ? r[2] : 0; }
+  const W = s.W; W.rx = W.ry = W.rz = 0; W.y = 1; W.sy = W.sxz = 1; W.snap = false;
+  s.O.fw = s.O.up = s.O.sd = 0; s.mouth = -1;
+  return s;
+}
+const _fr = new V3();
+function finApply(f, s, yaw, fx, fz, fdt) {
+  const k = 1 - Math.exp(-26 * fdt);
+  for (const key in s.P) {
+    const c = s.S[key], g = s.P[key];
+    c[0] += (g[0] - c[0]) * k; c[1] += (g[1] - c[1]) * k; c[2] += (g[2] - c[2]) * k;
+    const pp = f.pose[key]; if (pp) { pp[0] = c[0]; pp[1] = c[1]; pp[2] = c[2]; }
+    if (f.rig[key]) f.rig[key].rotation.set(c[0], c[1], c[2]);
+  }
+  const W = s.W, V = s.V, sm = W.snap ? 1 : k;
+  V.rx += angDiff(V.rx, W.rx) * sm; V.ry += angDiff(V.ry, W.ry) * sm; V.rz += angDiff(V.rz, W.rz) * sm;
+  V.y = lerp(V.y, W.y, W.snap ? 1 : k); V.sy = lerp(V.sy, W.sy, W.snap ? 1 : k); V.sxz = lerp(V.sxz, W.sxz, W.snap ? 1 : k);
+  if (!f.remote) Object.assign(f.V, V);
+  s.yaw = dampAngle(s.yaw, yaw, 18, fdt);
+  const Rt = f.root, O = s.O;
+  Rt.rotation.y = s.yaw;
+  Rt.position.x += fx * O.fw - fz * O.sd; Rt.position.y += O.up; Rt.position.z += fz * O.fw + fx * O.sd;
+  f.visual.rotation.set(V.rx, V.ry, V.rz); f.visual.position.set(0, V.y, 0); f.visual.scale.set(V.sxz, V.sy, V.sxz);
+  f.stars.visible = false; f.shield.visible = false;
+  if (s.mouth >= 0 && f.rig.mouth) f.rig.mouth.rotation.x = s.mouth;
+}
+// the attacker while the camera climbs the victim: settling into a stance
+function finReady(S, u) {
+  const P = S.P, e = ease(u * 1.6);
+  P.legL[0] -= 0.35 * e; P.legR[0] += 0.25 * e; P.legL[2] += 0.12 * e; P.legR[2] -= 0.12 * e;
+  S.W.y -= 0.12 * e; P.torso[0] += 0.12 * e;
+  P.armL[0] -= 0.9 * e; P.armR[0] -= 0.5 * e; P.armL[2] += 0.25 * e; P.armR[2] -= 0.35 * e;
+}
+// the victim until the blow: dazed, swaying, arms hanging
+function finDazed(S, t) {
+  const P = S.P, W = S.W, s = Math.sin(t * 3.1);
+  P.torso[0] -= 0.14; P.head[0] -= 0.12; P.armL[2] += 0.42 + s * 0.06; P.armR[2] -= 0.42 - s * 0.06; P.armL[0] += 0.15; P.armR[0] += 0.1;
+  P.legL[0] += 0.1; P.legR[0] -= 0.06; W.rz += s * 0.05; W.rx -= 0.04; W.y -= 0.03;
+}
+// the victim after the blow, until the K.O. takes over: thrown back, arms flung out
+function finRecoil(S, q, amt) {
+  const e = ease(q / 0.14), P = S.P;
+  S.W.rx -= 0.55 * e * amt; S.O.fw -= 0.5 * e * amt;
+  P.armL[2] += 0.7 * e; P.armR[2] -= 0.7 * e; P.armL[0] -= 0.6 * e; P.armR[0] -= 0.6 * e; P.head[0] -= 0.4 * e; P.legL[0] -= 0.4 * e;
+}
+function finFrame(fdt) {
+  for (const R of FIN.list) {
+    if (!fighters.includes(R.a) || !fighters.includes(R.v)) continue;
+    try { finPose(R, fdt); } catch (err) { R.skip = true; throw err; }
+  }
+  finHeads(fdt);
+  finHud();
+}
+function finPose(R, fdt) {
+  const a = R.a, v = R.v, T = R.T, t = Math.min(R.t + acc, T.end), m = finMoveT(T, t), mv = R.mv;
+  R.tr = t; R.m = m;
+  R.ap.copy(a.root.position); R.vp.copy(v.root.position);   // where they are drawn this frame, before the move's offsets
+  _fr.set(R.vp.x - R.ap.x, 0, R.vp.z - R.ap.z); const dd = _fr.length();
+  if (dd > 0.25) R.dir.copy(_fr).divideScalar(dd);
+  R.dist = dd;
+  const d = R.dir, yA = Math.atan2(d.x, d.z);
+  const SA = finRest(a, R.sa);
+  if (t < T.pan) finReady(SA, t / T.pan); else mv.att(SA, m, R);
+  finApply(a, SA, yA, d.x, d.z, fdt);
+  if (!R.koDone && !v.dead) {
+    const SV = finRest(v, R.sv);
+    finDazed(SV, t);
+    if (t >= T.pan) mv.vic(SV, m, R);
+    finApply(v, SV, yA + PI, -d.x, -d.z, fdt);
+    if (m < R.mH && v.rig.lids) for (const l of v.rig.lids) l.rotation.x = LDH.lid.open;   // wide-eyed under the camera
+    if (m < R.mH && v.rig.mouth) v.rig.mouth.rotation.x = Math.max(v.rig.mouth.rotation.x, 0.55);
+  }
+  finEvents(R, t, m, fdt);
+  if (mv.fx) mv.fx(R, t, m, fdt);
+}
+const finOnce = (R, k) => (R.ev[k] ? false : (R.ev[k] = true));
+const FINCOL = { lion: '#ffd34a', penguin: '#bdeeff', steve: '#c8a2ff', shark: '#7fd0ff' };
+function finEvents(R, t, m, fdt) {
+  const T = R.T, F = GFX.fx, cine = FIN.cine === R, me = R.a === player || R.v === player;
+  if (t >= T.pan && finOnce(R, 'cut')) finSound(R, 'cut');
+  if (R.black) {   // the Black form: embers pour off the attacker the whole time
+    if (Math.random() < fdt * 26 * F) emit('ember', randBodyPoint(R.a), { n: 1, speed: 1.2, up: 3 });
+    if (t >= T.pan && m < R.mH && Math.random() < fdt * 14 * F) emit('fire', randBodyPoint(R.a), { n: 1, speed: 1, up: 2, size: 0.12 });
+  }
+  if (m >= R.mH && finOnce(R, 'hit')) {
+    const hp = tA.set(R.vp.x, R.vp.y + 2.1, R.vp.z);
+    finSound(R, 'hit');
+    impactFlash(hp, R.black ? '#ffcf3a' : FINCOL[R.ch] || '#ffffff', true);
+    spawnSparks(hp, R.black ? '#ffd27a' : '#ffffff', 6 + 5 * F);
+    if (cine) { R.cam.shake = reduceMotion ? 0 : R.black ? 0.75 : 0.55; speedLines(0.85, 0.55); }
+    if (me) rumble(0.7, 1, 320);
+    if (R.black) {
+      finSound(R, 'black');
+      ringFx(_tb.set(R.vp.x, R.vp.y, R.vp.z), '#ffcf3a', 7, 0.7); ringFx(_tb, '#1a1210', 4.5, 0.55);
+      flashSphere(hp, '#ffd27a', 2.4, 0.45);
+      emit('fire', hp, { n: 8 + 8 * F, speed: 9, up: 4 }); emit('ember', hp, { n: 10 + 10 * F, speed: 7, up: 6, life: 1.1 });
+      if (cine) screenFlash('#ffcf3a', 0.95);
+    } else if (cine) screenFlash('#fff6dc', 0.55);
+  }
+  if (R.koDone && finOnce(R, 'ko')) {
+    finSound(R, 'ko');
+    if (R.black) { ringFx(_tb.set(R.vp.x, R.vp.y, R.vp.z), '#ffcf3a', 10, 0.9); emit('stars', tA.set(R.vp.x, R.vp.y + 1.4, R.vp.z), { n: 6 + 6 * F, speed: 8, up: 5 }); }
+  }
+}
+// ---- props: per-finisher meshes (shared geometry, own materials so each can fade), all freed at the end ----
+const FINGEO = {};
+function finGeo(k, make) { return FINGEO[k] || (FINGEO[k] = shared(make())); }
+function finMat(R, color, emissive, o = {}) {
+  const m = GFX.level === 'low' ? new THREE.MeshLambertMaterial(Object.assign({ color, emissive }, o)) : new THREE.MeshStandardMaterial(Object.assign({ color, emissive, roughness: 0.3, metalness: 0.1 }, o));
+  R.mats.push(m); return m;
+}
+function finObj(R, o, parent) { (parent || scene).add(o); R.objs.push(o); o.traverse((c) => { if (c.isMesh) c.castShadow = GFX.level === 'high'; }); return o; }
+function finFade(R, k) { for (const m of R.mats) { if (m.userData.op0 === undefined) { m.userData.op0 = m.opacity; m.transparent = true; } m.opacity = m.userData.op0 * k; } }
+// ---- the lion's head off its shoulders (lion finisher): it flies on the move's clock, lands, and goes back on
+// when the dancer gets up again ----
+const _hc = new V3(), _hl = new V3(), HOOD_C = new V3(0, LDH.c[1] * LDH.k, LDH.c[2] * LDH.k);
+function finHeadLaunch(R) {
+  const v = R.v, hood = v.rig.hood; if (!hood) return;
+  v.root.updateMatrixWorld(true);
+  const p = hood.localToWorld(_hc.copy(HOOD_C));
+  for (let i = FIN.heads.length - 1; i >= 0; i--) if (FIN.heads[i].f === v) FIN.heads.splice(i, 1);
+  FIN.heads.push({ f: v, R, p: p.clone(), vel: new V3(R.dir.x * 3, 5.5, R.dir.z * 3), r: new V3(0, 0, 0), w: new V3(-15, 9, 4), lastM: R.m, life: 0, rest: false });
+}
+function finHeadOff(H) { const h = H.f.rig && H.f.rig.hood; if (h) { h.position.set(0, 0, 0); h.rotation.set(0, 0, 0); } }
+function finHeads(fdt) {
+  for (let i = FIN.heads.length - 1; i >= 0; i--) {
+    const H = FIN.heads[i], f = H.f;
+    H.life += fdt;
+    if (!fighters.includes(f) || (H.life > 0.6 && !f.dead && !f.exe) || H.life > 7) { finHeadOff(H); FIN.heads.splice(i, 1); continue; }
+    const live = FIN.list.includes(H.R), dt = live ? clamp(H.R.m - H.lastM, 0, 0.1) : Math.min(fdt, 0.05);
+    if (live) H.lastM = H.R.m;
+    if (!H.rest) {
+      H.vel.y -= 20 * dt; H.p.addScaledVector(H.vel, dt);
+      const g = groundAt(H.p.x, H.p.z, H.p.y + 0.4) + 0.5;
+      if (H.p.y < g) {
+        H.p.y = g; H.vel.multiplyScalar(0.45); H.vel.y = Math.abs(H.vel.y) > 1.2 ? Math.abs(H.vel.y) * 0.6 : 0; H.w.multiplyScalar(0.5);
+        if (H.vel.lengthSq() < 0.3) { H.rest = true; H.r.x = Math.round(H.r.x / PI) * PI; H.r.z = Math.round(H.r.z / PI) * PI; }
+        emit('dust', tA.set(H.p.x, g - 0.45, H.p.z), { n: 4 });
+      }
+      H.r.addScaledVector(H.w, dt);
+    }
+    const hood = f.rig.hood, hd = f.rig.head; if (!hood || !hd) continue;
+    f.root.updateMatrixWorld(true);
+    hood.rotation.set(H.r.x, H.r.y, H.r.z);
+    hd.worldToLocal(_hl.copy(H.p));
+    hood.position.copy(_hl).sub(_hc.copy(HOOD_C).applyEuler(hood.rotation));
+  }
+}
+// ---- the four final moves: att() poses the attacker on the move clock m (the impact at R.mH), vic() the victim,
+// fx() runs the props and effects; launch = [knockback, upward] for the K.O. ----
+function finCubes(n) { return finGeo('cube' + n, () => new THREE.BoxGeometry(n, n, n)); }
+const FINMOVES = {
+  // 阿娟: a corkscrew flying double kick to the mask that sends the victim's lion head spinning off; a back flip home
+  lion: {
+    name: 'Twin Dragon Sky Kick', han: '飞龙', launch: [13, 12],
+    att(S, m, R) {
+      const P = S.P, W = S.W, O = S.O, u = m / R.mH, reach = Math.max(0, R.dist - 1.2);
+      W.snap = true; S.mouth = u > 0.3 && u < 1.4 ? 0.65 : -1;
+      if (u < 0.3) { const c = ease(u / 0.3); W.y -= 0.32 * c; P.legL[0] -= 0.7 * c; P.legR[0] -= 0.7 * c; P.torso[0] += 0.45 * c; P.armL[0] += 0.9 * c; P.armR[0] += 0.9 * c; P.head[0] += 0.2 * c; return; }
+      if (u < 1) {
+        const s = (u - 0.3) / 0.7, e = ease(s);
+        O.fw = reach * e; O.up = 1.05 * e + 0.55 * Math.sin(s * PI);
+        W.ry = TAU * e; W.rx = -1.05 * e;
+        P.legL[0] -= 1.55 * e; P.legR[0] -= 1.55 * e; P.legL[2] += 0.12 * e; P.legR[2] -= 0.12 * e;
+        P.armL[0] += 1.3 * e; P.armR[0] += 1.3 * e; P.armL[2] += 0.5 * e; P.armR[2] -= 0.5 * e; P.head[0] -= 0.3 * e;
+        return;
+      }
+      const q = m - R.mH, w = clamp((q - 0.14) / 0.55, 0, 1), e = ease(w), tuck = Math.sin(w * PI);
+      O.fw = reach * (1 - e); O.up = 1.05 * (1 - w) + 1.25 * tuck;
+      W.rx = -1.05 - (TAU - 1.05) * e;
+      P.legL[0] -= 1.55 * (1 - e) + 0.9 * tuck; P.legR[0] -= 1.55 * (1 - e) + 0.9 * tuck; P.torso[0] += 0.5 * tuck;
+      P.armL[0] += 1.3 * (1 - e); P.armR[0] += 1.3 * (1 - e); P.armL[2] += 0.5 * (1 - e); P.armR[2] -= 0.5 * (1 - e);
+      if (w >= 1) { const l = clamp((q - 0.69) / 0.3, 0, 1); W.y -= 0.28 * Math.sin(l * PI); P.armL[2] += 1.2 * ease(l); P.armR[2] -= 1.2 * ease(l); P.armL[0] -= 0.4 * ease(l); P.armR[0] -= 0.4 * ease(l); }
+    },
+    vic(S, m, R) { if (m >= R.mH) finRecoil(S, m - R.mH, 1); },
+    fx(R, t, m, fdt) {
+      if (t < R.T.pan) return;
+      const u = m / R.mH, F = GFX.fx, A = R.ap;
+      if (u >= 0.3 && finOnce(R, 'leap')) { finSfx(R, 'jump', 'wind'); emit('wind', tA.set(A.x, A.y + 0.2, A.z), { n: 4 + 3 * F, speed: 5 }); ringFx(_tb.set(A.x, A.y, A.z), '#ffd34a', 2.6, 0.4); }
+      if (u >= 0.3 && u < 1.05 && Math.random() < fdt * 30 * F) {   // a trail of sparks off the feet
+        const S = R.sa, up = S.O.up, fw = S.O.fw;
+        emit('lion', tA.set(A.x + R.dir.x * (fw + 0.6), A.y + up + 0.9, A.z + R.dir.z * (fw + 0.6)), { n: 1, speed: 0.6, up: 0.5, life: 0.4 });
+      }
+      if (m >= R.mH && finOnce(R, 'kick')) {
+        const hp = tA.set(R.vp.x, R.vp.y + 2.3, R.vp.z);
+        emit('lion', hp, { n: 10 + 8 * F, speed: 9, up: 4 }); ringFx(hp, '#ffd34a', 3.2, 0.5); finSfx(R, 'heavy', 'cymbal');
+        finHeadLaunch(R);
+      }
+      if (m - R.mH > 0.69 && finOnce(R, 'land')) { emit('dust', tA.set(A.x, A.y + 0.1, A.z), { n: 6 + 2 * F, speed: 3 }); ringFx(_tb.set(A.x, A.y, A.z), '#ffffff', 2.2, 0.35); }
+    },
+  },
+  // Penguin: an ice koi called up out of the frost circles it, then dives on the victim with a flipper slap; the
+  // victim freezes solid and shatters out of the ice
+  penguin: {
+    name: 'Ice-Koi Slap', han: '冰鲤', launch: [17, 9],
+    att(S, m, R) {
+      const P = S.P, W = S.W, O = S.O, u = m / R.mH;
+      if (u < 0.55) {
+        const c = ease(u / 0.3), b = Math.sin(u * 22) * 0.04 * c;
+        P.armL[2] += 1.5 * c; P.armR[2] -= 1.5 * c; P.armL[0] -= 0.5 * c; P.armR[0] -= 0.5 * c; P.head[0] -= 0.3 * c; W.y += b; W.rz += Math.sin(u * 11) * 0.08 * c;
+        P.torso[1] -= 0.6 * ease((u - 0.3) / 0.25);
+        return;
+      }
+      if (u < 1) {
+        const s = (u - 0.55) / 0.45, e = ease(s);
+        P.armR[0] += lerp(1.1, -1.5, e); P.armR[2] += lerp(-1.3, 0.55, e); P.torso[1] += lerp(-0.6, 0.75, e);
+        P.armL[2] += 1.2; P.armL[0] -= 0.3; O.fw = 0.35 * e; P.legL[0] -= 0.4 * e; P.legR[0] += 0.25 * e; W.rz -= 0.1 * e;
+        return;
+      }
+      const q = m - R.mH, b = ease(clamp((q - 0.35) / 0.3, 0, 1));
+      P.armR[0] -= 1.5 * (1 - b); P.armR[2] += 0.55 * (1 - b); P.torso[1] += 0.75 * (1 - b); P.armL[2] += 1.2 * (1 - b);
+      O.fw = 0.35 * (1 - b);
+      P.torso[0] += 0.55 * b * (q < 0.85 ? 1 : 0.5); P.head[0] += 0.3 * b; P.armR[2] -= 0.4 * b; P.armL[2] += 0.4 * b;   // a little bow
+    },
+    vic(S, m, R) {
+      if (m < R.mH) return;
+      const q = m - R.mH, e = ease(q / 0.08);
+      S.W.snap = q > 0.08;   // frozen stiff: no more sway
+      S.W.rz += 0.18 * e; S.W.rx -= 0.12 * e; S.O.fw -= 0.25 * e; S.P.armL[2] += 0.5; S.P.armR[2] -= 0.5; S.P.head[0] -= 0.3;
+    },
+    fx(R, t, m, fdt) {
+      const F = GFX.fx, u = m / R.mH, A = R.ap, d = R.dir, rx = -d.z, rz = d.x;
+      if (t < R.T.pan) return;
+      if (!R.props) R.props = { koi: finObj(R, finKoi(R)) };
+      const koi = R.props.koi, tail = koi.userData.tail;
+      let px, py, pz, s = 1;
+      const orbit = (uu) => { const ph = -PI * 0.5 + (uu / 0.55) * TAU * 1.1, r = 1.9; return [A.x + (rx * Math.cos(ph) - d.x * Math.sin(ph)) * r, A.y + 2.2 + 0.5 * uu, A.z + (rz * Math.cos(ph) - d.z * Math.sin(ph)) * r]; };
+      if (u < 0.55) { [px, py, pz] = orbit(u); s = ease(u / 0.22); }
+      else if (u < 1) {
+        const k = Math.pow((u - 0.55) / 0.45, 1.5), p0 = orbit(0.55), p2 = [R.vp.x - d.x * 0.5 + rx * 0.4, R.vp.y + 2.2, R.vp.z - d.z * 0.5 + rz * 0.4];
+        const p1 = [(p0[0] + p2[0]) / 2, Math.max(p0[1], p2[1]) + 2.4, (p0[2] + p2[2]) / 2], j = 1 - k;
+        px = j * j * p0[0] + 2 * j * k * p1[0] + k * k * p2[0]; py = j * j * p0[1] + 2 * j * k * p1[1] + k * k * p2[1]; pz = j * j * p0[2] + 2 * j * k * p1[2] + k * k * p2[2];
+      } else {
+        const q = m - R.mH;
+        px = R.vp.x - d.x * 0.5 + rx * 0.4 + d.x * 2.2 * q; py = R.vp.y + 2.2 + 3.2 * q; pz = R.vp.z - d.z * 0.5 + rz * 0.4 + d.z * 2.2 * q;
+        s = 1 - ease((q - 0.15) / 0.55);
+      }
+      const prev = koi.userData.prev || (koi.userData.prev = new V3(px - d.x, py, pz - d.z));
+      tA.set(px, py, pz);
+      if (tA.distanceToSquared(prev) > 1e-5) { koi.position.copy(tA); koi.lookAt(tA.x * 2 - prev.x, tA.y * 2 - prev.y, tA.z * 2 - prev.z); }
+      prev.copy(tA);
+      koi.scale.setScalar(Math.max(0.001, s) * 1.35);
+      if (tail) tail.rotation.y = Math.sin(t * (u < 1 ? 16 : 9)) * 0.55;
+      if (Math.random() < fdt * 22 * F && s > 0.2) emit('snow', tA, { n: 1, speed: 1.5, up: 0.5 });
+      if (finOnce(R, 'summon')) { finSfx(R, 'ice', 'wind'); emit('snow', tA.set(A.x, A.y + 1.5, A.z), { n: 6 + 4 * F, speed: 3, up: 2 }); }
+      if (u >= 0.55 && finOnce(R, 'dive')) finSfx(R, 'splash');
+      if (m >= R.mH && finOnce(R, 'slap')) {
+        const hp = tB.set(R.vp.x, R.vp.y + 1.8, R.vp.z);
+        finSfx(R, 'slap', 'ice', 'heavy'); emit('ice', hp, { n: 12 + 8 * F, speed: 9, up: 3 }); ringFx(hp, '#bdeeff', 3.4, 0.5);
+        flashSphere(hp, '#dff8ff', 1.6, 0.3);
+      }
+      // frozen solid from the slap to the K.O.; then it shatters
+      const v = R.v;
+      if (m >= R.mH && !R.koDone && fighters.includes(v)) { v.ice.visible = true; v.ice.scale.setScalar(Math.min(1, 0.6 + (m - R.mH) * 6)); }
+      if (R.koDone && finOnce(R, 'shatter')) {
+        v.ice.scale.setScalar(1);
+        const c = tB.set(R.vp.x, R.vp.y + 1.1, R.vp.z);
+        emit('ice', c, { n: 16 + 10 * F, speed: 11, up: 5 }); emit('snow', c, { n: 6 + 4 * F, speed: 6 }); finSfx(R, 'ice', 'crumble');
+      }
+    },
+  },
+  // Steve: a war hammer builds itself out of flying blocks, then a leaping overhead smash flattens the victim into a
+  // crater; they pop back out for the K.O.
+  steve: {
+    name: 'Block-Hammer Smash', han: '方锤', launch: [7, 17],
+    att(S, m, R) {
+      const P = S.P, W = S.W, O = S.O, u = m / R.mH, reach = Math.max(0, R.dist - 1.95);
+      if (u < 0.3) { const c = ease(u / 0.3); P.armR[0] -= 3.0 * c; P.armL[0] -= 2.6 * c; P.armL[2] -= 0.3 * c; P.armR[2] += 0.3 * c; P.torso[0] -= 0.25 * c; W.y -= 0.2 * c; P.legL[0] -= 0.4 * c; P.legR[0] += 0.25 * c; return; }
+      if (u < 1) {
+        const s = (u - 0.3) / 0.7, sw = s < 0.6 ? lerp(-3.0, -3.55, ease(s / 0.6)) : lerp(-3.55, -1.3, Math.pow((s - 0.6) / 0.4, 1.7));
+        W.snap = true;
+        O.up = 2.4 * Math.sin(s * PI); O.fw = reach * ease(s);
+        P.armR[0] += sw; P.armL[0] += sw * 0.95; P.armL[2] -= 0.3; P.armR[2] += 0.3;
+        W.rx = s < 0.6 ? -0.35 * ease(s / 0.6) : lerp(-0.35, 0.2, ease((s - 0.6) / 0.4));
+        P.legL[0] -= 0.8 * Math.sin(s * PI); P.legR[0] += 0.3 * Math.sin(s * PI);
+        return;
+      }
+      const q = m - R.mH, w = clamp((q - 0.25) / 0.45, 0, 1), e = ease(w);
+      W.snap = true;
+      O.fw = reach * (1 - e); O.up = 0.9 * Math.sin(w * PI);
+      W.rx = 0.2 * (1 - e); W.y -= 0.22 * (1 - e);
+      P.armR[0] += lerp(-1.3, -2.7, e); P.armL[0] += lerp(-1.24, -0.4, e); P.armR[2] += lerp(0.3, -0.2, e); P.armL[2] -= 0.3 * (1 - e);
+      P.legL[0] -= 0.5 * (1 - e);
+    },
+    vic(S, m, R) { if (m >= R.mH) { const e = ease((m - R.mH) / 0.03); S.W.snap = true; S.W.sy = lerp(1, 0.2, e); S.W.sxz = lerp(1, 1.6, e); S.W.y = lerp(S.W.y, 0.2, e); S.W.rx = 0; S.W.rz = 0; } },
+    fx(R, t, m, fdt) {
+      const F = GFX.fx, u = m / R.mH, a = R.a;
+      if (t < R.T.pan) return;
+      if (!R.props) R.props = finHammer(R, a);
+      const H = R.props, head = H.head;
+      // the blocks fly in from all round and lock into the hammer's head
+      a.root.updateMatrixWorld(true); head.getWorldPosition(_tb);
+      const k = clamp((u - 0.04) / 0.26, 0, 1);
+      for (const c of H.cubes) { c.visible = k < 1; if (c.visible) { c.position.lerpVectors(c.userData.from, _tb, ease(k)); c.rotation.set(c.userData.r * (1 - k), c.userData.r * 2 * (1 - k), 0); } }
+      const hs = k < 1 ? 0.001 : Math.min(1, 0.7 + (u - 0.3) * 3);
+      H.g.scale.set(1, 1, 1); head.scale.setScalar(hs); H.grip.visible = true; H.grip.scale.set(1, k < 1 ? Math.max(0.001, k) : 1, 1);
+      if (k >= 1 && finOnce(R, 'forged')) { finSfx(R, 'place', 'clang'); emit('voxel', _tb, { n: 4 + 3 * F, speed: 4 }); }
+      if (u >= 0.3 && finOnce(R, 'jump')) { finSfx(R, 'jump', 'wind'); emit('dust', tA.set(R.ap.x, R.ap.y + 0.1, R.ap.z), { n: 4 + 2 * F }); }
+      if (m >= R.mH && finOnce(R, 'smash')) {
+        const p = tA.set(R.vp.x, R.vp.y, R.vp.z);
+        finSfx(R, 'slam', 'boom'); crater(p, 2.4); emit('voxel', tA.set(p.x, p.y + 0.4, p.z), { n: 12 + 8 * F, speed: 9, up: 6 }); emit('dust', tA.set(p.x, p.y + 0.2, p.z), { n: 6 + 4 * F, speed: 6 });
+        spawnDebris(tB.set(p.x, p.y + 0.3, p.z), 1.3, concreteChunk, null, 4 + 3 * F); ringFx(tA.set(p.x, p.y, p.z), '#ffffff', 4.2, 0.45);
+        if (R.black) ringFx(tA, '#8a2be2', 5.5, 0.6);
+      }
+      if (R.koDone && finOnce(R, 'pop')) { finSfx(R, 'boom'); emit('voxel', tA.set(R.vp.x, R.vp.y + 0.5, R.vp.z), { n: 6 + 4 * F, speed: 7, up: 8 }); }
+      if (m - R.mH > 0.75) { head.getWorldPosition(_tb); if (finOnce(R, 'crumble')) { finSfx(R, 'crumble'); emit('voxel', _tb, { n: 8 + 4 * F, speed: 5 }); } H.g.visible = false; }
+    },
+  },
+  // Shark: a lunge into a spectral water-jaw bite, a thrashing death roll of the two of them in a spiral of water,
+  // then the jaws burst open and fling the victim away
+  shark: {
+    name: 'Death-Roll Bite', han: '死滚', launch: [19, 10],
+    roll(m, R) { const u = m / R.mH; return u < 0.6 ? 0 : u < 1 ? TAU * 1.5 * Math.pow((u - 0.6) / 0.4, 1.3) : TAU * 1.5 + (m - R.mH) * TAU * 3.2; },
+    att(S, m, R) {
+      const P = S.P, W = S.W, O = S.O, u = m / R.mH, reach = Math.max(0, R.dist - 0.8);
+      W.snap = true;
+      if (u < 0.3) { const c = ease(u / 0.3); W.y -= 0.3 * c; P.torso[0] += 0.5 * c; P.armL[0] += 0.8 * c; P.armR[0] += 0.8 * c; if (P.jaw) P.jaw[0] += 1.0 * c; if (P.tail) P.tail[1] += Math.sin(m * 16) * 0.35 * c; S.mouth = 0.7 * c; return; }
+      const s = clamp((u - 0.3) / 0.3, 0, 1), e = ease(s);
+      let rx = 1.35 * e, up = 0.9 * e, fw = reach * e, ry = FINMOVES.shark.roll(m, R);
+      S.mouth = u < 0.6 ? 0.75 : 0.05;
+      if (P.jaw) P.jaw[0] += u < 0.6 ? 1.0 : 0;
+      P.armL[0] -= 2.9 * e; P.armR[0] -= 2.9 * e; P.legL[0] += 0.2 * e; P.legR[0] += 0.2 * e;
+      if (P.tail) P.tail[1] += Math.sin(m * 22) * 0.5;
+      if (R.koDone) {   // the fling: let go, roll out upright and back to where it started
+        const ko = FINMOVES.shark.roll(R.koM ?? m, R), w = clamp((m - (R.koM ?? m)) / 0.45, 0, 1), k = ease(w);
+        ry = ko + (Math.ceil(ko / TAU) * TAU - ko) * k; rx = 1.35 * (1 - k); up = 0.9 * (1 - w) + 0.6 * Math.sin(w * PI); fw = reach * (1 - k);
+        P.armL[0] += 2.9 * k; P.armR[0] += 2.9 * k;
+      }
+      W.rx = rx; W.ry = ry; O.up = up; O.fw = fw;
+    },
+    vic(S, m, R) {
+      const u = m / R.mH; if (u < 0.6) return;
+      const e = ease((u - 0.6) / 0.08);
+      S.W.snap = true; S.W.rx = -1.3 * e; S.W.ry = FINMOVES.shark.roll(m, R); S.W.rz = 0; S.O.up = 0.9 * e;
+      S.P.armL[2] += 1.0; S.P.armR[2] -= 1.0; S.P.legL[0] -= 0.3; S.P.legR[0] += 0.2;
+    },
+    fx(R, t, m, fdt) {
+      const F = GFX.fx, u = m / R.mH, d = R.dir;
+      if (t < R.T.pan) return;
+      if (!R.props) R.props = finJaws(R);
+      const J = R.props, g = J.g, roll = FINMOVES.shark.roll(m, R);
+      // in front of the shark's snout until the bite, then round the victim's waist
+      const S = R.sa, fw = S.O.fw + 1.5, gx = R.ap.x + d.x * fw, gz = R.ap.z + d.z * fw, gy = R.ap.y + 1.0 + S.O.up;
+      const vx = R.vp.x, vz = R.vp.z, vy = R.vp.y + 1.0 + (R.sv ? R.sv.O.up : 0);
+      const b = clamp((u - 0.45) / 0.15, 0, 1), open = u < 0.6 ? lerp(1, 0.9, b) * ease(u / 0.25) + 0.05 : R.koDone ? Math.min(1.4, (m - (R.koM ?? m)) * 6) : 0.04;
+      g.position.set(lerp(gx, vx, b), lerp(gy, vy, b), lerp(gz, vz, b));
+      g.rotation.set(0, Math.atan2(d.x, d.z), roll);
+      const sc = (u < 0.25 ? ease(u / 0.25) : 1) * (R.koDone ? 1 - ease((m - (R.koM ?? m)) / 0.35) : 1);
+      g.scale.setScalar(Math.max(0.001, sc) * 1.05); g.visible = sc > 0.01;
+      J.up.position.y = open * 0.55; J.up.rotation.x = -open * 0.45; J.lo.position.y = -open * 0.55; J.lo.rotation.x = open * 0.45;
+      if (u >= 0.6 && !R.koDone && Math.random() < fdt * 40 * F) {   // the water spirals round the roll
+        const a = roll * 1.3 + Math.random() * 0.6, r = 1.2;
+        emit('water', tA.set(vx + Math.cos(a) * r * d.z, vy + Math.sin(a) * r, vz - Math.cos(a) * r * d.x), { n: 1, speed: 2, up: 1 });
+      }
+      if (finOnce(R, 'open')) finSfx(R, 'splash');
+      if (u >= 0.6 && finOnce(R, 'chomp')) { finSfx(R, 'bite', 'heavy'); emit('water', tB.set(vx, vy, vz), { n: 8 + 6 * F, speed: 7, up: 3 }); emit('blood', tB, { n: 3 + 2 * F, speed: 3 }); }
+      if (m >= R.mH && finOnce(R, 'thrash')) finSfx(R, 'wave');
+      if (R.koDone && finOnce(R, 'fling')) { finSfx(R, 'splash', 'heavy'); emit('water', tB.set(vx, vy, vz), { n: 14 + 10 * F, speed: 11, up: 6 }); ringFx(tB.set(vx, R.vp.y, vz), '#7fd0ff', 4.5, 0.55); }
+    },
+  },
+};
+// the ice koi: a lathe body, a forked tail on a wagging pivot, fins, eyes and orange patches, in glassy ice
+function finKoi(R) {
+  const g = new THREE.Group(), lo = GFX.level === 'low';
+  const ice = finMat(R, '#bfefff', '#2f8fc0', { transparent: true, opacity: 0.9, emissiveIntensity: 0.9 });
+  const fin = finMat(R, '#e6fbff', '#5ab8e8', { transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false });
+  const spot = finMat(R, '#ff8a3a', '#a8400a', {}), eye = finMat(R, '#0c1a22', '#000000', {});
+  const body = new THREE.Mesh(finGeo('koi' + lo, () => new THREE.LatheGeometry([[0, -1.25], [0.18, -1.05], [0.38, -0.6], [0.5, -0.05], [0.46, 0.5], [0.32, 0.95], [0.12, 1.25], [0, 1.32]].map((p) => new THREE.Vector2(p[0], p[1])), lo ? 10 : 22).rotateX(PI / 2)), ice);
+  body.scale.set(0.72, 1, 1); g.add(body);
+  const tail = new THREE.Group(); tail.position.set(0, 0, -1.15); g.add(tail);
+  const tailShape = new THREE.Shape(); tailShape.moveTo(0, 0); tailShape.quadraticCurveTo(0.5, 0.6, 1.0, 0.8); tailShape.lineTo(0.65, 0); tailShape.lineTo(1.0, -0.8); tailShape.quadraticCurveTo(0.5, -0.6, 0, 0);
+  tail.add(new THREE.Mesh(finGeo('koiTail', () => new THREE.ShapeGeometry(tailShape, 6).rotateY(PI / 2)), fin));
+  const dorsal = new THREE.Shape(); dorsal.moveTo(0, 0); dorsal.quadraticCurveTo(0.35, 0.55, 1.0, 0.1); dorsal.lineTo(1.0, 0);
+  const df = new THREE.Mesh(finGeo('koiDorsal', () => new THREE.ShapeGeometry(dorsal, 4).rotateY(PI / 2)), fin); df.position.set(0, 0.42, 0.55); g.add(df);
+  for (const s of [1, -1]) {
+    const pf = new THREE.Mesh(finGeo('koiPec', () => new THREE.PlaneGeometry(0.5, 0.3)), fin); pf.position.set(s * 0.38, -0.2, 0.5); pf.rotation.set(0.3, s * 0.6, s * 0.5); g.add(pf);
+    const e = new THREE.Mesh(gSph(0.075, lo ? 6 : 10, lo ? 5 : 8), eye); e.position.set(s * 0.25, 0.14, 0.98); g.add(e);
+  }
+  for (const [x, y, z, sx, sz] of [[0, 0.36, 0.3, 0.24, 0.32], [0.14, 0.3, -0.35, 0.2, 0.26], [-0.12, 0.33, 0.78, 0.15, 0.2]]) {
+    const p = new THREE.Mesh(gSph(1, lo ? 8 : 12, lo ? 5 : 8), spot); p.position.set(x, y, z); p.scale.set(sx, 0.07, sz); g.add(p);
+  }
+  g.userData.tail = tail; g.scale.setScalar(0.001);
+  return g;
+}
+// Steve's war hammer: a stone-and-iron head on a wooden haft, carried in his right hand along the arm (netherite
+// with violet runes in the Black form); the blocks that build it fly in from round about
+function finHammerTex(black) {
+  return finGeo('hamTex' + black, () => {
+    const t = canvasTex(16, 16, (c) => {
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        const n = Math.random(), edge = x === 0 || y === 0 || x === 15 || y === 15 || y === 7 || y === 8;
+        c.fillStyle = black ? (edge ? '#5a2a8a' : n < 0.2 ? '#3a3542' : n < 0.6 ? '#2c2a33' : '#24222a') : edge ? '#4a4a4f' : n < 0.25 ? '#9a9a9a' : n < 0.6 ? '#7f7f84' : '#6c6c70';
+        c.fillRect(x, y, 1, 1);
+      }
+      if (black) { c.fillStyle = '#b06aff'; c.fillRect(4, 3, 1, 3); c.fillRect(11, 10, 1, 3); c.fillRect(7, 12, 3, 1); }
+    }, true);
+    return t;
+  });
+}
+function finHammer(R, a) {
+  const hand = a.rig.hand || a.rig.armR, g = new THREE.Group(), lo = GFX.level === 'low';
+  g.position.set(0, hand === a.rig.hand ? 0 : -0.66, 0);
+  const stone = finMat(R, '#ffffff', R.black ? '#2a0f44' : '#000000', { map: finHammerTex(R.black), emissiveIntensity: 0.6, roughness: 0.6 });
+  const wood = finMat(R, '#7a5232', '#000000', { roughness: 0.8 }), band = finMat(R, R.black ? '#d4a537' : '#b8bcc4', R.black ? '#5a3a00' : '#000000', { metalness: 0.7, roughness: 0.35 });
+  const grip = new THREE.Group(); g.add(grip);
+  const haft = new THREE.Mesh(finCubes(1), wood); haft.scale.set(0.13, 1.55, 0.13); haft.position.y = -0.7; grip.add(haft);
+  const head = new THREE.Group(); head.position.set(0, -1.55, 0); g.add(head);
+  const hb = new THREE.Mesh(finCubes(1), stone); hb.scale.set(0.62, 0.62, 1.05); head.add(hb);
+  if (!lo) for (const z of [-0.33, 0.33]) { const b = new THREE.Mesh(finCubes(1), band); b.scale.set(0.67, 0.67, 0.09); b.position.z = z; head.add(b); }
+  finObj(R, g, hand);
+  const cubes = [];
+  for (let i = 0; i < (lo ? 4 : 8); i++) {
+    const c = new THREE.Mesh(finCubes(0.3), stone), ang = rand(0, TAU), r = rand(1.6, 3);
+    c.userData.from = new V3(R.ap.x + Math.cos(ang) * r, R.ap.y + rand(0.4, 3.2), R.ap.z + Math.sin(ang) * r); c.userData.r = rand(-6, 6);
+    c.position.copy(c.userData.from); finObj(R, c); cubes.push(c);
+  }
+  return { g, head, grip, cubes };
+}
+// the shark's spectral jaws: two half rings of gum (water-blue, glowing) set with inward teeth
+function finJaws(R) {
+  const lo = GFX.level === 'low', g = new THREE.Group(), n = lo ? 6 : 9;
+  const gum = finMat(R, '#2a6fb0', '#1a5a9a', { transparent: true, opacity: 0.85, emissiveIntensity: 0.9 }), tooth = finMat(R, '#f4fbff', '#6fb8ff', { emissiveIntensity: 0.35 });
+  const half = (k) => {
+    const h = new THREE.Group();
+    h.add(new THREE.Mesh(finGeo('jawGum' + lo, () => new THREE.TorusGeometry(0.95, 0.13, lo ? 5 : 8, lo ? 12 : 22, PI)), gum));
+    const tg = finGeo('jawTooth' + lo, () => new THREE.ConeGeometry(0.09, 0.34, lo ? 4 : 6)), im = new THREE.InstancedMesh(tg, tooth, n), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), Pp = new V3(), Sc = new V3(1, 1, 1);
+    for (let i = 0; i < n; i++) { const a = (i + 0.5) / n * PI; Pp.set(Math.cos(a) * 0.8, Math.sin(a) * 0.8, 0); Q.setFromEuler(E.set(0, 0, a + PI / 2)); M.compose(Pp, Q, Sc); im.setMatrixAt(i, M); }
+    h.add(im); if (k < 0) h.rotation.z = PI;
+    const p = new THREE.Group(); p.add(h); g.add(p); return p;
+  };
+  const up = half(1), lw = half(-1);
+  g.scale.setScalar(0.001); finObj(R, g);
+  return { g, up, lo: lw };
+}
+// ---- input: a key, a tap or a pad button skips once the first second has gone (mute and Esc keep working) ----
+addEventListener('keydown', (e) => {
+  if (!FIN.cine || rebinding || typing()) return;
+  const act = CODE2ACT.get(e.code) || ALT_KEYS[e.code];
+  if (act === 'mute' || e.code === 'Escape') return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (!e.repeat) finSkip();
+}, true);
+addEventListener('pointerdown', (e) => {
+  if (!FIN.cine) return;
+  e.preventDefault(); e.stopPropagation();
+  finSkip();
+}, true);
+// Settings > Finishers
+function finNote() {
+  const m = SETTINGS.fin;
+  $('#finNote').textContent = m === 'on' ? 'K.O. blows play a short finisher; you see the cutscene when you land it or take it.'
+    : m === 'mine' ? 'Only your own K.O. blows play a finisher and its cutscene.' : 'No finishers of yours and no cutscenes (others’ finishers still play in the world).';
+}
+{
+  const sel = $('#optFin'); sel.value = SETTINGS.fin; finNote();
+  sel.addEventListener('change', (e) => { const v = e.target.value; if (FIN_MODES.includes(v)) { SETTINGS.fin = v; store.set('settings', SETTINGS); } sel.value = SETTINGS.fin; finNote(); e.target.blur(); });
 }
 
 // =====================================================================
@@ -9564,6 +10355,7 @@ function camClip(fdt) {
 }
 function updateCamera(fdt) {
   const p = player, rp = p.root.position;
+  if (finCamera(fdt)) { sky.position.copy(camera.position); return; }   // a finisher's cinematic
   if (duelCamera(fdt)) { /* watching a duel */ }
   else if (fpv) {
     // eye level (follows the body when knocked down), nudged forward so the face never clips the view
@@ -9611,6 +10403,7 @@ function simStep(dt) {
   updateProjs(dt); updateTraps(dt); updateCans(dt); updateBlocks(dt);
   updateLantern(dt);
   updateDuel(dt);
+  finStep(dt);
   if (online()) recordHistory();
   NET.cap = false;
 }
@@ -9628,6 +10421,7 @@ function frame(t) {
     if (acc >= SIM_DT) acc = SIM_DT * 0.999;
     renderAlpha = acc / SIM_DT;
     for (const f of fighters) { if (f.remote) updatePuppet(f, fdt); else animateFighter(f, fdt); }
+    finFrame(fdt);
     updateContacts();
     drawProjs(renderAlpha);
     updateParts(fdt); updateImpactFx(fdt); updateScreenFlash(fdt); updateRings(fdt); updateTemps(fdt); updateDebris(fdt); updateAuras(); updateSouls(fdt); updateTrans(fdt);
@@ -9738,7 +10532,8 @@ function pollPad(dt) {
     const on = B[i] && (B[i].pressed || B[i].value > 0.5) ? 1 : 0;
     if (on && !pr[i]) {
       SFX.init();
-      if (EW.open && i === 0) { if (EW.sel >= 0) pickEmote(EW.sel); else closeEmotes(); }
+      if (FIN.cine) finSkip();
+      else if (EW.open && i === 0) { if (EW.sel >= 0) pickEmote(EW.sel); else closeEmotes(); }
       else if (EW.open && i === 1) closeEmotes();
       else if (PAD_PRESS[i]) press(PAD_PRESS[i]);
       else if (i === 14) { if (EW.open) closeEmotes(); else openEmotes(); }
@@ -9787,6 +10582,7 @@ if (/[?&]dev=1/.test(location.search)) window.__scbg = { SFX, fighters, get play
   applyState, packF, netNow, PORTRAITS,
   KILLS, KILL, setKills, creditKill, trophySet, trophyFull, TRO_CACHE, blackEnter, blackFlourish, transcend, TRANS, selectArena, syncArena, wantArena, ascendTo, descend, get ARENA_PASS() { return ARENA_PASS; }, ARENAS, ARENA_IDS, get ARENA() { return ARENA; }, get ARENA_SET() { return ARENA_SET; }, blocks, cans, DUEL, arenaFromHost, hostArena, joinArena, leaveRoom, sky, sun, hemi,
   koSeen, kCredit, kHit, TRAIL, applyNetHit, applyHitReply, applyFx, onData, pendingHits, botKills, souls, KO, respawn, switchCharacter,
-  PILLAR, blackClimber, pillarTry, colTop, groundAt, spotClear, homeArena, CO, CQ, CQ_POLES, CQ_CAB, CAB, KICK, DRUMS, cabTouch, duelFromHost, duelAsk, duelStart, duelFinish, duelFighter, duelSide, duelMsg, setLock, get camPull() { return camPull; }, get camYaw() { return camYaw; }, set camYaw(v) { camYaw = +v || 0; } };
+  PILLAR, blackClimber, pillarTry, colTop, groundAt, spotClear, homeArena, CO, CQ, CQ_POLES, CQ_CAB, CAB, KICK, DRUMS, cabTouch, duelFromHost, duelAsk, duelStart, duelFinish, duelFighter, duelSide, duelMsg, setLock, get camPull() { return camPull; }, get camYaw() { return camYaw; }, set camYaw(v) { camYaw = +v || 0; },
+  FIN, FINMOVES, finBegin, finStart, finFromNet, finOk, finWant, finAsk, finSkip, finTimes, finMoveT, get acc() { return acc; } };
 })();
 </script>
