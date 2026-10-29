@@ -7020,13 +7020,15 @@ async function joinArena(raw, tries = 0) {
   const to = setTimeout(() => { if (NET.mode === 'offline') netFail(); }, 10000);
   peer.on('open', () => {
     const conn = peer.connect('scbg-' + code.toLowerCase(), { serialization: 'json', reliable: true });
+    let early = null;   // the host names its arena as soon as its side opens, which can beat this side's 'open'
     conn.on('open', () => {
       clearTimeout(to); NET.mode = 'client'; NET.host = conn; NET.code = code; NET.me = peer.id; NET.arena = null;
       clearLocalNPCs(); reidLocal(); setRoomUI(); setRoomBusyButtons(false); $('#joinCode').blur(); showArena();
+      if (early) arenaFromHost(early, conn.peer);
       // a host that names no arena (an older build) is in the park
       setTimeout(() => { if (NET.mode === 'client' && NET.host === conn && !NET.arena) { NET.arena = 'park'; syncArena(); } }, 3000);
     });
-    conn.on('data', (d) => onData(d, conn.peer));
+    conn.on('data', (d) => { if (NET.mode !== 'client' && d && d.t === 'ar') { early = d; return; } onData(d, conn.peer); });
     conn.on('close', () => { if (NET.mode === 'client') leaveRoom('The host closed the arena.'); });
   });
   peer.on('error', (e) => {
