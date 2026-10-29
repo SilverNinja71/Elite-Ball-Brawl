@@ -2222,11 +2222,12 @@ const FUR_GLSL_F = `#include <color_fragment>
     diffuseColor.a = a;
     diffuseColor.rgb *= mix(0.5, 1.12, vFur.x) * (0.86 + st.g * 0.28);
     furTip = vFur.x;
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.6, 0.16), uTipGold * smoothstep(0.55, 1.0, vFur.x));   // Black form: gold-tipped strands
   }`;
 function furOBC(sh) {
-  sh.uniforms.uFur = { value: LDTEX.fur };
+  sh.uniforms.uFur = { value: LDTEX.fur }; sh.uniforms.uTipGold = { value: this.userData.tipGold || 0 };
   sh.vertexShader = sh.vertexShader.replace('#include <common>', FUR_GLSL_V[0]).replace('#include <begin_vertex>', FUR_GLSL_V[1]);
-  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D uFur;\nvarying vec3 vFur;\nvarying vec3 vFP;\nvarying vec3 vFN;\nfloat furTip;')
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D uFur;\nuniform float uTipGold;\nvarying vec3 vFur;\nvarying vec3 vFP;\nvarying vec3 vFN;\nfloat furTip;')
     .replace('#include <color_fragment>', FUR_GLSL_F)
     // soft light: a little of the strand colour comes back as fill, more at the tips and at grazing angles
     .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += diffuseColor.rgb * (0.1 + 0.22 * furTip) * (0.6 + 0.8 * pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 2.0));');
@@ -3636,7 +3637,7 @@ function trophySet(f, kills, normal) {
 // ---- the Black form at runtime (all render-side: nothing here touches the simulation) ----
 let _furBlack = null, _faceBlack = null;
 function blackFurMat() {   // the same fur shader, its strands burnt dark with an ember undertone
-  if (!_furBlack) _furBlack = makeFurMat({ roughness: 0.55, color: '#121012', emissive: '#0c0200' });
+  if (!_furBlack) { _furBlack = makeFurMat({ roughness: 0.55, color: '#121012', emissive: '#0c0200' }); _furBlack.userData.tipGold = 0.85; }
   return _furBlack;
 }
 function blackFaceMat() {   // painted face on a dark skin: the eyes burn
