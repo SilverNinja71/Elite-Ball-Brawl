@@ -5822,7 +5822,7 @@ class Fighter {
   get busy() { return this.stun > 0 || this.ragdoll > 0 || this.flatten > 0 || this.held || this.dead || this.frozen > 0 || !!this.exe; }
   speedMul() { let m = 1; if (this.awaken > 0 && this.def.ultSpeed) m *= this.def.ultSpeed; if (this.slowT > 0) m *= 0.6; return m; }
   atkSpeed() { return this.awaken > 0 && this.def.ultAtk ? this.def.ultAtk : 1; }
-  invuln() { if (this.remote) return this.netInv || this.dead || (!!this.exe && this.exe.v === this); if (this.exe) return true; return this.iframes > 0 || (this.action && this.action.invuln) || this.dead; }
+  invuln() { if (this.exe) return true; if (this.remote) return this.netInv || this.dead; return this.iframes > 0 || (this.action && this.action.invuln) || this.dead; }
   play(name, dur, real, wf) { this.anim = { name, t: 0, dur, wf: wf || 0 }; }
   startAction(spec) {
     if (this.action) this.endAction(true);
@@ -9346,7 +9346,7 @@ function koSeen(killer, victim) {
   if (killer === player.name) {
     if (!v) return;
     const fc = FIN.credited.get(v.id); if (fc !== undefined && realClock - fc < 6) return;   // our finisher already counted it
-    const h = kHit.get(v.id); if (h === undefined || realClock - h > 2.5) return;
+    const h = kHit.get(v.id); if (h === undefined || realClock - h > 4) return;   // (a finisher's K.O. lands ~3 s after its hit)
     const id = v.id; setTimeout(() => creditKill(fighters.find((x) => x.id === id) || { id }), 1200);   // the 'ko' reply normally lands first
     return;
   }
@@ -9721,7 +9721,7 @@ function finStep(dt) {
     if (!aIn || !vIn) { if (vIn && !R.koDone) finKO(R, false); finEnd(R); continue; }
     R.t += dt;
     if (R.skip && R.t < R.T.ko) R.t = R.T.ko;
-    if (R.a.remote && R.v.remote && R.t > 0.6 && !R.a.netInv && !R.koDone) { finEnd(R); continue; }   // its owner never froze it: nothing to show
+    if (R.a.remote && R.v.remote && R.t > 0.6 && !R.a.netInv && !R.koDone) { finEnd(R); continue; }   // its owner never froze it (a forged claim): stop drawing it and holding it untouchable
     if (!R.koDone && (R.t >= R.T.ko || (R.v.remote && R.v.dead))) finKO(R, true);
     if (R.t >= R.T.end || (R.skip && R.koDone)) finEnd(R);
   }
