@@ -197,6 +197,7 @@ button:focus-visible,input:focus-visible{outline:2px solid #fff;outline-offset:2
 @media (max-width:560px){
   .slot{height:62px}.slot .n{font-size:8px}.slot .t{font-size:17px}
   #room{width:min(250px,calc(100vw - 24px))}
+  #joinCode{width:66px;padding:0 6px;letter-spacing:.06em}#room .sbtn{padding:0 10px}#room .sbtn.sq{padding:0}   /* Host, code and Join on one row */
   .rbtn .lbl{display:none}
   #feed{display:none}
 }
@@ -6452,6 +6453,7 @@ const duelKicks = (f) => DUEL.ph === 'go' && duelSide(f) === 1;   // M1 is a kic
 const duelHold = (f) => DUEL.ph === 'intro' && duelSide(f) === 1;   // the drum roll: duelists stand on their marks
 const duelAuth = () => NET.mode !== 'client';
 const inRing = (f, pad = 0) => Math.hypot(f.pos.x - DUEL.x, f.pos.z - DUEL.z) < DUEL.r + pad;
+const duelWaiting = (f) => DUEL.ph === 'idle' && !f.ai && !f.isDummy && inRing(f);   // a dancer standing in the ring for a challenger
 function duelFighter(id) { if (!id) return null; for (const f of fighters) if (f.id === id) return f; return null; }
 function duelFoe(f) { return duelFighter(f.id === DUEL.aid ? DUEL.bid : DUEL.aid); }
 // does a dancer standing at p touch the greens? (the hanging lettuce, its centre at CAB.y; slack for a host's check)
@@ -8546,6 +8548,7 @@ function aiPickTarget(b, ai) {
   let best = null, bd = 34, human = null, hd = 34;
   for (const o of fighters) {
     if (o === b || o.dead || o.lantern || o.exe || duelSide(o) !== duelSide(b)) continue;   // never someone on the other side of the duel wall
+    if (duelWaiting(o) && !inRing(b)) continue;   // someone waiting in the ring for a challenger is left to the bot that answers
     // someone well above (a high platform, a pole top, the Pillar) counts as further away: bots prefer who they can reach
     const d = distH(b, o) + Math.max(0, o.pos.y - b.pos.y - 2) * 4; if (d < bd) { bd = d; best = o; }
     if (!o.ai && !o.isDummy && d < hd) { hd = d; human = o; }
@@ -8563,8 +8566,12 @@ function aiIntent(b, dt) {
   }
   if (duelSide(b) === 1) return DUEL.ph === 'go' ? duelBotIntent(b, I, P, dt) : I;   // the cabbage duel
   if (duelBotWalk(b, I)) return I;   // answering a challenge: off to the ring
+  if (DUEL.ph === 'idle' && inRing(b) && fighters.filter((o) => !o.dead && !o.isDummy && !o.lantern && inRing(o)).length > 2) {   // a crowded ring never starts a duel: step back out
+    tA.set(b.pos.x - DUEL.x, 0, b.pos.z - DUEL.z); if (tA.lengthSq() < 1e-4) tA.set(1, 0, 0);
+    I.move.copy(tA.normalize()); ai.target = null; return I;
+  }
   ai.retarget -= dt;
-  if (ai.retarget <= 0 || !ai.target || ai.target.dead || ai.target.exe || !fighters.includes(ai.target) || duelSide(ai.target) !== duelSide(b)) aiPickTarget(b, ai);
+  if (ai.retarget <= 0 || !ai.target || ai.target.dead || ai.target.exe || !fighters.includes(ai.target) || duelSide(ai.target) !== duelSide(b) || (duelWaiting(ai.target) && !inRing(b))) aiPickTarget(b, ai);
   const p = ai.target;
   if (!p) {   // nobody around: wander
     ai.wpT -= dt;
