@@ -229,7 +229,7 @@ button:focus-visible,input:focus-visible{outline:2px solid #fff;outline-offset:2
 #evChip i{width:8px;height:8px;border-radius:50%;background:var(--ult-full);box-shadow:0 0 8px var(--ult-full)}
 #evChip.live{border-color:rgba(255,207,58,.75);color:#fff6cf;box-shadow:0 0 14px rgba(255,207,58,.35)}
 #evChip.live i{animation:pulse .6s ease-in-out infinite alternate}
-#pillChip{display:inline-flex;align-items:center;gap:8px;max-width:100%;height:26px;padding:0 12px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#f3ddd0;white-space:nowrap;border-color:rgba(200,22,31,.6)}
+#pillChip{display:inline-flex;align-items:center;gap:8px;max-width:100%;height:26px;padding:0 12px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#f3ddd0;white-space:nowrap;border-color:rgba(200,22,31,.6)}
 #pillChip[hidden]{display:none}
 #pillChip span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 #pillChip i{flex:none;width:8px;height:8px;border-radius:50%;background:#c8161f;box-shadow:0 0 8px #c8161f}
@@ -3251,11 +3251,13 @@ function pillarHud() {
   PILLAR.chipKey = key;
   const el = $('#pillChip'); el.hidden = !key; el.classList.toggle('go', key === 'go' || key === 'asc');
   if (!key) return;
-  $('#pillTxt').textContent = key === 'go' ? (TOUCH.on ? 'Tap Jump on the glowing ring to climb' : 'Jump (' + keyName(BIND.jump) + ') on the glowing ring to climb')
+  const el2 = $('#pillTxt');
+  el2.textContent = key === 'go' ? (TOUCH.on ? 'Jump on the ring to climb' : keyName(BIND.jump) + ' on the ring to climb')
     : key === 'asc' ? 'Ascending…'
     : key === 'guest' ? 'Only the host can take the room up'
-    : key === 'form' ? 'Only a Black lion can climb this · wear the Black form'
-    : 'Only a Black lion can climb this · ' + KILL.black + ' K.O.s';
+    : key === 'form' ? 'Black lions only · wear the Black form'
+    : 'Only a Black lion can climb this';
+  el.title = key === 'locked' ? 'The Black form comes at ' + KILL.black + ' K.O.s' : '';
 }
 
 // =====================================================================
@@ -9005,6 +9007,7 @@ if (/[?&]dev=1/.test(location.search)) window.__scbg = { SFX, fighters, get play
   applyAvatar, avatarOf, avatarParts, HATS, BACKS, FACES_UI, FACE, EMOTES, playEmote, SKIN_CACHE, rigSync, mythGfx, own,
   applyState, packF, netNow, PORTRAITS,
   KILLS, KILL, setKills, creditKill, trophySet, trophyFull, TRO_CACHE, blackEnter, blackFlourish, transcend, TRANS, selectArena, syncArena, wantArena, ascendTo, descend, get ARENA_PASS() { return ARENA_PASS; }, ARENAS, ARENA_IDS, get ARENA() { return ARENA; }, get ARENA_SET() { return ARENA_SET; }, blocks, cans, DUEL, arenaFromHost, hostArena, joinArena, leaveRoom, sky, sun, hemi,
-  koSeen, kCredit, kHit, TRAIL, applyNetHit, applyHitReply, applyFx, onData, pendingHits, botKills, souls, KO, respawn, switchCharacter };
+  koSeen, kCredit, kHit, TRAIL, applyNetHit, applyHitReply, applyFx, onData, pendingHits, botKills, souls, KO, respawn, switchCharacter,
+  PILLAR, blackClimber, pillarTry, colTop, groundAt, spotClear, homeArena, CO, get camPull() { return camPull; }, get camYaw() { return camYaw; }, set camYaw(v) { camYaw = +v || 0; } };
 })();
 </script>
