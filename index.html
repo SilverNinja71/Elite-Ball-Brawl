@@ -817,52 +817,32 @@ function bevelG(w, h, d, r) {
   g.computeBoundingSphere(); shared(g); _bv.set(k, g); return g;
 }
 let BEVEL = false;   // on while a fighter is being built
-// painted faces: one atlas (4 x 2 expressions, 256 px each) plus a matching glow atlas for eye glints and the
-// awakened stare. Each expression is a curved patch that sits on the fighter's egg-shaped head (HEAD below),
-// with its own UVs; the decal swaps geometry, never material, so one draw call per fighter.
-// the head: a lathe (skull wider than the jaw, a narrow chin) stretched a little front to back; r(y) is its
-// radius at height y above the head centre, which the face patch follows exactly
+// the dancer's own face: one decal atlas (4 x 2 expressions, 256 px each) plus a matching glow atlas for eye
+// glints and the awakened stare, in the clean Roblox decal style (glossy black eyes, one bold ink line for a
+// mouth). Each expression is a curved patch that sits on the dancer's rounded-cylinder head (HEAD below), which
+// looks out through the lion head's mouth; the decal swaps geometry, never material, so one draw call per fighter.
+// the head: a lathe (a rounded cylinder, the classic block head); r(y) is its radius at height y above the head
+// centre, which the face patch follows exactly
 const HEAD = {
-  y: 0.28, sz: 1.04,
-  prof: [[0, -0.265], [0.1, -0.25], [0.165, -0.2], [0.2, -0.12], [0.222, -0.04], [0.232, 0.04], [0.234, 0.12], [0.214, 0.19], [0.17, 0.243], [0.09, 0.278], [0, 0.29]],
+  y: 0.25, sz: 1,
+  prof: [[0, -0.19], [0.1, -0.188], [0.15, -0.18], [0.182, -0.162], [0.198, -0.13], [0.204, -0.09], [0.205, 0.0], [0.204, 0.09], [0.198, 0.13], [0.182, 0.162], [0.15, 0.18], [0.1, 0.188], [0, 0.19]],
   r(y) { const p = this.prof; for (let i = 1; i < p.length; i++) if (y <= p[i][1]) return lerp(p[i - 1][0], p[i][0], (y - p[i - 1][1]) / (p[i][1] - p[i - 1][1])); return 0; },
 };
 const FACE = (() => {
   const keys = ['smile', 'smug', 'determined', 'hurt', 'awake', 'dummy', 'grin', 'cool'];
-  const INK = '#1a0f0a', WHITE = '#efe4d0', RED = '#a3161a';
-  const cell = (g, i) => { g.save(); g.translate((i % 4) * 256 + 128, Math.floor(i / 4) * 256 + 124); g.scale(1.1, 1.1); g.translate(-128, -124); };
-  // brush stroke: a tapered quadratic ribbon from (x0, y0) to (x1, y1), bulging by `bow`, `w` wide at its middle
-  function brush(g, x0, y0, x1, y1, w, bow = 0, col = INK) {
-    const mx = (x0 + x1) / 2, my = (y0 + y1) / 2, dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l;
-    const cx = mx + nx * bow, cy = my + ny * bow;
-    g.fillStyle = col; g.beginPath(); g.moveTo(x0, y0);
-    g.quadraticCurveTo(cx + nx * w, cy + ny * w, x1, y1); g.quadraticCurveTo(cx - nx * w * 0.35, cy - ny * w * 0.35, x0, y0); g.fill();
-  }
-  function line(g, w, col, ...pt) { g.strokeStyle = col; g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); g.moveTo(pt[0], pt[1]); for (let j = 2; j < pt.length; j += 2) g.lineTo(pt[j], pt[j + 1]); g.stroke(); }
+  const INK = '#151214', WHITE = '#ffffff', RED = '#c3242a';
+  const cell = (g, i) => { g.save(); g.translate((i % 4) * 256 + 128, Math.floor(i / 4) * 256 + 128); g.scale(1.12, 1.12); g.translate(-128, -128); };
   function curve(g, w, col, x0, y0, cx, cy, x1, y1) { g.strokeStyle = col; g.lineWidth = w; g.lineCap = 'round'; g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo(cx, cy, x1, y1); g.stroke(); }
-  // almond eye looking at (lx, ly) (-1..1); lid: 0 open .. 0.6 heavy; glow paints the iris into the glow atlas
-  function eye(g, e, x, y, w, h, side, o = {}) {
-    const lid = o.lid || 0, lx = o.lx || 0, ly = o.ly || 0, iris = o.iris || '#7a4a16';
-    g.save(); g.beginPath();
-    g.moveTo(x - w, y + h * 0.1 * side * 0); g.quadraticCurveTo(x, y - h * (1.15 - lid * 1.6), x + w, y - h * 0.15);
-    g.quadraticCurveTo(x, y + h * 0.95, x - w, y); g.closePath();
-    g.fillStyle = WHITE; g.fill(); g.clip();
-    const ix = x + lx * w * 0.35, iy = y + ly * h * 0.25 + lid * h * 0.3, ir = h * 0.78;
-    const gr = g.createRadialGradient(ix, iy - ir * 0.3, 1, ix, iy, ir);
-    gr.addColorStop(0, o.irisHi || '#d29a3c'); gr.addColorStop(0.6, iris); gr.addColorStop(1, '#2a1606');
-    g.fillStyle = gr; g.beginPath(); g.arc(ix, iy, ir, 0, TAU); g.fill();
-    g.fillStyle = '#0a0604'; g.beginPath(); g.arc(ix, iy, ir * 0.42, 0, TAU); g.fill();
-    g.fillStyle = 'rgba(255,255,255,.95)'; g.beginPath(); g.arc(ix + ir * 0.35, iy - ir * 0.4, ir * 0.2, 0, TAU); g.fill();
-    g.restore();
-    // upper lid line (heavy ink, flicked out at the far corner) and a faint lower lid
-    g.save(); g.beginPath();
-    g.moveTo(x - w * 1.02, y + 1); g.quadraticCurveTo(x, y - h * (1.2 - lid * 1.6), x + w * 1.15, y - h * 0.32);
-    g.lineTo(x + w * 1.05, y - h * 0.05); g.quadraticCurveTo(x, y - h * (0.98 - lid * 1.6), x - w * 0.95, y + 3); g.closePath();
-    g.fillStyle = INK; g.fill(); g.restore();
-    curve(g, 2.5, 'rgba(26,15,10,.55)', x - w * 0.8, y + h * 0.35, x, y + h * 1.05, x + w * 0.85, y + h * 0.2);
-    if (e) {   // glints (and the iris when the eyes burn)
-      if (o.glow) { e.fillStyle = o.glow; e.beginPath(); e.arc(ix, iy, ir * 0.95, 0, TAU); e.fill(); }
-      e.fillStyle = '#ffffff'; e.beginPath(); e.arc(ix + ir * 0.35, iy - ir * 0.4, ir * 0.2, 0, TAU); e.fill();
+  function line(g, w, col, ...pt) { g.strokeStyle = col; g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); g.moveTo(pt[0], pt[1]); for (let j = 2; j < pt.length; j += 2) g.lineTo(pt[j], pt[j + 1]); g.stroke(); }
+  // a glossy oval eye (the classic decal look): black, a big glint top-left and a small one below
+  function eye(g, e, x, y, w, h, o = {}) {
+    g.fillStyle = o.col || INK; g.beginPath(); g.ellipse(x, y, w, h, 0, 0, TAU); g.fill();
+    if (o.cut) { g.save(); g.globalCompositeOperation = 'destination-out'; g.beginPath(); g.ellipse(x, y - h * (1.15 - o.cut * 2), w * 1.6, h, 0, 0, TAU); g.fill(); g.restore(); }
+    g.fillStyle = WHITE; g.beginPath(); g.ellipse(x - w * 0.3, y - h * 0.38, w * 0.34, h * 0.24, -0.3, 0, TAU); g.fill();
+    g.beginPath(); g.arc(x + w * 0.28, y + h * 0.34, w * 0.14, 0, TAU); g.fill();
+    if (e) {
+      if (o.glow) { e.fillStyle = o.glow; e.beginPath(); e.ellipse(x, y, w, h, 0, 0, TAU); e.fill(); }
+      e.fillStyle = '#ffffff'; e.beginPath(); e.ellipse(x - w * 0.3, y - h * 0.38, w * 0.34, h * 0.24, -0.3, 0, TAU); e.fill();
     }
   }
   const tex = (draw) => canvasTex(1024, 512, draw);
@@ -871,65 +851,52 @@ const FACE = (() => {
   const map = tex((g) => {
     keys.forEach((k, i) => {
       cell(g, i); cell(eg, i);
-      const L = 84, R = 172, EY = 108;   // eye centres: the nose sits between them, below EY
-      if (k === 'smile') {
-        brush(g, 52, 78, 112, 74, 7, -6); brush(g, 204, 78, 144, 74, 7, 6);
-        eye(g, eg, L, EY, 26, 15, 1, { lid: 0.15 }); eye(g, eg, R, EY, 26, 15, -1, { lid: 0.15 });
-        curve(g, 6, INK, 100, 186, 128, 204, 158, 184); curve(g, 3, 'rgba(26,15,10,.5)', 112, 210, 128, 214, 144, 210);
+      const L = 96, R = 160, EY = 104;   // eye centres; the mouth sits round y 170
+      if (k === 'smile') {   // the classic: two glossy ovals and one smile
+        eye(g, eg, L, EY, 13, 21); eye(g, eg, R, EY, 13, 21);
+        curve(g, 9, INK, 86, 160, 128, 196, 170, 160);
       } else if (k === 'smug') {
-        brush(g, 52, 84, 112, 82, 7, -2); brush(g, 206, 62, 144, 74, 8, 9);
-        eye(g, eg, L, EY + 2, 26, 15, 1, { lid: 0.45, lx: 0.7 }); eye(g, eg, R, EY, 26, 15, -1, { lid: 0.4, lx: 0.7 });
-        curve(g, 6, INK, 104, 196, 140, 204, 166, 180); curve(g, 4, INK, 162, 178, 170, 182, 168, 190);
+        eye(g, eg, L, EY + 4, 13, 17, { cut: 0.35 }); eye(g, eg, R, EY + 2, 13, 18, { cut: 0.3 });
+        line(g, 8, INK, 76, 72, 112, 78); line(g, 8, INK, 144, 66, 180, 58);
+        curve(g, 9, INK, 98, 172, 140, 184, 172, 156);
       } else if (k === 'determined') {
-        brush(g, 46, 66, 116, 92, 9, -4); brush(g, 210, 66, 140, 92, 9, 4);
-        eye(g, eg, L, EY + 4, 25, 13, 1, { lid: 0.35 }); eye(g, eg, R, EY + 4, 25, 13, -1, { lid: 0.35 });
-        brush(g, 60, 140, 92, 146, 4, 2, RED); brush(g, 196, 140, 164, 146, 4, -2, RED);
-        line(g, 6, INK, 104, 196, 128, 192, 152, 196);
-      } else if (k === 'hurt') {
-        brush(g, 52, 74, 112, 90, 7, 4); brush(g, 204, 74, 144, 90, 7, -4);
-        line(g, 7, INK, 60, 102, 102, 114, 64, 126); line(g, 7, INK, 196, 102, 154, 114, 192, 126);
-        g.fillStyle = '#2a0c08'; g.beginPath(); g.ellipse(128, 196, 26, 15, 0, 0, TAU); g.fill();
-        g.fillStyle = WHITE; g.fillRect(108, 184, 40, 6);
-      } else if (k === 'awake') {
-        // opera-style war paint swept out from the eyes, burning gold irises, bared teeth
-        g.fillStyle = 'rgba(163,22,26,.85)';
-        for (const s of [1, -1]) { g.beginPath(); g.moveTo(128 - s * 20, 84); g.quadraticCurveTo(128 - s * 70, 70, 128 - s * 118, 46); g.quadraticCurveTo(128 - s * 96, 120, 128 - s * 34, 140); g.closePath(); g.fill(); }
-        brush(g, 40, 58, 116, 94, 10, -6); brush(g, 216, 58, 140, 94, 10, 6);
-        eye(g, eg, L, EY + 2, 27, 14, 1, { lid: 0.25, iris: '#e0a020', irisHi: '#fff2a8', glow: '#ffb020' });
-        eye(g, eg, R, EY + 2, 27, 14, -1, { lid: 0.25, iris: '#e0a020', irisHi: '#fff2a8', glow: '#ffb020' });
-        g.fillStyle = '#2a0c08'; g.beginPath(); g.moveTo(96, 184); g.quadraticCurveTo(128, 176, 160, 184); g.quadraticCurveTo(128, 214, 96, 184); g.fill();
-        g.fillStyle = WHITE; g.beginPath(); g.moveTo(100, 185); g.quadraticCurveTo(128, 178, 156, 185); g.lineTo(152, 192); g.quadraticCurveTo(128, 186, 104, 192); g.fill();
-        for (const s of [1, -1]) { g.beginPath(); g.moveTo(128 - s * 20, 186); g.lineTo(128 - s * 15, 200); g.lineTo(128 - s * 11, 186); g.fill(); }
-      } else if (k === 'dummy') {
-        // talisman paint on a wooden head: red rings for eyes, stitched mouth, a seal mark on the brow
-        for (const x of [L, R]) { g.strokeStyle = RED; g.lineWidth = 9; g.beginPath(); g.arc(x, EY, 17, 0, TAU); g.stroke(); g.fillStyle = INK; g.beginPath(); g.arc(x, EY, 5, 0, TAU); g.fill(); }
-        line(g, 5, INK, 92, 194, 164, 194); for (let x = 98; x <= 158; x += 12) line(g, 4, INK, x, 184, x + 4, 204);
-        g.fillStyle = RED; g.fillRect(116, 44, 24, 24); g.fillStyle = '#e8d8b0'; g.fillRect(122, 50, 12, 12);
-      } else if (k === 'grin') {
-        brush(g, 52, 72, 112, 72, 7, -10); brush(g, 204, 72, 144, 72, 7, 10);
-        curve(g, 8, INK, 62, 116, 84, 92, 108, 114); curve(g, 8, INK, 148, 114, 172, 92, 194, 116);
-        g.fillStyle = '#2a0c08'; g.beginPath(); g.moveTo(88, 178); g.quadraticCurveTo(128, 236, 168, 178); g.quadraticCurveTo(128, 190, 88, 178); g.fill();
-        g.fillStyle = WHITE; g.beginPath(); g.moveTo(94, 181); g.quadraticCurveTo(128, 192, 162, 181); g.lineTo(158, 190); g.quadraticCurveTo(128, 198, 98, 190); g.fill();
-      } else if (k === 'cool') {
-        // ink mask: a swept black band over the eyes with glowing slits, a red seal on the brow
-        g.fillStyle = INK; g.beginPath(); g.moveTo(18, 86); g.quadraticCurveTo(128, 60, 238, 86); g.quadraticCurveTo(220, 140, 150, 132);
-        g.quadraticCurveTo(128, 124, 106, 132); g.quadraticCurveTo(36, 140, 18, 86); g.fill();
-        for (const s of [1, -1]) {
-          g.fillStyle = '#f4ead6'; g.beginPath(); g.moveTo(128 - s * 22, 108); g.quadraticCurveTo(128 - s * 46, 92, 128 - s * 76, 102); g.quadraticCurveTo(128 - s * 46, 114, 128 - s * 22, 108); g.fill();
-          eg.fillStyle = '#c8e8ff'; eg.beginPath(); eg.moveTo(128 - s * 22, 108); eg.quadraticCurveTo(128 - s * 46, 92, 128 - s * 76, 102); eg.quadraticCurveTo(128 - s * 46, 114, 128 - s * 22, 108); eg.fill();
-        }
-        g.fillStyle = RED; g.beginPath(); g.moveTo(128, 34); g.lineTo(138, 56); g.lineTo(128, 66); g.lineTo(118, 56); g.closePath(); g.fill();
-        curve(g, 6, INK, 104, 194, 128, 186, 156, 192);
+        eye(g, eg, L, EY + 6, 13, 17); eye(g, eg, R, EY + 6, 13, 17);
+        line(g, 10, INK, 72, 70, 114, 86); line(g, 10, INK, 184, 70, 142, 86);
+        line(g, 9, INK, 102, 172, 154, 168);
+      } else if (k === 'hurt') {   // squeezed shut, mouth open in an "O"
+        line(g, 9, INK, 78, 92, 108, 106, 78, 120); line(g, 9, INK, 178, 92, 148, 106, 178, 120);
+        g.fillStyle = INK; g.beginPath(); g.ellipse(128, 172, 20, 24, 0, 0, TAU); g.fill();
+        g.fillStyle = RED; g.beginPath(); g.ellipse(128, 182, 12, 9, 0, 0, TAU); g.fill();
+      } else if (k === 'awake') {   // burning eyes and a fierce grin
+        line(g, 10, INK, 70, 72, 116, 92); line(g, 10, INK, 186, 72, 140, 92);
+        eye(g, eg, L, EY + 6, 14, 15, { col: '#ffb020', glow: '#ffb020' }); eye(g, eg, R, EY + 6, 14, 15, { col: '#ffb020', glow: '#ffb020' });
+        g.fillStyle = INK; g.beginPath(); g.moveTo(88, 158); g.quadraticCurveTo(128, 214, 168, 158); g.closePath(); g.fill();
+        g.fillStyle = WHITE; g.beginPath(); g.moveTo(94, 160); g.lineTo(162, 160); g.lineTo(156, 172); g.lineTo(100, 172); g.closePath(); g.fill();
+      } else if (k === 'dummy') {   // stitched practice face
+        for (const x of [L, R]) { line(g, 8, INK, x - 12, EY - 12, x + 12, EY + 12); line(g, 8, INK, x + 12, EY - 12, x - 12, EY + 12); }
+        line(g, 6, INK, 92, 170, 164, 170); for (let x = 98; x <= 158; x += 12) line(g, 5, INK, x, 160, x + 3, 180);
+      } else if (k === 'grin') {   // big open grin
+        curve(g, 9, INK, 78, 102, 96, 78, 114, 102); curve(g, 9, INK, 142, 102, 160, 78, 178, 102);
+        g.fillStyle = INK; g.beginPath(); g.moveTo(80, 146); g.quadraticCurveTo(128, 226, 176, 146); g.closePath(); g.fill();
+        g.fillStyle = WHITE; g.beginPath(); g.moveTo(86, 148); g.lineTo(170, 148); g.quadraticCurveTo(166, 162, 160, 166); g.lineTo(96, 166); g.quadraticCurveTo(90, 160, 86, 148); g.fill();
+        g.fillStyle = '#e0505a'; g.beginPath(); g.ellipse(128, 190, 22, 10, 0, 0, TAU); g.fill();
+      } else if (k === 'cool') {   // shades and a smirk
+        g.fillStyle = INK; g.beginPath(); g.moveTo(58, 82); g.lineTo(198, 82); g.lineTo(194, 96); g.quadraticCurveTo(184, 128, 150, 120); g.quadraticCurveTo(138, 104, 128, 104);
+        g.quadraticCurveTo(118, 104, 106, 120); g.quadraticCurveTo(72, 128, 62, 96); g.closePath(); g.fill();
+        g.fillStyle = 'rgba(255,255,255,.55)'; g.beginPath(); g.moveTo(72, 90); g.lineTo(92, 90); g.lineTo(80, 112); g.closePath(); g.fill();
+        g.beginPath(); g.moveTo(152, 90); g.lineTo(172, 90); g.lineTo(160, 112); g.closePath(); g.fill();
+        eg.fillStyle = '#9fd8ff'; eg.fillRect(70, 88, 24, 6); eg.fillRect(150, 88, 24, 6);
+        curve(g, 9, INK, 100, 170, 142, 180, 166, 156);
       }
       g.restore(); eg.restore();
     });
   });
   map.anisotropy = 4;
   const glow = new THREE.CanvasTexture(glowC); glow.encoding = THREE.sRGBEncoding;
-  const mat = shared(new THREE.MeshStandardMaterial({ map, emissiveMap: glow, emissive: new THREE.Color(1.6, 1.4, 1.1), alphaTest: 0.45, roughness: 0.55, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  const mat = shared(new THREE.MeshStandardMaterial({ map, emissiveMap: glow, emissive: new THREE.Color(1.6, 1.4, 1.1), alphaTest: 0.45, roughness: 0.4, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
   const geo = {};
-  // a patch of the head's ellipsoid, pushed out a hair, spanning +-0.8 rad around the front and the eye-mouth band
-  const S = 1.012, NU = 12, NV = 10, U0 = 0.82, Y0 = -0.2, Y1 = 0.2;
+  // a patch of the head's lathe, pushed out a hair, spanning +-0.8 rad round the front and most of its height
+  const S = 1.012, NU = 12, NV = 10, U0 = 0.8, Y0 = -0.16, Y1 = 0.16;
   keys.forEach((k, i) => {
     const pos = [], nor = [], uv = [], idx = [];
     const u0 = (i % 4) / 4, v0 = 1 - (Math.floor(i / 4) + 1) / 2;
@@ -939,7 +906,6 @@ const FACE = (() => {
         const s = a / NU, th = lerp(-U0, U0, s);
         const x = r * Math.sin(th), z = r * HEAD.sz * Math.cos(th);
         pos.push(x * S, y * S, z * S);
-        // normal = d/dy x d/dtheta of (r sin th, y, r sz cos th)
         const n = new V3(HEAD.sz * Math.sin(th), -HEAD.sz * dr, Math.cos(th)).normalize(); nor.push(n.x, n.y, n.z);
         uv.push(u0 + s / 4, v0 + t / 2);
       }
@@ -1989,13 +1955,54 @@ function mythEnv() {
   pm.dispose(); g.dispose(); ball.dispose();
   return _mythEnv;
 }
+// ---- lion-dance textures (data, generated once) ----
+// SEQ: the sequinned cloth of the trousers and shirts, a tiling hex grid of overlapping round sequins:
+// R gold rim of each sequin, G its domed face, B a random value per sequin (when it catches the light)
+// FUR: soft strand height field for the fur shells: R strand height (tapered cones, clumped), G clump tint
+const LDTEX = (() => {
+  const hash = (x, y, s) => { let h = (x * 374761393 + y * 668265263 + s * 982451653) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+  const tile = (N, data) => { const t = new THREE.DataTexture(data, N, N, THREE.RGBAFormat); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.anisotropy = 4; t.needsUpdate = true; return shared(t); };
+  // sequins: 8 columns x 8 rows (offset rows) in a 128 px tile; each row overlaps the one below like scales
+  const N = 128, d = new Uint8Array(N * N * 4), cw = 16, ch = 14;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    let rim = 0, face = 0, id = 0, best = -1;
+    const row = Math.floor(y / ch);
+    for (let j = row - 1; j <= row + 1; j++) {
+      const off = (((j % 8) + 8) % 8 & 1) * cw / 2;
+      for (let c = -1; c <= 1; c++) {
+        const cx = Math.floor((x - off) / cw) * cw + off + cw / 2 + c * cw, cy = j * ch + ch / 2;
+        let dx = x - cx, dy = y - cy; const q = Math.hypot(dx, dy) / (cw * 0.62);
+        if (q >= 1) continue;
+        // a later row (lower on the leg) sits on top: the highest j that covers this pixel wins
+        if (j > best || (j === best && q < 0.5)) { best = j; rim = clamp((q - 0.7) / 0.18, 0, 1) * (1 - clamp((q - 0.92) / 0.08, 0, 1)); face = 1 - q * q * 0.6; id = hash(((Math.floor((cx) / cw) % 8) + 8) % 8, ((j % 8) + 8) % 8, 3); }
+      }
+    }
+    const o = (y * N + x) * 4; d[o] = rim * 255; d[o + 1] = face * 255; d[o + 2] = id * 255; d[o + 3] = 255;
+  }
+  // fur strands: ~3600 tapered strands per 256 px tile, taller in clumps, each a soft cone
+  const F = 256, fh = new Float32Array(F * F), fd = new Uint8Array(F * F * 4);
+  let seed = 11; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const clump = (x, y) => 0.5 + 0.5 * Math.sin(x * TAU * 3 / F + Math.sin(y * TAU * 2 / F) * 2.0) * Math.sin(y * TAU * 4 / F + Math.cos(x * TAU * 2 / F) * 1.5);
+  for (let k = 0; k < 5200; k++) {
+    const cx = rnd() * F, cy = rnd() * F, r = 2.6 + rnd() * 3.2, h = (0.55 + rnd() * 0.45) * (0.72 + 0.28 * clump(cx, cy));
+    for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) {
+      const q = Math.hypot(x - cx, y - cy) / r; if (q >= 1) continue;
+      const px = ((x % F) + F) % F, py = ((y % F) + F) % F, v = h * Math.pow(1 - q, 0.45);
+      if (v > fh[py * F + px]) fh[py * F + px] = v;
+    }
+  }
+  for (let i = 0; i < F * F; i++) { const o = i * 4, x = i % F, y = (i / F) | 0; fd[o] = clamp(fh[i], 0, 1) * 255; fd[o + 1] = clamp(0.35 + clump(x, y) * 0.5 + (hash(x, y, 9) - 0.5) * 0.2, 0, 1) * 255; fd[o + 2] = 0; fd[o + 3] = 255; }
+  const white = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, THREE.RGBAFormat); white.needsUpdate = true;
+  const black = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, THREE.RGBAFormat); black.needsUpdate = true;
+  return { seq: tile(N, d), fur: tile(F, fd), white: shared(white), black: shared(black) };
+})();
 // shared uniforms: detail on / off (Low), time, the warm rim light's direction (view space) and colour
 const MYTH_U = {
-  uDetailMap: { value: DETAIL.tex }, uNoiseMap: { value: DETAIL.smooth }, uDetail: { value: GFX.level === 'low' ? 0 : 1 }, uTime: RIG_U.uTime,
+  uDetailMap: { value: DETAIL.tex }, uNoiseMap: { value: DETAIL.smooth }, uSeqMap: { value: LDTEX.seq }, uDetail: { value: GFX.level === 'low' ? 0 : 1 }, uTime: RIG_U.uTime,
   uRimDir: { value: new V3(0, 1, 0) }, uRimCol: { value: new THREE.Color(1.0, 0.62, 0.32).multiplyScalar(0.55) },
 };
-// Black form (50 K.O.s), shared by the High and Medium body shaders: lacquer black over everything that is not
-// metal, metal turns to molten gold, trims glow like embers and ember veins pulse through the lacquer.
+// Black form (50 K.O.s), shared by the High and Medium body shaders: black over everything that is not metal,
+// metal (gold rings, gold leaf lines) turns to molten gold, trims glow like embers, ember veins pulse through.
 // uBlack is the fighter's own 0..1 uniform (it ramps during the transformation); 0 costs one uniform branch.
 const MYTH_BLACK_GLSL = `
 const vec3 BLACK_RIM = vec3(0.08, 0.016, 0.004);   // a faint ember edge (a stronger rim browns the whole lacquer)
@@ -2012,18 +2019,47 @@ vec3 mythEmber(vec2 uv, vec3 rest, vec4 m) {
   float v = nn.x * 0.8 + nn.y * 0.2;
   float vein = (1.0 - smoothstep(0.0, 0.018, abs(v - 0.5))) * (1.0 - m.y);
   float pulse = 0.45 + 0.55 * sin(uTime * 2.6 + rest.y * 9.0 + rest.x * 5.0);
-  return BLACK_EMBER * vein * pulse * 1.1 + vec3(1.0, 0.5, 0.12) * m.w * (0.9 + 0.3 * sin(uTime * 2.4)) * 1.1;
+  return BLACK_EMBER * vein * pulse * 0.7 + vec3(1.0, 0.5, 0.12) * m.w * (0.9 + 0.3 * sin(uTime * 2.4)) * 1.1;
 }`;
+// The lion-dance surfaces, shared by all three body shaders (mat.z picks the pattern):
+//  5 sequinned cloth: gold-rimmed sequins over the cloth colour, each catching the light now and then as the
+//    fighter turns (a per-sequin phase plus the view angle and time: no extra lights, one texture fetch)
+//  6 painted papier-mache (the lion heads, jaw plates, capes): colour from the fighter's own paint atlas at the
+//    baked atlas UV (puv), with a shared mask atlas whose R marks gold-leaf lines (metal) and G the eyes' irises
+//    (they burn in the Black form)
+const LD_DECL = `uniform sampler2D uSeqMap; uniform sampler2D uPaint; uniform sampler2D uPaintMask; varying vec2 vPuv;
+float ldMetal; float ldSpark; vec2 ldMask;`;
+const LD_COLOR = `
+    ldMetal = 0.0; ldSpark = 0.0; ldMask = vec2(0.0);
+    if (p > 4.5 && p < 5.5) {
+      vec4 sq = texture2D(uSeqMap, uv * 2.6);
+      vec3 gold = vec3(0.98, 0.66, 0.2);
+      diffuseColor.rgb = mix(diffuseColor.rgb * (0.78 + sq.g * 0.42), gold * (0.7 + 0.3 * sq.g), sq.r);
+      ldMetal = sq.r; ldSpark = sq.b + sq.g * 0.001;
+    } else if (p > 5.5) {
+      diffuseColor.rgb *= sRGBToLinear(texture2D(uPaint, vPuv)).rgb;   // custom samplers are not decoded for us
+      ldMask = texture2D(uPaintMask, vPuv).rg; ldMetal = ldMask.r * 0.9;
+    }`;
+// the sparkle term (needs the shading normal): a sequin flashes while (its phase + view angle + time) passes 1
+const LD_SPARK = `
+    if (vMat.z > 4.5 && vMat.z < 5.5) {
+      float facing = dot(normal, normalize(vViewPosition));
+      float k = fract(ldSpark * 9.0 + facing * 2.2 + uTime * 0.23);
+      totalEmissiveRadiance += vec3(1.0, 0.86, 0.55) * smoothstep(0.955, 1.0, k) * ldMetal * 2.6;
+    }
+    if (vMat.z > 5.5) totalEmissiveRadiance += BLACK_EMBER * ldMask.g * uBlack * (1.4 + 0.5 * sin(uTime * 3.1));`;
+function ldUniforms(sh, m) { sh.uniforms.uPaint = m.userData.uPaint || { value: LDTEX.white }; sh.uniforms.uPaintMask = m.userData.uPaintMask || { value: LDTEX.black }; sh.uniforms.uSeqMap = MYTH_U.uSeqMap; }
 // One onBeforeCompile for every fighter's body material (same source = one shader program for all of them);
-// `this` is the material, whose userData carries that fighter's own awaken uniform.
+// `this` is the material, whose userData carries that fighter's own awaken / Black uniforms and paint atlas.
 function mythOBC(sh) {
-  Object.assign(sh.uniforms, MYTH_U); sh.uniforms.uAwake = this.userData.uAwake; sh.uniforms.uBlack = this.userData.uBlack;
-  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 mat;\nattribute float emi;\nvarying vec4 vMat;\nvarying float vEmi;\nvarying vec3 vRest;\nvarying vec3 vRestN;')
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMat = mat; vEmi = emi; vRest = position; vRestN = normal;');
+  Object.assign(sh.uniforms, MYTH_U); sh.uniforms.uAwake = this.userData.uAwake; sh.uniforms.uBlack = this.userData.uBlack; ldUniforms(sh, this);
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 mat;\nattribute float emi;\nattribute vec2 puv;\nvarying vec4 vMat;\nvarying float vEmi;\nvarying vec3 vRest;\nvarying vec3 vRestN;\nvarying vec2 vPuv;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMat = mat; vEmi = emi; vRest = position; vRestN = normal; vPuv = puv;');
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
 uniform sampler2D uDetailMap; uniform sampler2D uNoiseMap; uniform float uDetail; uniform float uAwake; uniform float uTime; uniform vec3 uRimDir; uniform vec3 uRimCol; uniform float uBlack;
 varying vec4 vMat; varying float vEmi; varying vec3 vRest; varying vec3 vRestN;
 float mythH; vec2 mythUV;
+${LD_DECL}
 ${MYTH_BLACK_GLSL}
 vec3 mythBump(vec3 sp, vec3 sn, vec2 dh) {
   vec3 sx = dFdx(sp), sy = dFdy(sp), r1 = cross(sy, sn), r2 = cross(sn, sx);
@@ -2038,17 +2074,18 @@ vec3 mythBump(vec3 sp, vec3 sn, vec2 dh) {
     vec2 uv = an.x > an.y && an.x > an.z ? vRest.zy : (an.y > an.z ? vRest.xz : vRest.xy);
     float sc = p < 1.5 ? 1.8 : (p < 2.5 ? 4.0 : (p < 3.5 ? 2.2 : 1.7));
     vec4 t = texture2D(uDetailMap, uv * sc);
-    float h = p < 0.5 ? 0.5 : (p < 1.5 ? t.r : (p < 2.5 ? t.g : (p < 3.5 ? t.b : t.a)));
+    float h = p < 0.5 || p > 4.5 ? 0.5 : (p < 1.5 ? t.r : (p < 2.5 ? t.g : (p < 3.5 ? t.b : t.a)));
     mythH = mix(0.5, h, uDetail); mythUV = uv;
     diffuseColor.rgb *= 1.0 + (mythH - 0.5) * (p > 3.5 ? 0.55 : (p > 2.5 ? 0.3 : (p > 1.5 ? 0.16 : 0.22)));
-    if (uBlack > 0.0) diffuseColor.rgb = mythBlack(diffuseColor.rgb, vMat.y);
+    ${LD_COLOR}
+    if (uBlack > 0.0) diffuseColor.rgb = mythBlack(diffuseColor.rgb, max(vMat.y, ldMetal));
   }`)
-    .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = clamp(mix(vMat.x, 0.34 + vMat.x * 0.2, uBlack) + (0.5 - mythH) * 0.3, 0.05, 1.0);')
-    .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n  metalnessFactor = vMat.y;')
+    .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = clamp(mix(mix(vMat.x, 0.26, ldMetal), 0.34 + vMat.x * 0.2, uBlack) + (0.5 - mythH) * 0.3, 0.05, 1.0);')
+    .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n  metalnessFactor = max(vMat.y, ldMetal);')
     // Black form: lacquer keeps a dim sheen instead of mirroring the warm sky
-    .replace('#include <aomap_fragment>', 'reflectedLight.indirectSpecular *= 1.0 - uBlack * 0.65 * (1.0 - vMat.y);\n#include <aomap_fragment>')
+    .replace('#include <aomap_fragment>', 'reflectedLight.indirectSpecular *= 1.0 - uBlack * 0.65 * (1.0 - max(vMat.y, ldMetal));\n#include <aomap_fragment>')
     .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-  normal = mythBump(-vViewPosition, normal, vec2(dFdx(mythH), dFdy(mythH)) * (vMat.z < 0.5 ? 0.0 : (vMat.z > 3.5 ? 0.007 : (vMat.z > 2.5 ? 0.003 : (vMat.z > 1.5 ? 0.0015 : 0.004)))));   // bump heights in world units`)
+  normal = mythBump(-vViewPosition, normal, vec2(dFdx(mythH), dFdy(mythH)) * (vMat.z < 0.5 || vMat.z > 4.5 ? 0.0 : (vMat.z > 3.5 ? 0.007 : (vMat.z > 2.5 ? 0.003 : (vMat.z > 1.5 ? 0.0015 : 0.004)))));   // bump heights in world units`)
     .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
   {
     float fres = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);
@@ -2056,43 +2093,69 @@ vec3 mythBump(vec3 sp, vec3 sn, vec2 dh) {
     totalEmissiveRadiance += mix(uRimCol, BLACK_RIM, uBlack) * fres * side * (1.0 - 0.45 * vMat.y);
     totalEmissiveRadiance += mix(vColor, BLACK_EMBER, uBlack) * (vEmi * 1.4 + vMat.w * uAwake * (1.1 + 0.6 * sin(uTime * 7.0)));
     if (uBlack > 0.0) totalEmissiveRadiance += mythEmber(mythUV, vRest, vMat) * uBlack;
+    ${LD_SPARK}
   }`);
 }
-function mythMat(uAwake, uBlack) {
+const DUMMY_PAINT = { value: null };
+function ldPaintU(f) { return f && f.rig && f.rig.paint ? { uPaint: { value: f.rig.paint }, uPaintMask: { value: LDPAINT.mask() } } : {}; }
+function mythMat(uAwake, uBlack, pu) {
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, skinning: true, roughness: 1, metalness: 1, envMap: mythEnv(), envMapIntensity: 1 });
-  m.userData.uAwake = uAwake; m.userData.uBlack = uBlack; m.onBeforeCompile = mythOBC; m.extensions = { derivatives: true };
+  Object.assign(m.userData, pu); m.userData.uAwake = uAwake; m.userData.uBlack = uBlack; m.onBeforeCompile = mythOBC; m.extensions = { derivatives: true };
   return m;
 }
-// Low: the same look lit per vertex (Lambert), no reflections or surface detail; metal is simply brighter
+// Low: the same look lit per vertex (Lambert), no reflections or surface detail; metal is simply brighter.
+// The paint atlas and the sequins stay (one texture fetch each, only on those parts): the head is the hero.
 function mythOBCLow(sh) {
-  sh.uniforms.uAwake = this.userData.uAwake; sh.uniforms.uTime = RIG_U.uTime; sh.uniforms.uBlack = this.userData.uBlack;
-  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 mat;\nattribute float emi;\nuniform float uBlack;\nvarying float vEmi;\nvarying float vNeon;\nvarying vec3 vEmc;')
+  sh.uniforms.uAwake = this.userData.uAwake; sh.uniforms.uTime = RIG_U.uTime; sh.uniforms.uBlack = this.userData.uBlack; ldUniforms(sh, this);
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 mat;\nattribute float emi;\nattribute vec2 puv;\nuniform float uBlack;\nvarying float vEmi;\nvarying float vNeon;\nvarying vec3 vEmc;\nvarying vec2 vPuv;\nvarying vec3 vRest;\nvarying vec3 vRestN;\nvarying float vPat;\nvarying float vMet;')
     .replace('#include <color_vertex>', `#include <color_vertex>
-vColor.xyz *= 1.0 + mat.y * 0.45; vEmi = emi; vNeon = mat.w; vEmc = vColor.xyz;
-if (uBlack > 0.0) {   // Black form, per vertex: lacquer black, molten-gold metal, ember glow on trim and glowing parts
+vColor.xyz *= 1.0 + mat.y * 0.45; vEmi = emi; vNeon = mat.w; vEmc = vColor.xyz; vPuv = puv; vRest = position; vRestN = normal; vPat = mat.z; vMet = mat.y;
+if (uBlack > 0.0 && mat.z < 4.5) {   // Black form, per vertex: lacquer black, molten-gold metal, ember glow on trim and glowing parts
   float lum = dot(vColor.xyz, vec3(0.3, 0.59, 0.11));
   vColor.xyz = mix(vColor.xyz, mat.y > 0.5 ? vec3(0.5, 0.24, 0.05) * (0.5 + lum * 0.7) : vec3(0.02, 0.018, 0.02) + lum * vec3(0.06, 0.045, 0.045), uBlack);
   vEmc = mix(vEmc, vec3(1.0, 0.3, 0.05), uBlack);
 }`);
-  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uAwake;\nuniform float uTime;\nuniform float uBlack;\nvarying float vEmi;\nvarying float vNeon;\nvarying vec3 vEmc;')
-    .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += vEmc * (vEmi * 1.4 + vNeon * (uAwake * (1.1 + 0.6 * sin(uTime * 7.0)) + uBlack * (0.9 + 0.3 * sin(uTime * 2.4))));');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+uniform float uAwake; uniform float uTime; uniform float uBlack; uniform sampler2D uSeqMap; uniform sampler2D uPaint; uniform sampler2D uPaintMask;
+varying float vEmi; varying float vNeon; varying vec3 vEmc; varying vec2 vPuv; varying vec3 vRest; varying vec3 vRestN; varying float vPat; varying float vMet;`)
+    .replace('#include <color_fragment>', `#include <color_fragment>
+  float ldGlow = 0.0, ldSp = 0.0;
+  if (vPat > 4.5) {
+    float metal = 0.0;
+    if (vPat < 5.5) {
+      vec3 an = abs(vRestN); vec2 uv = an.x > an.y && an.x > an.z ? vRest.zy : (an.y > an.z ? vRest.xz : vRest.xy);
+      vec4 sq = texture2D(uSeqMap, uv * 2.6);
+      diffuseColor.rgb = mix(diffuseColor.rgb * (0.8 + sq.g * 0.4), vec3(1.25, 0.85, 0.28) * (0.7 + 0.3 * sq.g), sq.r);
+      metal = sq.r; ldSp = smoothstep(0.95, 1.0, fract(sq.b * 9.0 + uTime * 0.3)) * sq.r;
+    } else {
+      diffuseColor.rgb *= sRGBToLinear(texture2D(uPaint, vPuv)).rgb;
+      vec2 mk = texture2D(uPaintMask, vPuv).rg; metal = mk.r; ldGlow = mk.g;
+      diffuseColor.rgb *= 1.0 + mk.r * 0.35;
+    }
+    if (uBlack > 0.0) {
+      float lum = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+      diffuseColor.rgb = mix(diffuseColor.rgb, metal > 0.5 || vMet > 0.5 ? vec3(0.62, 0.3, 0.07) * (0.6 + lum * 0.7) : vec3(0.02, 0.018, 0.02) + lum * vec3(0.06, 0.045, 0.045), uBlack);
+    }
+  }`)
+    .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += vEmc * (vEmi * 1.4 + vNeon * (uAwake * (1.1 + 0.6 * sin(uTime * 7.0)) + uBlack * (0.9 + 0.3 * sin(uTime * 2.4)))) + vec3(1.0, 0.85, 0.5) * ldSp * 1.5 + vec3(1.0, 0.24, 0.04) * ldGlow * uBlack * 1.6;');
 }
-function mythMatLow(uAwake, uBlack) {
+function mythMatLow(uAwake, uBlack, pu) {
   const m = new THREE.MeshLambertMaterial({ vertexColors: true, skinning: true });
-  m.userData.uAwake = uAwake; m.userData.uBlack = uBlack; m.onBeforeCompile = mythOBCLow;
+  Object.assign(m.userData, pu); m.userData.uAwake = uAwake; m.userData.uBlack = uBlack; m.onBeforeCompile = mythOBCLow;
   return m;
 }
 // Medium (phones by default): per-pixel Blinn-Phong instead of PBR. Roughness and metalness still come from the
 // vertices (shininess and specular colour), metal gets a cheap sky / ground sheen in place of reflections, and
-// the detail patterns and the warm rim stay. About as cheap to shade as Lambert, far cheaper than the PBR + env.
+// the detail patterns, sequins, paint and the warm rim stay. About as cheap to shade as Lambert.
 function mythOBCMid(sh) {
-  Object.assign(sh.uniforms, MYTH_U); sh.uniforms.uAwake = this.userData.uAwake; sh.uniforms.uBlack = this.userData.uBlack;
-  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 mat;\nattribute float emi;\nvarying vec4 vMat;\nvarying float vEmi;\nvarying vec3 vRest;\nvarying vec3 vRestN;')
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMat = mat; vEmi = emi; vRest = position; vRestN = normal;');
+  Object.assign(sh.uniforms, MYTH_U); sh.uniforms.uAwake = this.userData.uAwake; sh.uniforms.uBlack = this.userData.uBlack; ldUniforms(sh, this);
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 mat;\nattribute float emi;\nattribute vec2 puv;\nvarying vec4 vMat;\nvarying float vEmi;\nvarying vec3 vRest;\nvarying vec3 vRestN;\nvarying vec2 vPuv;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMat = mat; vEmi = emi; vRest = position; vRestN = normal; vPuv = puv;');
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
 uniform sampler2D uDetailMap; uniform sampler2D uNoiseMap; uniform float uAwake; uniform float uTime; uniform vec3 uRimDir; uniform vec3 uRimCol; uniform float uBlack;
 varying vec4 vMat; varying float vEmi; varying vec3 vRest; varying vec3 vRestN;
 float mythH; vec2 mythUV;
+${LD_DECL}
 ` + MYTH_BLACK_GLSL)
     .replace('#include <color_fragment>', `#include <color_fragment>
   {
@@ -2100,13 +2163,14 @@ float mythH; vec2 mythUV;
     vec2 uv = an.x > an.y && an.x > an.z ? vRest.zy : (an.y > an.z ? vRest.xz : vRest.xy);
     float sc = p < 1.5 ? 1.8 : (p < 2.5 ? 4.0 : (p < 3.5 ? 2.2 : 1.7));
     vec4 t = texture2D(uDetailMap, uv * sc);
-    mythH = p < 0.5 ? 0.5 : (p < 1.5 ? t.r : (p < 2.5 ? t.g : (p < 3.5 ? t.b : t.a))); mythUV = uv;
+    mythH = p < 0.5 || p > 4.5 ? 0.5 : (p < 1.5 ? t.r : (p < 2.5 ? t.g : (p < 3.5 ? t.b : t.a))); mythUV = uv;
     diffuseColor.rgb *= 1.0 + (mythH - 0.5) * (p > 3.5 ? 0.55 : (p > 2.5 ? 0.3 : (p > 1.5 ? 0.16 : 0.22)));
-    if (uBlack > 0.0) diffuseColor.rgb = mythBlack(diffuseColor.rgb, vMat.y);
+    ${LD_COLOR}
+    if (uBlack > 0.0) diffuseColor.rgb = mythBlack(diffuseColor.rgb, max(vMat.y, ldMetal));
   }`)
     .replace('#include <lights_phong_fragment>', `#include <lights_phong_fragment>
   {
-    float rough = clamp(mix(vMat.x, 0.34 + vMat.x * 0.2, uBlack) + (0.5 - mythH) * 0.3, 0.05, 1.0), metal = vMat.y;
+    float metal = max(vMat.y, ldMetal), rough = clamp(mix(mix(vMat.x, 0.26, ldMetal), 0.34 + vMat.x * 0.2, uBlack) + (0.5 - mythH) * 0.3, 0.05, 1.0);
     material.diffuseColor = diffuseColor.rgb * (1.0 - metal * 0.75);
     material.specularColor = mix(vec3(0.04), diffuseColor.rgb * 1.6, metal) * (1.0 - rough * 0.7);
     material.specularShininess = mix(90.0, 6.0, rough);
@@ -2116,44 +2180,91 @@ float mythH; vec2 mythUV;
     float fres = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);
     float side = clamp(dot(normal, uRimDir) * 0.7 + 0.45, 0.0, 1.0);
     totalEmissiveRadiance += mix(uRimCol, BLACK_RIM, uBlack) * fres * side * (1.0 - 0.45 * vMat.y);
-    totalEmissiveRadiance += diffuseColor.rgb * vMat.y * (0.22 + 0.2 * normal.y) * (1.0 - vMat.x * 0.5);
+    totalEmissiveRadiance += diffuseColor.rgb * max(vMat.y, ldMetal) * (0.22 + 0.2 * normal.y) * (1.0 - vMat.x * 0.5);
     totalEmissiveRadiance += mix(vColor, BLACK_EMBER, uBlack) * (vEmi * 1.4 + vMat.w * uAwake * (1.1 + 0.6 * sin(uTime * 7.0)));
     if (uBlack > 0.0) totalEmissiveRadiance += mythEmber(mythUV, vRest, vMat) * uBlack;
+    ${LD_SPARK}
   }`);
 }
-function mythMatMid(uAwake, uBlack) {
+function mythMatMid(uAwake, uBlack, pu) {
   const m = new THREE.MeshPhongMaterial({ vertexColors: true, skinning: true });
-  m.userData.uAwake = uAwake; m.userData.uBlack = uBlack; m.onBeforeCompile = mythOBCMid;
+  Object.assign(m.userData, pu); m.userData.uAwake = uAwake; m.userData.uBlack = uBlack; m.onBeforeCompile = mythOBCMid;
   return m;
 }
-// a fighter's body material for the current level (all three share its awaken uniform)
+// a fighter's body material for the current level (all three share its awaken / Black uniforms and paint atlas)
 function fighterMat(f) {
   if (!f.uAwake) f.uAwake = { value: 0 };
   if (!f.uBlack) f.uBlack = { value: 0 };
-  if (GFX.level === 'low') return f.matLow || (f.matLow = mythMatLow(f.uAwake, f.uBlack));
-  if (GFX.level === 'medium') return f.matMid || (f.matMid = mythMatMid(f.uAwake, f.uBlack));
-  return f.matStd || (f.matStd = mythMat(f.uAwake, f.uBlack));
+  const pu = ldPaintU(f);
+  if (GFX.level === 'low') return f.matLow || (f.matLow = mythMatLow(f.uAwake, f.uBlack, pu));
+  if (GFX.level === 'medium') return f.matMid || (f.matMid = mythMatMid(f.uAwake, f.uBlack, pu));
+  return f.matStd || (f.matStd = mythMat(f.uAwake, f.uBlack, pu));
 }
-// fur shells: copies of a base surface pushed out along their normals, each cut away by the strand texture
-// a little more than the last; all shells are one geometry and one draw call, no shadow
-const furMat = shared(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0, envMap: null }));
-furMat.extensions = { derivatives: true };
-furMat.onBeforeCompile = (sh) => {
-  sh.uniforms.uFur = { value: DETAIL.fur };
-  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 fur;\nvarying vec3 vFur;\nvarying vec2 vFurUv;')
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFur = fur; vFurUv = uv * vec2(9.0, 3.0);\ntransformed += objectNormal * fur.x * fur.y; transformed.y -= fur.x * fur.x * fur.y * 0.5;');
-  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D uFur;\nvarying vec3 vFur;\nvarying vec2 vFurUv;')
-    .replace('#include <color_fragment>', `#include <color_fragment>
-  float st = texture2D(uFur, vFurUv).r;
-  if (st < vFur.x * 0.92 + 0.06) discard;
-  diffuseColor.rgb *= mix(0.42, 1.12, vFur.x) * (0.85 + st * 0.3);`);
-};
+// ---- fur ----
+// Fur shells: copies of a base surface pushed out along their normals, each cut away by the strand texture a
+// little more than the last. Every shell of a fighter is baked into ONE skinned mesh on the body's skeleton
+// (skinBake), so all of a dancer's fur (lion head, brows, beard, cuffs, pompoms, cape fringe) is one draw call
+// with no shadow. The strands are box-projected in the part's own space at a fixed density (the same strand
+// size on a pompom and on the upper lip), tapered and clumped; strand edges blend through alpha-to-coverage
+// (soft with MSAA, a plain cut-off without), tips catch a soft fill so the fur reads lit through, not painted.
+// fur attribute: x = shell height 0..1, y = strand length, z = droop (how much the strands hang)
+const FUR_GLSL_V = ['#include <common>\nattribute vec3 fur;\nvarying vec3 vFur;\nvarying vec3 vFP;\nvarying vec3 vFN;',
+  '#include <begin_vertex>\nvFur = fur; vFP = position; vFN = normal;\ntransformed += normal * fur.x * fur.y; transformed.y -= fur.x * fur.x * fur.y * fur.z;'];
+const FUR_GLSL_F = `#include <color_fragment>
+  {
+    vec3 an = abs(vFN);
+    vec2 fuv = an.x > an.y && an.x > an.z ? vFP.zy : (an.y > an.z ? vFP.xz : vFP.xy);
+    vec4 st = texture2D(uFur, fuv * 4.2 + vec2(0.37, 0.11) * floor(an.x * 2.0 + an.y * 4.0));
+    float t = vFur.x * 0.94 + 0.04;
+    float a = clamp((st.r - t) * 9.0 + 0.5, 0.0, 1.0);
+    if (a < 0.22) discard;
+    diffuseColor.a = a;
+    diffuseColor.rgb *= mix(0.5, 1.12, vFur.x) * (0.86 + st.g * 0.28);
+    furTip = vFur.x;
+  }`;
+function furOBC(sh) {
+  sh.uniforms.uFur = { value: LDTEX.fur };
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', FUR_GLSL_V[0]).replace('#include <begin_vertex>', FUR_GLSL_V[1]);
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D uFur;\nvarying vec3 vFur;\nvarying vec3 vFP;\nvarying vec3 vFN;\nfloat furTip;')
+    .replace('#include <color_fragment>', FUR_GLSL_F)
+    // soft light: a little of the strand colour comes back as fill, more at the tips and at grazing angles
+    .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += diffuseColor.rgb * (0.1 + 0.22 * furTip) * (0.6 + 0.8 * pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 2.0));');
+}
+function makeFurMat(o) {
+  const m = new THREE.MeshStandardMaterial(Object.assign({ vertexColors: true, skinning: true, roughness: 0.88, metalness: 0, envMap: null }, o));
+  m.alphaToCoverage = true; m.extensions = { derivatives: true }; m.onBeforeCompile = furOBC;
+  return shared(m);
+}
+const furMat = makeFurMat();
+// fluffy base geometry: a surface with soft noise lumps pushed out along its normals (it is all that shows of the
+// fur on Low, where it still reads as tufts rather than a smooth shell); welded so the lumps never crack
+function gFluff(geo, amp, freq = 9, key = '') {
+  return gk('fluff' + geo.uuid + '|' + rk(amp) + '|' + rk(freq) + key, () => {
+    const g = geo.clone(), P = g.attributes.position, v = new V3(), n = new V3();
+    if (!g.attributes.normal) g.computeVertexNormals();
+    const N = g.attributes.normal;
+    const h = (x, y, z) => { const s = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453; return s - Math.floor(s); };
+    const noise = (x, y, z) => {   // value noise, trilinear
+      const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z), fx = x - xi, fy = y - yi, fz = z - zi;
+      const u = fx * fx * (3 - 2 * fx), w = fy * fy * (3 - 2 * fy), q = fz * fz * (3 - 2 * fz);
+      let r = 0;
+      for (let c = 0; c < 8; c++) { const a = c & 1, b = (c >> 1) & 1, e = (c >> 2) & 1; r += h(xi + a, yi + b, zi + e) * (a ? u : 1 - u) * (b ? w : 1 - w) * (e ? q : 1 - q); }
+      return r;
+    };
+    for (let i = 0; i < P.count; i++) {
+      v.fromBufferAttribute(P, i); n.fromBufferAttribute(N, i);
+      const k = noise(v.x * freq, v.y * freq, v.z * freq) * 0.7 + noise(v.x * freq * 2.3 + 5, v.y * freq * 2.3, v.z * freq * 2.3) * 0.3;
+      v.addScaledVector(n, (k - 0.35) * amp); P.setXYZ(i, v.x, v.y, v.z);
+    }
+    g.computeVertexNormals(); return g;
+  });
+}
 // build a shell geometry for `geo` placed by matrix `mx`, `n` shells, strands `len` long, coloured `col`
-function furShells(key, geo, mx, col, len, n) {
-  return gk('fur' + key + '|' + n + '|' + rk(len) + col, () => {
-    const P0 = geo.attributes.position, N0 = geo.attributes.normal, U0 = geo.attributes.uv, I0 = geo.index, nm = new THREE.Matrix3().getNormalMatrix(mx);
+function furShells(key, geo, mx, col, len, n, droop = 0.35) {
+  return gk('fur' + key + '|' + n + '|' + rk(len) + '|' + rk(droop) + col, () => {
+    const P0 = geo.attributes.position, N0 = geo.attributes.normal, I0 = geo.index, nm = new THREE.Matrix3().getNormalMatrix(mx);
     const vc = P0.count, ic = I0 ? I0.count : vc, c = new THREE.Color(col);
-    const pos = new Float32Array(vc * n * 3), nor = new Float32Array(vc * n * 3), uv = new Float32Array(vc * n * 2), cl = new Float32Array(vc * n * 3), fr = new Float32Array(vc * n * 3);
+    const pos = new Float32Array(vc * n * 3), nor = new Float32Array(vc * n * 3), cl = new Float32Array(vc * n * 3), fr = new Float32Array(vc * n * 3);
     const idx = new Uint32Array(ic * n), v = new V3();
     for (let s = 0; s < n; s++) {
       const t = (s + 1) / n;
@@ -2161,27 +2272,227 @@ function furShells(key, geo, mx, col, len, n) {
         const k = s * vc + i;
         v.fromBufferAttribute(P0, i).applyMatrix4(mx); pos.set([v.x, v.y, v.z], k * 3);
         v.fromBufferAttribute(N0, i).applyMatrix3(nm).normalize(); nor.set([v.x, v.y, v.z], k * 3);
-        uv.set([U0.getX(i), U0.getY(i)], k * 2); cl.set([c.r, c.g, c.b], k * 3); fr.set([t, len, 0], k * 3);
+        cl.set([c.r, c.g, c.b], k * 3); fr.set([t, len, droop], k * 3);
       }
       for (let i = 0; i < ic; i++) idx[s * ic + i] = (I0 ? I0.getX(i) : i) + s * vc;
     }
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     g.setAttribute('color', new THREE.BufferAttribute(cl, 3)); g.setAttribute('fur', new THREE.BufferAttribute(fr, 3)); g.setIndex(new THREE.BufferAttribute(idx, 1));
     g.computeBoundingSphere(); g.boundingSphere.radius += len; return g;
   });
 }
-// a furry part: the solid base goes into the body (it is all that shows on Low), the shells hang beside it
-function furPart(parent, key, geo, spec, x, y, z, o, len) {
-  const base = P(parent, geo, spec, x, y, z, o);
+const FUR_N = () => (GFX.level === 'high' ? 12 : 5);   // shells per fur part (Medium: phones, fill rate)
+// a furry part: the lumpy solid base goes into the body (all that shows on Low), its shells into the fighter's
+// one fur mesh. o.fluff: lump size (0 = smooth base); o.droop: how much the strands hang
+function furPart(parent, key, geo, spec, x, y, z, o, len, fo = {}) {
+  const amp = fo.fluff === undefined ? len * 0.6 : fo.fluff;
+  const g = amp > 0 ? gFluff(geo, amp, fo.freq || 7, key) : geo;
+  const base = P(parent, g, spec, x, y, z, o);
   if (LOWB) return base;
-  const n = GFX.level === 'high' ? 8 : 5;
   base.updateMatrix();
-  const c = '#' + spec.c.clone().convertLinearToSRGB().getHexString();
-  const m = new THREE.Mesh(furShells(key, geo, base.matrix, c, len, n), furMat);
+  const c = '#' + (fo.tip || spec.c).clone().convertLinearToSRGB().getHexString();
+  const m = new THREE.Mesh(furShells(key + '|' + LODF, g, base.matrix, c, len, FUR_N(), fo.droop === undefined ? 0.35 : fo.droop), furMat);
   m.userData.noShadow = true; m.userData.fur = true; parent.add(m); MYTH.fur.push(m);
   return base;
 }
+// several fur parts at once: items are [geometry, spec, x, y, z, o, strand length, fur options]
+function furGroup(parent, key, items) { return items.map(([g, s, x, y, z, o, len, fo], i) => furPart(parent, key + i, g, s, x, y, z, o, len, fo)); }
+// ---- the lion-dance paint atlas ----
+// Everything painted on a lion head (and its cape) comes from ONE canvas per palette, 1024 px square on High and
+// 512 on Medium / Low, laid out in regions (canvas pixels in the 1024 layout; uv origin bottom-left):
+//   DOME  the head shell, equirectangular: x = front at 512, round the head to the back at the edges;
+//         y = angle from the crown (0) down to the jaw line (LDH.th1)
+//   EYE   one eyeball disc: concentric spiral rings (photo: black / white spiral, red pupil, colour rings)
+//   EAR   the ear roundels: bright concentric rings
+//   JAW   the lower jaw plate: pale with red tooth lines and a red rim
+//   NOSE  the striped nose roll (stripes run along it)
+//   LID   the eyelids: shell colour with a gold lash line
+//   CHEEK the cheek roundels: a white swirl with a colourful heart
+//   CAPE  the cape: overlapping scales outlined in gold with gold chevron stripes
+// A second, shared canvas with the same layout is the mask: R gold leaf (drawn metallic, molten gold in the
+// Black form), G the eyes' irises (they burn in the Black form). Painting both with one routine keeps them aligned.
+const LDA = {
+  DOME: [0, 0, 1024, 448], EYE: [0, 448, 256, 256], EAR: [256, 448, 256, 256], JAW: [512, 448, 512, 256],
+  NOSE: [0, 704, 512, 128], LID: [512, 704, 256, 256], CHEEK: [768, 704, 256, 256], CAPE: [0, 832, 512, 192],
+};
+const ldUvr = (r) => [r[0] / 1024, 1 - (r[1] + r[3]) / 1024, r[2] / 1024, r[3] / 1024];
+const LDPAINT = (() => {
+  const cache = new Map();
+  let maskTex = null;
+  const GOLD = '#e8b030';
+  // draw the whole atlas with colour lookup C(name): the colour of a palette entry, or the mask's colour for it
+  function draw(g, C) {
+    const gold = C('gold'), goldD = C('goldD');
+    const lineW = (w) => { g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round'; };
+    const circle = (x, y, r, fill, stroke, w) => { g.beginPath(); g.arc(x, y, r, 0, TAU); if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { lineW(w); g.strokeStyle = stroke; g.stroke(); } };
+    const clip = (r) => { g.save(); g.beginPath(); g.rect(r[0], r[1], r[2], r[3]); g.clip(); };
+    // ---- DOME ----
+    {
+      const [X, Y, W, H] = LDA.DOME; clip(LDA.DOME);
+      const px = (ph) => X + (0.5 + ph / TAU) * W, py = (th) => Y + th / LDH.th1 * H;   // angles -> canvas
+      const gr = g.createLinearGradient(0, Y, 0, Y + H); gr.addColorStop(0, C('shellHi')); gr.addColorStop(0.55, C('shell')); gr.addColorStop(1, C('shellLo'));
+      g.fillStyle = gr; g.fillRect(X, Y, W, H);
+      // scales over the crown and the back of the head, each outlined in gold leaf
+      for (let row = 0; row < 9; row++) for (let i = -1; i < 34; i++) {
+        const th = 0.12 + row * 0.11, ph = PI - (i + (row & 1) * 0.5) * 0.2;   // starting at the back
+        const x = px(((ph + PI) % TAU) - PI), y = py(th);
+        const front = Math.cos(((ph + PI) % TAU) - PI);
+        if (front > -0.05 && th > 0.25) continue;   // the forehead and face stay clear for the paintwork
+        g.beginPath(); g.arc(x, y, 15, 0, PI); g.fillStyle = row & 1 ? C('shell2') : C('shell'); g.fill();
+        lineW(3); g.strokeStyle = gold; g.stroke();
+      }
+      // gold crown band
+      lineW(7); g.strokeStyle = gold; g.beginPath(); g.moveTo(X, py(0.1)); g.lineTo(X + W, py(0.1)); g.stroke();
+      // forehead: a flame crown in stacked tongues, the mirror sits in its heart
+      const fx = px(0), fy = py(0.62);
+      const flame = (s, hgt, wid, col) => {
+        g.beginPath(); g.moveTo(fx - wid * s, fy + 30);
+        g.bezierCurveTo(fx - wid * 1.25 * s, fy - hgt * 0.3, fx - wid * 0.25 * s, fy - hgt * 0.55, fx - wid * 0.5 * s, fy - hgt);
+        g.bezierCurveTo(fx + wid * 0.4 * s, fy - hgt * 0.6, fx + wid * 0.3 * s, fy - hgt * 0.2, fx, fy + 30);
+        g.closePath(); g.fillStyle = col; g.fill(); lineW(4); g.strokeStyle = gold; g.stroke();
+      };
+      for (const s of [1, -1]) { flame(s, 150, 120, C('p1')); flame(s, 120, 80, C('p2')); flame(s, 88, 46, C('p3')); }
+      circle(fx, fy - 4, 46, C('p4'), gold, 8);
+      // a gold scroll border round the flame crown
+      lineW(6); g.strokeStyle = gold; g.beginPath(); g.ellipse(fx, fy - 10, 190, 150, 0, PI * 0.08, PI * 0.92, true); g.stroke();
+      // the sides: big ruyi cloud scrolls in bright colours, gold outlined, with gold dots (photo 1)
+      const scroll = (cx, cy, r, s, c1, c2) => {
+        g.save(); g.translate(cx, cy); g.scale(s, 1);
+        g.beginPath(); g.moveTo(-r * 1.6, r * 0.9);
+        g.bezierCurveTo(-r * 1.8, -r * 0.4, -r * 0.6, -r * 1.2, r * 0.2, -r * 0.9);
+        g.bezierCurveTo(r * 1.1, -r * 0.6, r * 1.1, r * 0.5, r * 0.2, r * 0.55);
+        g.bezierCurveTo(-r * 0.4, r * 0.6, -r * 0.5, -r * 0.1, 0, -r * 0.15);
+        g.bezierCurveTo(-r * 0.2, r * 1.4, -r * 1.1, r * 1.3, -r * 1.6, r * 0.9);
+        g.closePath(); g.fillStyle = c1; g.fill(); lineW(5); g.strokeStyle = gold; g.stroke();
+        g.beginPath(); g.arc(r * 0.18, -r * 0.1, r * 0.42, PI * 0.9, PI * 2.6); lineW(r * 0.16); g.strokeStyle = c2; g.stroke();
+        lineW(4); g.strokeStyle = gold; g.beginPath(); g.arc(r * 0.18, -r * 0.1, r * 0.62, PI * 1.1, PI * 2.4); g.stroke();
+        for (let k = 0; k < 7; k++) { const a = PI * (0.85 + k * 0.22); circle(Math.cos(a) * r * 1.25 - r * 0.2, Math.sin(a) * r * 1.0 + r * 0.25, 5, gold); }
+        g.restore();
+      };
+      for (const s of [1, -1]) {
+        scroll(px(s * 1.55), py(1.05), 62, s, C('p1'), C('p3'));
+        scroll(px(s * 2.35), py(1.3), 54, s, C('p2'), C('p1'));
+        scroll(px(s * 1.25), py(1.72), 44, -s, C('p3'), C('p2'));
+        // a swept flame line from above each eye back over the dome
+        lineW(10); g.strokeStyle = C('p2'); g.beginPath(); g.moveTo(px(s * 0.55), py(0.55)); g.bezierCurveTo(px(s * 0.9), py(0.3), px(s * 1.6), py(0.38), px(s * 2.2), py(0.7)); g.stroke();
+        lineW(4); g.strokeStyle = gold; g.beginPath(); g.moveTo(px(s * 0.55), py(0.62)); g.bezierCurveTo(px(s * 0.9), py(0.4), px(s * 1.6), py(0.47), px(s * 2.2), py(0.8)); g.stroke();
+        // cheek bands under the eyes: white / colour / black stripes sweeping back (photo 1's snout)
+        for (let k = 0; k < 5; k++) {
+          lineW(13); g.strokeStyle = [C('white'), C('p3'), C('white'), C('ink'), C('p1')][k];
+          g.beginPath(); g.moveTo(px(s * 0.35), py(1.32 + k * 0.07)); g.quadraticCurveTo(px(s * 0.8), py(1.22 + k * 0.08), px(s * 1.1), py(1.42 + k * 0.08)); g.stroke();
+        }
+      }
+      // a gold rim along the jaw line
+      lineW(9); g.strokeStyle = gold; g.beginPath(); g.moveTo(X, Y + H - 8); g.lineTo(X + W, Y + H - 8); g.stroke();
+      g.restore();
+    }
+    // ---- EYE: concentric rings, a black / white spiral and a red pupil ----
+    {
+      const [X, Y, W] = LDA.EYE, cx = X + W / 2, cy = Y + W / 2, R = W / 2;
+      clip(LDA.EYE); g.fillStyle = C('irisW'); g.fillRect(X, Y, W, W);
+      circle(cx, cy, R * 0.99, gold);
+      circle(cx, cy, R * 0.9, C('eyeR1'));
+      circle(cx, cy, R * 0.8, C('eyeR2'));
+      circle(cx, cy, R * 0.71, C('irisW'));
+      // spiral: an Archimedean band of ink
+      g.save(); g.translate(cx, cy); g.beginPath();
+      const turns = 3.2, r0 = R * 0.17, r1 = R * 0.67;
+      for (let i = 0; i <= 200; i++) { const t = i / 200, a = t * turns * TAU, r = lerp(r0, r1, t); const x = Math.cos(a) * r, y = Math.sin(a) * r; i ? g.lineTo(x, y) : g.moveTo(x, y); }
+      lineW(R * 0.085); g.strokeStyle = C('irisK'); g.stroke(); g.restore();
+      circle(cx, cy, R * 0.2, C('pupil'), C('irisK'), R * 0.05);
+      circle(cx, cy, R * 0.07, C('irisK'));
+      circle(cx - R * 0.07, cy - R * 0.08, R * 0.05, C('glint'));
+      g.restore();
+    }
+    // ---- EAR: bright roundel ----
+    {
+      const [X, Y, W] = LDA.EAR, cx = X + W / 2, cy = Y + W / 2, R = W / 2;
+      clip(LDA.EAR); g.fillStyle = C('white'); g.fillRect(X, Y, W, W);
+      const rings = [gold, C('p1'), C('white'), C('p2'), C('p3'), C('white'), C('p4'), gold];
+      rings.forEach((c, i) => circle(cx, cy, R * (0.98 - i * 0.12), c));
+      g.restore();
+    }
+    // ---- JAW: the lower jaw plate (u across, v from the mouth edge at the top to the chin at the bottom) ----
+    {
+      const [X, Y, W, H] = LDA.JAW; clip(LDA.JAW);
+      g.fillStyle = C('jaw'); g.fillRect(X, Y, W, H);
+      // tooth lines fanning from the mouth edge, a red rim band and a gold edge
+      lineW(6); g.strokeStyle = C('jawLine');
+      for (let k = 0; k <= 16; k++) { const x = X + W * (0.06 + k * 0.055); g.beginPath(); g.moveTo(x, Y + H * 0.18); g.lineTo(x + (k - 8) * 3, Y + H * 0.68); g.stroke(); }
+      g.fillStyle = C('jawLine'); g.fillRect(X, Y + H * 0.7, W, H * 0.14);
+      g.fillStyle = C('jaw2'); g.fillRect(X, Y + H * 0.84, W, H * 0.16);
+      g.fillStyle = gold; g.fillRect(X, Y + H * 0.66, W, H * 0.05); g.fillRect(X, Y, W, H * 0.06); g.fillRect(X, Y + H * 0.93, W, H * 0.07);
+      g.restore();
+    }
+    // ---- NOSE: stripes along the roll ----
+    {
+      const [X, Y, W, H] = LDA.NOSE; clip(LDA.NOSE);
+      const bands = [C('white'), C('p3'), C('white'), C('ink'), C('white'), C('p3'), C('white'), C('p1')];
+      bands.forEach((c, i) => { g.fillStyle = c; g.fillRect(X, Y + i * H / bands.length, W, H / bands.length + 1); });
+      g.fillStyle = gold; for (let k = 0; k < 12; k++) g.fillRect(X + k * W / 12, Y, 5, H);
+      g.restore();
+    }
+    // ---- LID: shell colour, a dark lash line and gold leaf along the edge ----
+    {
+      const [X, Y, W, H] = LDA.LID; clip(LDA.LID);
+      g.fillStyle = C('lid'); g.fillRect(X, Y, W, H);
+      g.fillStyle = C('p2'); g.fillRect(X, Y + H * 0.35, W, H * 0.15);
+      g.fillStyle = gold; g.fillRect(X, Y + H * 0.5, W, H * 0.06);
+      g.fillStyle = C('ink'); g.fillRect(X, Y + H * 0.56, W, H * 0.44);
+      g.restore();
+    }
+    // ---- CHEEK: white swirl, colourful heart ----
+    {
+      const [X, Y, W] = LDA.CHEEK, cx = X + W / 2, cy = Y + W / 2, R = W / 2;
+      clip(LDA.CHEEK); g.fillStyle = C('shell'); g.fillRect(X, Y, W, W);
+      circle(cx, cy, R * 0.97, C('white'), gold, 8);
+      circle(cx, cy, R * 0.6, C('p3'));
+      g.save(); g.translate(cx, cy); g.beginPath();
+      for (let i = 0; i <= 120; i++) { const t = i / 120, a = t * 2.4 * TAU, r = lerp(R * 0.08, R * 0.58, t); const x = Math.cos(a) * r, y = Math.sin(a) * r; i ? g.lineTo(x, y) : g.moveTo(x, y); }
+      lineW(R * 0.1); g.strokeStyle = C('p1'); g.stroke(); g.restore();
+      for (let k = 0; k < 12; k++) { const a = k / 12 * TAU; circle(cx + Math.cos(a) * R * 0.78, cy + Math.sin(a) * R * 0.78, R * 0.06, gold); }
+      g.restore();
+    }
+    // ---- CAPE: overlapping scales outlined in gold, gold chevrons ----
+    {
+      const [X, Y, W, H] = LDA.CAPE; clip(LDA.CAPE);
+      g.fillStyle = C('cape'); g.fillRect(X, Y, W, H);
+      for (let row = 0; row < 9; row++) for (let i = -1; i < 18; i++) {
+        const x = X + (i + (row & 1) * 0.5) * 30, y = Y + row * 22;
+        g.beginPath(); g.arc(x, y, 16, 0, PI); g.fillStyle = row & 1 ? C('cape2') : C('cape'); g.fill(); lineW(3); g.strokeStyle = gold; g.stroke();
+      }
+      lineW(9); g.strokeStyle = gold;
+      for (const y of [0.3, 0.72]) { g.beginPath(); for (let i = 0; i <= 8; i++) { const x = X + i * W / 8, yy = Y + H * y + (i & 1 ? 18 : -18); i ? g.lineTo(x, yy) : g.moveTo(x, yy); } g.stroke(); }
+      g.fillStyle = gold; g.fillRect(X, Y, 14, H); g.fillRect(X + W - 14, Y, 14, H);
+      g.restore();
+    }
+  }
+  const MASK = { gold: '#ff0000', goldD: '#ff0000', irisW: '#00ff00', irisK: '#00ff00', pupil: '#00ff00', eyeR1: '#00ff00', eyeR2: '#00ff00' };
+  function canvasFor(size, C) {
+    const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d');
+    g.scale(size / 1024, size / 1024); draw(g, C);
+    return c;
+  }
+  const size = () => (GFX.level === 'high' ? 1024 : 512);
+  return {
+    // the atlas for a palette (cached by palette key and size)
+    tex(pal) {
+      const n = size(), k = pal.key + '|' + n; let t = cache.get(k);
+      if (!t) {
+        const C = (name) => (name === 'gold' ? pal.gold || GOLD : name === 'goldD' ? '#a8741c' : pal.paint[name] || '#ff00ff');
+        t = new THREE.CanvasTexture(canvasFor(n, C)); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; shared(t);
+        if (cache.size > 24) cache.delete(cache.keys().next().value);
+        cache.set(k, t);
+      }
+      return t;
+    },
+    mask() {
+      if (!maskTex) { maskTex = new THREE.CanvasTexture(canvasFor(512, (name) => MASK[name] || '#000000')); shared(maskTex); }
+      return maskTex;
+    },
+  };
+})();
 // ---- baking: every spec part of a fighter -> one skinned mesh ----
 const SKIN_CACHE = new Map();   // look key -> baked geometry, shared by every fighter that looks the same
 const SKIN_CACHE_MAX = 48;
@@ -2203,7 +2514,7 @@ function bakeGeometry(parts, holders, body, keep) {
   let nv = 0, ni = 0, nd = 0;
   const marks = [];
   for (const [m] of parts) { const g = m.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
-  const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), col = new Float32Array(nv * 3), mat = new Float32Array(nv * 4), emi = new Float32Array(nv);
+  const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), col = new Float32Array(nv * 3), mat = new Float32Array(nv * 4), emi = new Float32Array(nv), puv = new Float32Array(nv * 2);
   const si = new Uint16Array(nv * 4), sw = new Float32Array(nv * 4), idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
   // detail parts go last in the index buffer so Low can simply draw less of it; within each group the parts
   // built last (armour, trims: usually on top) are drawn first, so the body under them fails the depth test early
@@ -2215,6 +2526,7 @@ function bakeGeometry(parts, holders, body, keep) {
     m.updateMatrix(); _bm.getNormalMatrix(m.matrix);
     const rest = restMatrix(holders[bi], body, _rm).multiply(m.matrix), rn = new THREE.Matrix3().getNormalMatrix(rest), bp = new V3(), bn = new V3();
     const g = m.geometry, Pp = g.attributes.position, N = g.attributes.normal, s = m.userData.spec, c = s.c, flip = m.matrix.determinant() < 0;
+    const U = s.uvr && g.attributes.uv, ur = s.uvr;   // painted parts: their uv, placed in the paint atlas region
     for (let i = 0; i < Pp.count; i++) {
       const k = (vo + i) * 3, k4 = (vo + i) * 4;
       _bv3.fromBufferAttribute(Pp, i).applyMatrix4(m.matrix); pos[k] = _bv3.x; pos[k + 1] = _bv3.y; pos[k + 2] = _bv3.z;
@@ -2227,6 +2539,7 @@ function bakeGeometry(parts, holders, body, keep) {
       col[k] = c.r * j * ao; col[k + 1] = c.g * j * ao; col[k + 2] = c.b * j * ao;
       mat[k4] = s.r; mat[k4 + 1] = s.m; mat[k4 + 2] = s.p; mat[k4 + 3] = s.n; emi[vo + i] = s.e;
       si[k4] = bi; sw[k4] = 1;
+      if (U) { puv[(vo + i) * 2] = ur[0] + U.getX(i) * ur[2]; puv[(vo + i) * 2 + 1] = ur[1] + U.getY(i) * ur[3]; }
     }
     const n = g.index ? g.index.count : Pp.count;
     for (let i = 0; i < n; i += 3) {
@@ -2238,34 +2551,56 @@ function bakeGeometry(parts, holders, body, keep) {
   if (!nd) lodCount = io;
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); geo.setAttribute('mat', new THREE.BufferAttribute(mat, 4)); geo.setAttribute('emi', new THREE.BufferAttribute(emi, 1));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); geo.setAttribute('mat', new THREE.BufferAttribute(mat, 4)); geo.setAttribute('emi', new THREE.BufferAttribute(emi, 1)); geo.setAttribute('puv', new THREE.BufferAttribute(puv, 2));
   geo.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4)); geo.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
   geo.setIndex(new THREE.BufferAttribute(idx, 1));
   // vertices are in pivot space, so the real bounds are only known per pose: a generous sphere round the body
-  geo.boundingSphere = new THREE.Sphere(new V3(0, 1, 0), 2.8);
+  geo.boundingSphere = new THREE.Sphere(new V3(0, 1.3, 0), 3.2);
   geo.userData.lodCount = lodCount; geo.userData.full = io;
   if (keep) { geo.userData.marks = marks; geo.userData.end = [vo, io]; return geo; }
   lodRange(geo);
   return geo;
 }
 function lodRange(g) { g.setDrawRange(0, GFX.level === 'low' ? g.userData.lodCount : g.userData.full); }
+// all fur shells of a fighter -> one skinned geometry (rigid weights on the pivot each shell hangs from)
+function bakeFur(list, hIdx) {
+  let nv = 0, ni = 0; for (const [g] of list) { nv += g.attributes.position.count; ni += g.index.count; }
+  const out = new THREE.BufferGeometry(), idx = new Uint32Array(ni), si = new Uint16Array(nv * 4), sw = new Float32Array(nv * 4);
+  for (const [a, sz] of [['position', 3], ['normal', 3], ['color', 3], ['fur', 3]]) {
+    const arr = new Float32Array(nv * sz); let o = 0;
+    for (const [g] of list) { arr.set(g.attributes[a].array, o); o += g.attributes[a].array.length; }
+    out.setAttribute(a, new THREE.BufferAttribute(arr, sz));
+  }
+  let vo = 0, io = 0;
+  for (const [g, h] of list) {
+    const I = g.index.array, n = g.attributes.position.count, b = hIdx.get(h);
+    for (let i = 0; i < I.length; i++) idx[io++] = I[i] + vo;
+    for (let i = 0; i < n; i++) { si[(vo + i) * 4] = b; sw[(vo + i) * 4] = 1; }
+    vo += n;
+  }
+  out.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4)); out.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
+  out.setIndex(new THREE.BufferAttribute(idx, 1));
+  out.boundingSphere = new THREE.Sphere(new V3(0, 1.3, 0), 3.2);
+  return out;
+}
 function skinBake(f) {
   const rig = f.rig;
   if (f.skin) { f.body.remove(f.skin); f.skin.skeleton.dispose(); if (!SHARED.has(f.skin.geometry)) f.skin.geometry.dispose(); for (const b of rig.bones) b.bone.parent && b.bone.parent.remove(b.bone); }
-  // collect the spec parts still hanging in the tree (fresh ones) and keep them for later re-bakes
-  const fresh = [];
-  f.body.traverse((o) => { if (o.isMesh && o.userData.spec) fresh.push(o); });
-  for (const m of fresh) { m.userData.holder = m.parent; m.parent.remove(m); }
+  if (rig.furMesh) { f.body.remove(rig.furMesh); if (!SHARED.has(rig.furMesh.geometry)) rig.furMesh.geometry.dispose(); rig.furMesh = null; }
+  // collect the spec parts and fur shells still hanging in the tree (fresh ones) and keep them for later re-bakes
+  const fresh = [], freshFur = [];
+  f.body.traverse((o) => { if (o.isMesh && o.userData.spec) fresh.push(o); else if (o.isMesh && o.userData.fur && !o.isSkinnedMesh) freshFur.push(o); });
+  for (const m of fresh.concat(freshFur)) { m.userData.holder = m.parent; m.parent.remove(m); }
   // canonical order (body, then headgear, then back gear, each in build order) so that every fighter with the
   // same look gets the same bone numbering, whichever way it got that look, and can share the cached geometry
-  const all = (rig.parts || []).concat(fresh), grp = (m) => (under(m.userData.holder, rig.hat) ? 1 : under(m.userData.holder, rig.back) ? 2 : 0);
+  const grp = (m) => (under(m.userData.holder, rig.hat) ? 1 : under(m.userData.holder, rig.back) ? 2 : 0);
+  const all = (rig.parts || []).concat(fresh), allFur = (rig.furSrc || []).concat(freshFur);
   rig.parts = [0, 1, 2].flatMap((g) => all.filter((m) => grp(m) === g));
+  rig.furSrc = [0, 1, 2].flatMap((g) => allFur.filter((m) => grp(m) === g));
   const holders = [], hIdx = new Map(), parts = [];
-  for (const m of rig.parts) {
-    const h = m.userData.holder; let i = hIdx.get(h);
-    if (i === undefined) { i = holders.length; hIdx.set(h, i); holders.push(h); }
-    parts.push([m, i]);
-  }
+  const hold = (h) => { let i = hIdx.get(h); if (i === undefined) { i = holders.length; hIdx.set(h, i); holders.push(h); } return i; };
+  for (const m of rig.parts) parts.push([m, hold(m.userData.holder)]);
+  for (const m of rig.furSrc) hold(m.userData.holder);
   const key = f.lookKey ? f.lookKey + '|' + (f.lodf || 1) : null;
   let geo = key && SKIN_CACHE.get(key);
   if (!geo) {
@@ -2279,7 +2614,104 @@ function skinBake(f) {
   mesh.bind(sk, new THREE.Matrix4());
   mesh.castShadow = true; mesh.receiveShadow = GFX.level === 'high'; mesh.layers.mask = f.body.layers.mask;
   f.body.add(mesh); f.skin = mesh;
+  // the fur: one more skinned mesh on the same skeleton, one draw call for every shell of the fighter
+  rig.fur = [];
+  if (rig.furSrc.length) {
+    const fk = key && key + '|fur';
+    let fg = fk && SKIN_CACHE.get(fk);
+    if (!fg) { fg = bakeFur(rig.furSrc.map((m) => [m.geometry, m.userData.holder]), hIdx); if (fk && SKIN_CACHE.size < SKIN_CACHE_MAX) { shared(fg); SKIN_CACHE.set(fk, fg); } }
+    const fm = rig.furMesh = new THREE.SkinnedMesh(fg, f.tro && f.tro.black ? blackFurMat() : furMat);
+    fm.bind(sk, new THREE.Matrix4()); fm.userData.noShadow = true; fm.castShadow = false; fm.layers.mask = f.body.layers.mask;
+    fm.visible = GFX.level !== 'low'; f.body.add(fm); rig.fur.push(fm);
+  }
   if (f.tro) trophyMesh(f);   // a new skeleton: the trophies follow it
+}
+// ---- render-side life of the lion head (never sent: peers animate their own copy) ----
+// the mouth gapes in the wind-up of an attack and snaps shut on the strike, jolts open when hit and breathes
+// otherwise; the lids blink every few seconds (and squeeze when hurt); the antennae spring with the head; the
+// head itself bobs with the stride, lags and rolls into turns, and looks about when idle, like a real dancer's
+const _hv = new V3(), _hq = new THREE.Quaternion(), _hm = new THREE.Matrix4();
+const LID_MOOD = { smile: 0, smug: 0.42, determined: 0.25, hurt: 0.95, awake: 0.3, dummy: 0, grin: 0.12, cool: 0.5 };
+function lionLife(f, fdt) {
+  const rig = f.rig, dt = Math.min(fdt, 0.05), t = realClock;
+  if (dt <= 0) return;
+  const V = f.clothV || { fw: 0, sd: 0, vy: 0 }, sp = Math.hypot(V.fw, V.sd), run = clamp(sp / 14, 0, 1);
+  // yaw rate (the head lags behind turns)
+  const yaw = f.root.rotation.y, dy = f.lastYawR === undefined ? 0 : angDiff(f.lastYawR, yaw); f.lastYawR = yaw;
+  f.yawRate = lerp(f.yawRate || 0, clamp(dy / dt, -12, 12), 1 - Math.exp(-8 * dt));
+  // ---- mouth ----
+  if (rig.mouth) {
+    let tg = 0.13 + 0.05 * Math.sin(t * 2.1 + rig.mouthPh);
+    const a = f.anim;
+    if (a) {   // wind-up: wide open; strike: snap shut; follow-through: half open
+      const p = a.t / a.dur, w = a.wf || 0.3;
+      tg = p < w ? 0.62 : p < w + 0.12 ? 0.0 : 0.3;
+    } else if (f.action) tg = 0.42 + 0.12 * Math.sin(t * 9);
+    else if (f.emote) tg = 0.3 + 0.25 * Math.max(0, Math.sin(t * 7));
+    if (f.lastHurt !== rig.hurtSeen) { if (rig.hurtSeen !== undefined && gameTime - f.lastHurt < 0.3) rig.mouthV += 9; rig.hurtSeen = f.lastHurt; }
+    if (f.dead || f.ragdoll > 0) tg = 0.5;
+    const K = 260, D = 2 * Math.sqrt(K) * 0.5;
+    rig.mouthV += ((tg - rig.mouthA) * K - rig.mouthV * D) * dt; rig.mouthA += rig.mouthV * dt;
+    rig.mouthA = clamp(rig.mouthA, -0.05, 0.75);
+    let base = 0;
+    if (rig.jaw) { const j = rig.jaw.rotation.x; base = (j > 0 ? 0.55 * (1 - Math.exp(-j / 0.55)) : j) - j; }   // a networked jaw: its shown angle eases to ~0.55
+    rig.mouth.rotation.x = base + rig.mouthA;
+  }
+  // ---- lids ----
+  if (rig.lids) {
+    if (!rig.blinkT) rig.blinkT = t + 1 + Math.random() * 3;
+    let shut = LID_MOOD[rig.faceNow] || 0;
+    if (t > rig.blinkT) { const b = (t - rig.blinkT) / 0.16; if (b >= 1) { rig.blinkT = t + 1.8 + Math.random() * 3.5; if (Math.random() < 0.2) rig.blinkT = t + 0.25; } else shut = Math.max(shut, Math.sin(b * PI)); }
+    if (f.dead) shut = 1;
+    const L = LDH.lid, tgt = lerp(L.open, L.shut, shut);
+    rig.lidA = rig.lidA === undefined ? tgt : rig.lidA + (tgt - rig.lidA) * (1 - Math.exp(-40 * dt));
+    for (const l of rig.lids) l.rotation.x = rig.lidA;
+  }
+  // ---- head bob and tilt ----
+  if (rig.hood && !f.isDummy) {
+    const ph = f.walk || 0, upright = !f.dead && f.ragdoll <= 0 && f.flatten <= 0;
+    let rx = 0, ry = 0, rz = 0, y = 0;
+    if (upright) {
+      // stride: a nod on every step and a sway from side to side
+      rx += Math.sin(ph * 2) * 0.07 * run; rz += Math.sin(ph) * 0.1 * run; y += Math.abs(Math.sin(ph)) * 0.035 * run;
+      // turns: the head leans into them and trails them a little
+      rz += clamp(-f.yawRate * 0.045, -0.3, 0.3); ry += clamp(-f.yawRate * 0.03, -0.25, 0.25);
+      // idle: the lion looks about, blinks, cocks its head
+      const idle = 1 - run;
+      ry += idle * (Math.sin(t * 0.53 + rig.mouthPh) * 0.22 + Math.sin(t * 1.31) * 0.05);
+      rz += idle * Math.sin(t * 0.71 + 1.3) * 0.08; rx += idle * Math.sin(t * 0.9) * 0.04;
+      // attack: a forward thrust
+      if (f.anim) { const p = f.anim.t / f.anim.dur; rx += Math.sin(clamp(p, 0, 1) * PI) * 0.22; }
+      rx -= clamp(V.vy * 0.012, -0.15, 0.2);
+    }
+    const B = rig.bob || (rig.bob = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0 }), K = 120, D = 2 * Math.sqrt(K) * 0.55;
+    B.vx += ((rx - B.x) * K - B.vx * D) * dt; B.x += B.vx * dt;
+    B.vy += ((ry - B.y) * K - B.vy * D) * dt; B.y += B.vy * dt;
+    B.vz += ((rz - B.z) * K - B.vz * D) * dt; B.z += B.vz * dt;
+    rig.hood.rotation.set(B.x, B.y, B.z); rig.hood.position.y = y;
+  }
+  // ---- antennae: two-stage springs driven by the head's own acceleration ----
+  if (rig.antennae) {
+    rig.hood.updateWorldMatrix(true, false);
+    const hp = _hv.setFromMatrixPosition(rig.hood.matrixWorld);
+    const prev = rig.hoodP || (rig.hoodP = hp.clone()), vel = rig.hoodVel || (rig.hoodVel = new V3());
+    const nv = hp.clone().sub(prev).divideScalar(dt); prev.copy(hp);
+    if (nv.lengthSq() > 900) nv.set(0, 0, 0);
+    const acc = nv.clone().sub(vel).divideScalar(dt); vel.copy(nv);
+    // into head space
+    _hq.setFromRotationMatrix(_hm.extractRotation(rig.hood.matrixWorld)).invert(); acc.applyQuaternion(_hq);
+    const ax = clamp(acc.x, -60, 60), ay = clamp(acc.y, -80, 80), az = clamp(acc.z, -60, 60);
+    for (const A of rig.antennae) {
+      // the stalk tips away from the acceleration (inertia), and wobbles a touch on its own
+      const tx = clamp(az * 0.006 + ay * 0.002, -0.6, 0.6) + Math.sin(t * 2.3 + A.s) * 0.03, tz = clamp(-ax * 0.006, -0.6, 0.6) + Math.sin(t * 1.7 + A.s * 2) * 0.03;
+      const K1 = 90, D1 = 2 * Math.sqrt(K1) * 0.25, K2 = 140, D2 = 2 * Math.sqrt(K2) * 0.2;
+      A.vx += ((tx - A.x) * K1 - A.vx * D1) * dt; A.x += A.vx * dt;
+      A.vz += ((tz - A.z) * K1 - A.vz * D1) * dt; A.z += A.vz * dt;
+      A.vx2 += ((A.x * 1.4 - A.x2) * K2 - A.vx2 * D2) * dt; A.x2 += A.vx2 * dt;
+      A.vz2 += ((A.z * 1.4 - A.z2) * K2 - A.vz2 * D2) * dt; A.z2 += A.vz2 * dt;
+      A.a.rotation.set(A.rx + A.x, 0, A.rz + A.z); A.b.rotation.set(A.x2 - A.x, 0, A.z2 - A.z);
+    }
+  }
 }
 // every drawn frame: hide the bones of hidden pivots, swing the cloth, keep fur in step with the level
 const _cv = new V3();
@@ -2291,11 +2723,7 @@ function rigSync(f, fdt) {
     while (o && o !== f.body) { if (!o.visible) { v = false; break; } o = o.parent; }
     const s = v ? 1 : 1e-4; if (b.s !== s) { b.s = s; b.bone.scale.setScalar(s); }
   }
-  if (rig.jawDamp) { const j = rig.jaw.rotation.x; rig.jawDamp.rotation.x = (j > 0 ? 0.55 * (1 - Math.exp(-j / 0.55)) : j) - j; }   // shown angle eases to ~0.55
-  if (rig.mouth) {   // a lion-dance head's lower jaw: gapes while the fighter attacks, breathes otherwise (render-side only)
-    const tg = f.anim || f.action ? 0.42 : 0.05 + 0.04 * Math.sin(realClock * 2.3 + rig.mouthPh);
-    rig.mouthA += (tg - rig.mouthA) * Math.min(1, fdt * 12); rig.mouth.rotation.x = rig.mouthA;
-  }
+  if (rig.hood && rig.lids) lionLife(f, fdt);
   const cl = rig.cloth, ca = rig.clothAv;
   if (!cl.length && !(ca && ca.length)) return;
   const dt = Math.min(fdt, 0.05), R = f.root.position;
@@ -2335,388 +2763,418 @@ function mythGfx() {
 }
 // warm rim light comes from the sun's side of each silhouette (view space, refreshed every frame)
 function mythFrame() { MYTH_U.uRimDir.value.copy(SUN_N).transformDirection(camera.matrixWorldInverse); }
-// ---- the shared warrior body ----
+// ---- the lion dancers ----
+// Every fighter is ONE lion dancer: a polished block-built body (the R15 layout: upper / lower torso, upper /
+// lower arms and legs, hands, a rounded-cylinder head) in lion-dance trousers covered in gold-rimmed sequins
+// that glint as they move, fur cuffs over kung-fu shoes, a sash tied in a bow, a kung-fu jacket; over the
+// dancer's head an oversized lion-dance head (lionHead below: the hero asset) with a cape hanging from its nape.
 // Pivots are exactly the old rig's: legs at the hips (+-0.2, 0.8), torso at 0.8, arms at the shoulders
-// (+-0.6, 0.72 on the torso), head at the neck (0.8 on the torso), hands 0.66 down the arm.
-// o: skin, pants, shin, boots, chest, sleeve, fore, hands (surfaces); torso (lathe profile), tw / td (torso
-// width / depth scale), leg / arm (limb radius), foot(L, s) custom feet, arms: false to dress the arms yourself
-function mythBody(B, o) {
-  const rig = { cloth: [], fur: [], mythic: true }; MYTH = rig;
-  const lr = o.leg || 0.15, ar = o.arm || 0.135;
-  rig.legL = piv(B, 0.2, 0.8, 0); rig.legR = piv(B, -0.2, 0.8, 0);
-  for (const [L, s] of [[rig.legL, 1], [rig.legR, -1]]) {
-    P(L, gLimb(lr * 1.12, lr * 0.88, 0.4), o.pants, 0, -0.03, 0);
-    P(L, gLimb(lr * 0.88, lr * 0.7, 0.24), o.shin || o.pants, 0, -0.43, 0);
-    if (o.foot) o.foot(L, s);
-    else {
-      P(L, gLathe([[lr * 0.78, -0.73], [lr * 0.8, -0.62], [lr * 0.84, -0.56]], 12), o.boots);
-      P(L, gSph(1, 14, 10), o.boots, 0, -0.73, 0.045, { s: [lr * 0.82, 0.075, 0.19] });
-      P(L, gBox(lr * 1.55, 0.035, 0.38, 0.012), SURF.leather('#18110d'), 0, -0.782, 0.04);
+// (+-0.6, 0.72 on the torso), head at the neck (0.8 on the torso), hands 0.66 down the arm, so every
+// animation, move, emote and ragdoll plays unchanged. The big head is visual only: hit boxes do not change.
+// rounded box: a BoxGeometry whose grid crowds into the edges, every vertex then pushed round the inner box
+// by r, so the corners are true quarter-rounds with smooth normals (k steps a quarter: 3 High, 2 Medium, 1 Low)
+function gRBox(w, h, d, r) {
+  const k = LOWB ? 1 : LODF >= 0.8 ? 3 : 2, n = 2 * k + 1;
+  return gk(['rbox', rk(w), rk(h), rk(d), rk(r), k].join(), () => {
+    const g = new THREE.BoxGeometry(w, h, d, n, n, n), Pp = g.attributes.position, N = g.attributes.normal, half = [w / 2, h / 2, d / 2], p = [0, 0, 0], q = [0, 0, 0];
+    for (let i = 0; i < Pp.count; i++) {
+      p[0] = Pp.getX(i); p[1] = Pp.getY(i); p[2] = Pp.getZ(i);
+      let l = 0;
+      for (let a = 0; a < 3; a++) {
+        const ins = half[a] - r, j = Math.round((p[a] / half[a] + 1) / 2 * n);   // grid index 0..n along this axis
+        // indices 0..k and n-k..n sit in the rounded zone, at even angles; the middle span stays flat
+        if (j <= k) p[a] = -ins - r * Math.tan((1 - j / k) * PI / 4);
+        else if (j >= n - k) p[a] = ins + r * Math.tan((1 - (n - j) / k) * PI / 4);
+        const c = Math.max(-ins, Math.min(ins, p[a])); q[a] = p[a] - c; l += q[a] * q[a]; p[a] = c;
+      }
+      l = Math.sqrt(l) || 1;
+      Pp.setXYZ(i, p[0] + (q[0] / l) * r, p[1] + (q[1] / l) * r, p[2] + (q[2] / l) * r); N.setXYZ(i, q[0] / l, q[1] / l, q[2] / l);
     }
-  }
-  const T = rig.torso = piv(B, 0, 0.8, 0);
-  P(T, gLathe(o.torso, 24), o.chest, 0, 0, 0, { s: [o.tw || 1, 1, o.td || 0.64] });
-  // z of the torso's front surface at height y, x across (negative side: the back); parts sit on it
-  rig.tz = (y, x = 0) => {
-    const p = o.torso; let r = 0;
-    for (let i = 1; i < p.length; i++) if (y <= p[i][1]) { r = lerp(p[i - 1][0], p[i][0], (y - p[i - 1][1]) / (p[i][1] - p[i - 1][1])); break; }
-    const rx = r * (o.tw || 1); return (o.td || 0.64) * r * Math.sqrt(Math.max(0, 1 - (x / rx) ** 2));
-  };
-  // the torso's half-width (x) and half-depth (z) at height y (kill trophies hang round it)
-  rig.trad = (y) => { const z = rig.tz(y, 0); return [z / (o.td || 0.64) * (o.tw || 1), z]; };
-  // a path over the torso: [x, y, side (1 front, -1 back, 0 = explicit z), z] -> points just proud of the surface and their normals
-  rig.tpath = (list, lift = 0.012) => {
-    const td = o.td || 0.64, tw = o.tw || 1, pts = [], nrm = [];
-    for (const [x, y, sd, z0] of list) {
-      if (!sd) { pts.push([x, y, z0]); nrm.push([x * 0.4, 1, z0 * 0.4]); continue; }
-      const z = sd * rig.tz(y, x), n = new V3(x * td * td / (tw * tw), 0.15, z).normalize();
-      pts.push([x + n.x * lift, y + n.y * lift, z + n.z * lift]); nrm.push([n.x, n.y, n.z]);
-    }
-    return [pts, nrm];
-  };
-  P(T, gCyl(0.085, 0.1, 0.16, 10), o.skin, 0, 0.84, 0);
-  rig.armL = piv(T, 0.6, 0.72, 0); rig.armR = piv(T, -0.6, 0.72, 0);
-  if (o.arms !== false) for (const A of [rig.armL, rig.armR]) {
-    P(A, gSph(ar * 1.1, 14, 10), o.sleeve, 0, -0.02, 0);
-    P(A, gLimb(ar, ar * 0.86, 0.34), o.sleeve, 0, -0.04, 0);
-    P(A, gLimb(ar * 0.88, ar * 0.72, 0.24), o.fore || o.sleeve, 0, -0.38, 0);
-  }
-  for (const [A, s] of [[rig.armL, 1], [rig.armR, -1]]) {   // fists, thumbs over the fingers
-    P(A, gBox(ar * 1.12, 0.17, 0.17, 0.05), o.hands, 0, -0.665, 0.01);
-    P(A, gSph(1, 8, 6), o.hands, -s * 0.05, -0.64, 0.075, { s: [0.035, 0.05, 0.035], d: 1 });
-  }
-  const H = rig.head = piv(T, 0, 0.8, 0);
-  P(H, gLathe(HEAD.prof, 24), o.skin, 0, HEAD.y, 0, { s: [1, 1, HEAD.sz] });
-  P(H, gSph(1, 10, 8), o.skin, 0, HEAD.y - 0.045, HEAD.r(-0.045) * HEAD.sz - 0.008, { s: [0.032, 0.05, 0.042] });   // nose
-  P(H, gSph(1, 8, 6), o.skin, 0, HEAD.y - 0.2, HEAD.r(-0.2) * HEAD.sz - 0.03, { s: [0.06, 0.04, 0.05], d: 1 });   // chin
-  P2(H, gSph(1, 10, 8), o.skin, HEAD.r(0.01) - 0.01, HEAD.y + 0.0, -0.01, { s: [0.028, 0.06, 0.045] });   // ears
-  rig.face = new THREE.Mesh(FACE.geo[o.face], FACE.mat); rig.face.position.set(0, HEAD.y, 0); rig.face.userData.noShadow = true; H.add(rig.face);
-  rig.faceKey = rig.baseFace = o.face;
-  rig.hood = piv(H); rig.hat = piv(H); rig.back = piv(T, 0, 0.42, -(o.backZ || 0.23));
-  return rig;
-}
-// a skirt of four hanging plates on cloth pivots that ride over the legs (front / back / sides)
-function skirt(T, s, trim, o = {}) {
-  const y = o.y || 0.14, len = o.len || 0.42, w = o.w || 0.38, tp = o.taper || 1.12, zf = o.zf || 0.21, zb = o.zb || 0.21, xs = o.xs || 0.29;
-  const panel = (p, ww, l) => {
-    P(p, gPlate(ww, l, 0.035, 0.9, tp, true, 8, 3), s);
-    if (trim) P(p, gPlate(ww * tp + 0.01, 0.05, 0.05, 0.9, 1), trim, 0, -l + 0.02, 0.004);
-    if (o.bands) for (let i = 1; i < o.bands; i++) P(p, gPlate(ww * lerp(1, tp, i / o.bands) + 0.008, 0.022, 0.045, 0.9, 1), o.bandS || trim, 0, -l * i / o.bands, 0.002, { d: 1 });
-  };
-  panel(clothPiv(T, 0, y, zf, { leg: 'F', amt: 0.5 }), w, len);
-  panel(clothPiv(T, 0, y, -zb, { leg: 'B', ry: PI, amt: 0.8 }), w, len * (o.backLen || 1));
-  if (o.sides !== false) for (const s2 of [1, -1]) panel(clothPiv(T, s2 * xs, y, 0, { leg: s2 > 0 ? 'L' : 'R', ry: s2 * PI / 2, amt: 0.5 }), w * 0.62, len * 0.9);
-}
-// layered shoulder guard on an arm pivot: a domed cap and `n` curved lames flaring down the outside
-function pauldron(A, s, cap, lame, o = {}) {
-  const r = o.r || 0.19, n = o.n === undefined ? 3 : o.n, R0 = o.R || 0.165;
-  const g = gSph(r, 18, 8, 0, TAU, 0, 1.3);
-  P(A, g, cap, s * 0.02, 0.0, 0, { s: [1.08, 0.72, 1.1], r: [0, 0, -s * 0.3] });
-  P(A, gFlip(g), o.lining || SURF.leather('#1b1411'), s * 0.02, -0.003, 0, { s: [1.05, 0.69, 1.07], r: [0, 0, -s * 0.3] });
-  // overlapping lames down the outside of the arm, each flaring out a little more than the one above
-  for (let i = 0; i < n; i++) {
-    const R = R0 + i * 0.012, w = R * 2.7;
-    P(A, gPlate(w, o.lh || 0.1, 0.022, 2.7, 1.04), Array.isArray(lame) ? lame[i % lame.length] : lame, s * (R - 0.012), -0.06 - i * (o.step || 0.07), 0, { r: [0, s * PI / 2, s * (0.2 + i * 0.07)], ord: 'ZYX' });
-  }
-}
-const nethG = (rig, parent) => { const g = piv(parent); g.visible = false; rig.neth.push(g); return g; };
-function concatGeo(key, list) {   // small static merges for separate (non-skinned) meshes: [geometry, matrix]
-  return gk('cat' + key, () => {
-    let nv = 0, ni = 0; for (const [g] of list) { nv += g.attributes.position.count; ni += g.index.count; }
-    const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), idx = new Uint16Array(ni), nm = new THREE.Matrix3(), v = new V3();
-    let vo = 0, io = 0;
-    for (const [g, mx] of list) {
-      nm.getNormalMatrix(mx); const Pp = g.attributes.position, N = g.attributes.normal;
-      for (let i = 0; i < Pp.count; i++) { v.fromBufferAttribute(Pp, i).applyMatrix4(mx); pos.set([v.x, v.y, v.z], (vo + i) * 3); v.fromBufferAttribute(N, i).applyMatrix3(nm).normalize(); nor.set([v.x, v.y, v.z], (vo + i) * 3); }
-      for (let i = 0; i < g.index.count; i++) idx[io++] = g.index.getX(i) + vo;
-      vo += Pp.count;
-    }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setIndex(new THREE.BufferAttribute(idx, 1));
     return g;
   });
 }
-const M4 = (x, y, z, s = 1) => new THREE.Matrix4().makeScale(s, s, s).setPosition(x, y, z);
-
-// ---- lion-dance heads (every warrior but the lion general wears one) ----
-// Several fur parts as ONE shell mesh (one draw call): items are [geometry, spec, x, y, z, o, strand length];
-// each solid base still goes into the baked body, so Low (no shells) keeps the shapes.
-function furGroup(parent, key, items) {
-  const bases = items.map(([g, s, x, y, z, o]) => P(parent, g, s, x, y, z, o));
-  if (LOWB) return bases;
-  const n = GFX.level === 'high' ? 6 : 3;   // sparser than a single fur part: these cover big areas (fill rate on phones)
-  const geo = gk('furg' + key + '|' + n + '|' + LODF, () => {
-    const parts = items.map(([g, s, , , , , len], i) => { bases[i].updateMatrix(); return furShells(key + i, g, bases[i].matrix, '#' + s.c.clone().convertLinearToSRGB().getHexString(), len, n); });
-    let nv = 0, ni = 0; for (const g of parts) { nv += g.attributes.position.count; ni += g.index.count; }
-    const out = new THREE.BufferGeometry(), idx = new Uint32Array(ni);
-    for (const [a, sz] of [['position', 3], ['normal', 3], ['uv', 2], ['color', 3], ['fur', 3]]) {
-      const arr = new Float32Array(nv * sz); let o = 0;
-      for (const g of parts) { arr.set(g.attributes[a].array, o); o += g.attributes[a].array.length; }
-      out.setAttribute(a, new THREE.BufferAttribute(arr, sz));
-    }
-    let vo = 0, io = 0;
-    for (const g of parts) { const I = g.index.array; for (let i = 0; i < I.length; i++) idx[io++] = I[i] + vo; vo += g.attributes.position.count; }
-    out.setIndex(new THREE.BufferAttribute(idx, 1)); out.computeBoundingSphere(); out.boundingSphere.radius += 0.1;
-    return out;
-  });
-  const m = new THREE.Mesh(geo, furMat);
-  m.userData.noShadow = true; m.userData.fur = true; parent.add(m); MYTH.fur.push(m);
-  return bases;
+// paint spec: colour comes from the fighter's paint atlas region (white vertex colour)
+const _spp = new Map();
+function spP(region, r = 0.42, e = 0, n = 0) {
+  const k = region + '|' + r + '|' + e + '|' + n; let s = _spp.get(k);
+  if (!s) { s = { c: new THREE.Color('#ffffff'), r, m: 0, p: 6, e, n, uvr: ldUvr(LDA[region]) }; _spp.set(k, s); }
+  return s;
 }
-// A southern lion-dance head worn over the warrior's own: a lacquered papier-mache dome with a forehead mirror
-// and a single horn, huge round eyes ringed in black under fluffy brows, a big furry upper lip, painted cheeks,
-// a fur fringe round the back, and a hinged lower jaw with a beard; the dancer looks out through the mouth.
-// c: palette { shell, paint, fur, brow, trim, beard, nose, iris, teeth }; o.jaw: the pivot for the lower jaw
-// (the shark's bite jaw), otherwise the jaw hangs on rig.mouth, opened render-side only (never sent).
-// Parts sit in head-pivot space (the head's centre is at HEAD.y = 0.28, its crown at 0.57).
-function lionDanceHead(rig, c, o = {}) {
-  const D = rig.hood, SH = SURF.lacq(c.shell), PT = SURF.lacq(c.paint), FU = SURF.fur(c.fur), BR = SURF.fur(c.brow);
-  const TR = c.trimS || SURF.gold(c.trim), TN = NEON(TR), WH = sp('#f4efe4', 0.25, 0, 0), INK = sp('#0d0b0c', 0.18, 0, 0), TE = SURF.bone(c.teeth || '#efe6cf');
-  const LN = SURF.cloth(c.lining || '#2a0c0c');
-  // the head is an ellipsoid (centre C, radii RX / RY / RZ); dome(th, ph, lift) is a point on it (th from the top,
-  // ph round from the front, positive to the warrior's left) pushed out along the normal by `lift`
-  const CY = 0.5, CZ = 0.05, RX = 0.42, RY = 0.37, RZ = 0.4;
-  const dome = (th, ph, lift = 0) => {
-    const nx = Math.sin(th) * Math.sin(ph), ny = Math.cos(th), nz = Math.sin(th) * Math.cos(ph);
-    const n = new V3(nx / RX, ny / RY, nz / RZ).normalize();
-    return [RX * nx + n.x * lift, CY + RY * ny + n.y * lift, CZ + RZ * nz + n.z * lift];
-  };
-  // dome over the crown, cheeks and nape down to the jaw line (open in front below the lip), lined in dark cloth
-  const top = gSph(1, 30, 12, 0, TAU, 0, 1.55), side = gSph(1, 30, 7, PI / 2 + 0.95, TAU - 1.9, 1.55, 1.0);
-  for (const g of [top, side]) { P(D, g, SH, 0, CY, CZ, { s: [RX, RY, RZ] }); P(D, gFlip(g), LN, 0, CY, CZ, { s: [RX * 0.97, RY * 0.97, RZ * 0.97] }); }
-  // a high forehead swelling forward over the eyes
-  P(D, gSph(1, 22, 12, 0, TAU, 0, 1.9), SH, 0, 0.66, 0.2, { s: [0.33, 0.2, 0.24] });
-  // painted flame swirls sweeping back over the dome from above each eye, and a gilt rim round the jaw line
-  for (const s of [1, -1]) {
-    P(D, gTube('ldsw' + s, [dome(0.55, s * 0.45, 0.012), dome(0.62, s * 0.95, 0.012), dome(0.85, s * 1.5, 0.012), dome(1.15, s * 2.1, 0.012), dome(1.45, s * 2.55, 0.012)], 0.024, 0.008, 18, 5), PT);
-    P(D, gTube('ldsw2' + s, [dome(1.05, s * 1.0, 0.01), dome(1.2, s * 1.35, 0.01), dome(1.45, s * 1.7, 0.01), dome(1.8, s * 1.9, 0.01)], 0.018, 0.006, 12, 5), TR, 0, 0, 0, { d: 1 });
-    for (let k = 0; k < 3; k++) P(D, gSph(0.022, 8, 6), k === 1 ? PT : TR, ...dome(0.95 + k * 0.22, s * (2.45 - k * 0.1), 0.01), { d: 1 });   // studs
-  }
-  // a painted ridge from the horn back over the crown to the nape, and a gilt band round the back of the dome
-  P(D, gTube('ldridge', [dome(0.35, 0, 0.01), dome(0.0001, PI, 0.012), dome(0.5, PI, 0.012), dome(1.0, PI, 0.012), dome(1.5, PI, 0.012), dome(1.95, PI, 0.01)], 0.03, 0.022, 24, 6), PT);
-  P(D, gTube('ldband', [...Array(9)].map((_, i) => dome(1.55, 1.25 + (TAU - 2.5) * i / 8, 0.006)), 0.014, 0.014, 30, 5), TR);
-  P(D, gTube('ldrim', [...Array(13)].map((_, i) => dome(2.5, 0.95 + (TAU - 1.9) * i / 12, 0.008)), 0.016, 0.016, 36, 5), TN);
-  // forehead mirror, a single horn, ears
-  P(D, gCyl(0.062, 0.062, 0.02, 20), sp('#d8dde2', 0.12, 1, 1), 0, 0.84, 0.25, { r: [PI / 2 - 0.85, 0, 0] });
-  P(D, gTor(0.066, 0.016, 6, 22), TN, 0, 0.84, 0.25, { r: [-0.85, 0, 0] });
-  P(D, gCone(0.045, 0.18, 10), TR, 0, 0.92, 0.12, { r: [0.5, 0, 0] });
-  for (const s of [1, -1]) {
-    P(D, gCone(0.075, 0.15, 10), SH, ...dome(0.75, s * 1.45, 0.03), { r: [0, 0, -s * 0.85] });
-    P(D, gSph(0.045, 8, 6), PT, ...dome(0.75, s * 1.45, 0.05), { s: [0.5, 1, 1], d: 1 });
-  }
-  // eyes: big white globes with a gilt rim, a black ring, a coloured iris and a glint, turned a little outward
-  const EX = 0.175, EY = 0.69, EZ = 0.315, ER = 0.112, ea = 0.34;
-  const eyeAt = (s, dx, dy, dz) => { const a = s * ea, x = dx * Math.cos(a) + dz * Math.sin(a), z = -dx * Math.sin(a) + dz * Math.cos(a); return [s * EX + x, EY + dy, EZ + z]; };
-  for (const s of [1, -1]) {
-    const r = [0, s * ea, 0];
-    P(D, gSph(ER, 20, 14), WH, ...eyeAt(s, 0, 0, 0), { s: [1, 1, 0.8], r });
-    P(D, gTor(ER * 1.02, 0.016, 6, 24), TN, ...eyeAt(s, 0, 0, 0.02), { r });
-    P(D, gTor(0.074, 0.014, 6, 22), INK, ...eyeAt(s, 0, 0, 0.068), { r });
-    if (!o.eyes) {
-      P(D, gSph(0.05, 14, 10), sp(c.iris, 0.2, 0, 0, 0.25), ...eyeAt(s, 0, 0, 0.056), { s: [1, 1, 0.6], r });
-      P(D, gSph(0.027, 10, 8), INK, ...eyeAt(s, 0, 0, 0.08), { s: [1, 1, 0.6], r });
-    }
-    P(D, gSph(0.013, 6, 5), SURF.glow('#fff8e8', 2), ...eyeAt(s, -0.025, 0.028, 0.092), { d: 1 });
-    // a painted cheek with a gilt spiral below each eye
-    P(D, gSph(0.12, 14, 10), PT, ...dome(1.25, s * 0.85, -0.04), { s: [0.75, 0.85, 0.75] });
-    P(D, gTor(0.05, 0.012, 5, 16, 1.6 * PI), TN, ...dome(1.25, s * 0.85, 0.045), { r: [0, s * 0.85, 0], d: 1 });
-    P(D, gSph(0.016, 6, 5), TR, ...dome(1.25, s * 0.85, 0.045), { d: 1 });
-  }
-  // a broad nose with round nostrils over the lip, and a row of teeth under it
-  P(D, gSph(0.09, 16, 12), c.noseS || PT, 0, 0.535, 0.43, { s: [1.4, 0.85, 0.85] });
-  P2(D, gSph(0.034, 10, 8), TR, 0.075, 0.51, 0.475);
-  for (let k = -4; k <= 4; k++) { const a = k * 0.2; P(D, gCone(0.02, 0.065, 5), TE, Math.sin(a) * 0.33, 0.37, CZ + Math.cos(a) * 0.33, { r: [PI, 0, 0], d: Math.abs(k) > 2 ? 1 : 0 }); }
-  // fur: the big upper lip, fluffy brows over the eyes, a fringe round the nape, pompoms along the crest
-  const brow = (s) => { const [x, y, z] = eyeAt(s, 0, 0.035, 0.035); return [gTor(0.12, 0.036, 5, 12, PI * 1.05), BR, x, y, z, { r: [0, s * ea, PI / 2 - PI * 0.525 + s * 0.12], ord: 'YXZ' }, 0.05]; };
-  const POM = c.pom || [c.brow, c.fur, c.brow];
-  furGroup(D, 'ld' + c.key, [
-    [gTor(0.355, 0.085, 7, 22, 3.1), FU, 0, 0.45, CZ, { r: [PI / 2, 0, PI / 2 - 1.55] }, 0.065],
-    brow(1), brow(-1),
-    [gTor(0.3, 0.07, 6, 22, TAU - 2.2), FU, 0, 0.19, CZ - 0.02, { r: [PI / 2, 0, PI / 2 + 1.1], s: [1.12, 1, 1.05] }, 0.07],
-    // fluffy tufts cap the ends of the lip and of the nape fringe
-    [gSph(0.11, 9, 6), BR, 0.35, 0.44, 0.06, { s: [0.8, 1, 1] }, 0.055], [gSph(0.11, 9, 6), BR, -0.35, 0.44, 0.06, { s: [0.8, 1, 1] }, 0.055],
-    [gSph(0.085, 9, 6), FU, 0.3, 0.2, 0.17, null, 0.06], [gSph(0.085, 9, 6), FU, -0.3, 0.2, 0.17, null, 0.06],
-    [gSph(0.065, 9, 6), SURF.fur(POM[0]), ...dome(0.25, PI, 0.03), null, 0.05],
-    [gSph(0.06, 9, 6), SURF.fur(POM[1]), ...dome(0.6, PI, 0.03), null, 0.05],
-    [gSph(0.055, 9, 6), SURF.fur(POM[2]), ...dome(0.95, PI, 0.03), null, 0.05],
-  ]);
-  // the lower jaw, hinged at the cheeks: a painted bowl with a gilt lip, a tongue, teeth and a swinging beard
-  // a networked bite jaw (o.jaw) swings the jaw through an inner pivot that takes back part of each angle
-  // (render-side: the shown angle eases towards 0.55 rad), so a wide bite gapes instead of burying the jaw in the chest
-  const J = o.jaw ? (rig.jawDamp = piv(o.jaw)) : (rig.mouth = piv(D, 0, 0.22, -0.05));
-  J.userData.anim = true; rig.mouthA = 0; rig.mouthPh = Math.random() * TAU; rig.ldEye = eyeAt;
-  const JP = o.jaw || J, jy = 0.22 - JP.position.y, jz = -0.05 - JP.position.z;   // the parts below sit as if the hinge were at (0, 0.22, -0.05)
-  const bowl = gSph(1, 24, 8, PI / 2 - 1.3, 2.6, PI / 2, 1.1), BY = jy - 0.06, BZ = jz + 0.1;
-  P(J, bowl, PT, 0, BY, BZ, { s: [0.34, 0.15, 0.33] });
-  P(J, gFlip(bowl), sp('#5a1014', 0.6, 0, 0), 0, BY + 0.003, BZ, { s: [0.33, 0.14, 0.32] });
-  P(J, gTor(1, 0.1, 6, 26, 2.6), TN, 0, BY, BZ, { r: [PI / 2, 0, PI / 2 - 1.3], s: [0.34, 0.33, 0.35] });
-  P(J, gTor(1, 0.12, 6, 26, 2.6), PT, 0, BY - 0.035, BZ, { r: [PI / 2, 0, PI / 2 - 1.3], s: [0.345, 0.335, 0.3] });
-  P(J, gSph(1, 12, 8), sp('#b0242a', 0.35, 0, 0), 0, BY - 0.01, BZ + 0.17, { s: [0.13, 0.03, 0.11] });
-  for (let k = -3; k <= 3; k++) { const a = k * 0.3; P(J, gCone(0.019, 0.06, 5), TE, Math.sin(a) * 0.32, BY + 0.03, BZ + Math.cos(a) * 0.31, { d: Math.abs(k) > 1 ? 1 : 0 }); }
-  const beard = clothPiv(J, 0, BY - 0.07, BZ + 0.3, { amt: 0.9, k: 90, sway: 0.06 });
-  const BD = SURF.fur(c.beard);
-  P(beard, gPlate(0.34, 0.16, 0.04, 1.3, 0.75, true, 6, 2), BD, 0, 0.02, 0);
-  for (let k = -2; k <= 2; k++) P(beard, gPlate(0.08, 0.22 + (2 - Math.abs(k)) * 0.05, 0.03, 0.8, 0.3, true, 3, 3), BD, k * 0.062, -0.12, 0.012 - Math.abs(k) * 0.02, { r: [0.08, -k * 0.16, k * 0.07], d: Math.abs(k) === 2 ? 1 : 0 });   // flowing locks
-  // the lion's cloth body hanging from the nape, edged with a fur fringe; it swings on its own
-  if (o.body !== false) {
-    // (it hangs from the nape under the fringe and widens over the shoulders, so the head still shows from behind)
-    const bd = clothPiv(D, 0, 0.3, -0.36, { amt: 0.8, k: 95, sway: 0.04, ry: PI, bx: 0.1 });
-    const BC = SURF.lamel(c.body || c.fur), BW = 0.56;
-    P(bd, gPlate(BW, 0.62, 0.025, 1.5, 1.35, true, 10, 4), BC, 0, 0, 0, { r: [-0.22, 0, 0] });
-    const lx = (y, w) => [0, y, 0.012 - Math.sin(0.22) * y];
-    for (const [y, n, d] of [[-0.3, 4, 1], [-0.6, 5, 0]]) {   // rows of fur fringe, the last one at the hem
-      const w = BW * lerp(1, 1.35, -y / 0.62) / 2;
-      for (let k = -n; k <= n; k++) { const [, y0, z0] = lx(y); P(bd, gCone(0.034, 0.12, 5), FU, k * w / n, y0, z0 + 0.006 + Math.abs(k / n) * w * 0.25, { r: [PI - 0.22, 0, 0], d: d || Math.abs(k) === n ? 1 : 0 }); }
-    }
-    P(bd, gPlate(BW * 1.35 + 0.02, 0.04, 0.04, 1.5, 1), TN, ...lx(-0.6), { r: [-0.22, 0, 0] });
-  }
-  return D;
+const SEQ = (c, r = 0.5) => sp(c, r, 0, 5);   // sequinned cloth
+// ---- palettes ----
+// paint: the colours the paint atlas uses; the rest colour the body, fur and costume. A bot's tint overrides
+// some of them (deep merge), so a pink lion is still the lion, with its own small touches.
+const LDPAL = {
+  lion: {   // classic red and gold
+    paint: { shell: '#d41818', shellHi: '#ea3424', shellLo: '#9a0c12', shell2: '#f2b42a', p1: '#1e5fd6', p2: '#f6c21e', p3: '#2fb24a', p4: '#ffffff', white: '#fbf7ee', ink: '#151214',
+      irisW: '#fbf7ee', irisK: '#141216', pupil: '#e21a1a', eyeR1: '#1e5fd6', eyeR2: '#2fb24a', glint: '#ffffff', jaw: '#fbf3e6', jaw2: '#d81c1c', jawLine: '#d42020', lid: '#d81c1c', cape: '#d01a1a', cape2: '#e8a21c' },
+    gold: '#f0b428', fur: '#ee1c1c', brow: '#f42222', lip: '#ee1c1c', rim: '#e81a1a', crest: '#f42424', beard: '#e01818', lash: '#fbf7ee',
+    pom: ['#f42424', '#ffd23a', '#ffffff'], nose: '#f6f2ea', teeth: '#fbf7ee', mouth: '#120809', ear: '#ee1c1c',
+    skin: '#e7b48a', shirt: '#b8121a', trim: '#f0b428', trousers: '#c8141c', sash: '#f6c21e', cuff: '#f02020', shoe: '#18151a', sole: '#f4f0e8', capeFur: '#f02020', antenna: '#1a1418',
+  },
+  penguin: {   // black and white with orange accents
+    paint: { shell: '#1c1e26', shellHi: '#3a3e4c', shellLo: '#0c0d12', shell2: '#f4f4f0', p1: '#ff8a1a', p2: '#7fd4ff', p3: '#f4f4f0', p4: '#ff8a1a', white: '#fbfbf7', ink: '#0e0f14',
+      irisW: '#fbfbf7', irisK: '#101218', pupil: '#ff7a10', eyeR1: '#7fd4ff', eyeR2: '#ff8a1a', glint: '#ffffff', jaw: '#ff8a1a', jaw2: '#1c1e26', jawLine: '#fbfbf7', lid: '#1c1e26', cape: '#1c1e26', cape2: '#3a3e4c' },
+    gold: '#e8e8e8', fur: '#f6f6f2', brow: '#ffffff', lip: '#f6f6f2', rim: '#f2f2ee', crest: '#202228', beard: '#f8f8f4', lash: '#ff8a1a',
+    pom: ['#ff8a1a', '#ffffff', '#7fd4ff'], nose: '#ff8a1a', teeth: '#fbfbf7', mouth: '#0c0c10', ear: '#202228',
+    skin: '#f0c9a2', shirt: '#1e2028', trim: '#ff8a1a', trousers: '#1c1e26', sash: '#ff8a1a', cuff: '#f6f6f2', shoe: '#ff8a1a', sole: '#2a2a30', capeFur: '#f6f6f2', antenna: '#1a1a20', belly: '#f6f6f2',
+  },
+  steve: {   // teal and blue
+    paint: { shell: '#12a3a6', shellHi: '#3cd0d0', shellLo: '#0a6870', shell2: '#2a50c8', p1: '#2a50c8', p2: '#f6c21e', p3: '#ffffff', p4: '#5ad06a', white: '#f6fbfa', ink: '#10181c',
+      irisW: '#f6fbfa', irisK: '#0e1a22', pupil: '#2a50c8', eyeR1: '#f6c21e', eyeR2: '#2a50c8', glint: '#ffffff', jaw: '#f6fbfa', jaw2: '#12a3a6', jawLine: '#2a50c8', lid: '#12a3a6', cape: '#119ea2', cape2: '#2a50c8' },
+    gold: '#f0b428', fur: '#1cc0c0', brow: '#2ad2cc', lip: '#1cb8b8', rim: '#18b2b4', crest: '#2a50c8', beard: '#6b4626', lash: '#f6fbfa',
+    pom: ['#2a50c8', '#f6c21e', '#5ad06a'], nose: '#2a50c8', teeth: '#f6fbfa', mouth: '#0a1418', ear: '#12a3a6',
+    skin: '#c88c62', shirt: '#14a8b0', trim: '#f0b428', trousers: '#2838a8', sash: '#7a4a26', cuff: '#1cc0c0', shoe: '#3a3a40', sole: '#e8e4dc', capeFur: '#1cc0c0', antenna: '#16201f',
+  },
+  shark: {   // slate blue and grey
+    paint: { shell: '#4f6e88', shellHi: '#7898b4', shellLo: '#2c4054', shell2: '#c7d2dc', p1: '#1d3d66', p2: '#c7d2dc', p3: '#a8202a', p4: '#e8eef2', white: '#eef2f4', ink: '#0e1418',
+      irisW: '#e8c070', irisK: '#2a1408', pupil: '#ff8a1a', eyeR1: '#1d3d66', eyeR2: '#c7d2dc', glint: '#ffffff', jaw: '#dfe6ec', jaw2: '#4f6e88', jawLine: '#a8202a', lid: '#4f6e88', cape: '#4c6a84', cape2: '#2c4054' },
+    gold: '#c8ccd4', fur: '#62829c', brow: '#7a98b2', lip: '#5c7c96', rim: '#58788f', crest: '#3c556c', beard: '#34495c', lash: '#e8eef2',
+    pom: ['#a8202a', '#c7d2dc', '#1d3d66'], nose: '#2c4054', teeth: '#f4f4f0', mouth: '#120a0c', ear: '#4f6e88',
+    skin: '#9fb0bc', shirt: '#b9c6d2', trim: '#a8202a', trousers: '#3c5064', sash: '#a8202a', cuff: '#62829c', shoe: '#1c2228', sole: '#c8ccd4', capeFur: '#62829c', antenna: '#1a2026',
+  },
+  dummy: {   // an unpainted practice head: raw paper, raffia, red seals
+    paint: { shell: '#d9c79c', shellHi: '#e8dab4', shellLo: '#b9a47a', shell2: '#c9b483', p1: '#b02a24', p2: '#8a6a3a', p3: '#c9b483', p4: '#e8dab4', white: '#efe6cc', ink: '#3a2a1a',
+      irisW: '#efe6cc', irisK: '#3a2a1a', pupil: '#b02a24', eyeR1: '#b02a24', eyeR2: '#8a6a3a', glint: '#ffffff', jaw: '#e8dab4', jaw2: '#c9b483', jawLine: '#b02a24', lid: '#d9c79c', cape: '#c9b483', cape2: '#b9a47a' },
+    gold: '#a8865a', fur: '#b39760', brow: '#c2a46a', lip: '#b39760', rim: '#ad9058', crest: '#a8865a', beard: '#a8865a', lash: '#3a2a1a',
+    pom: ['#b02a24', '#c9b483', '#e8dab4'], nose: '#b02a24', teeth: '#efe6cc', mouth: '#2a1c12', ear: '#c9b483',
+    skin: '#a77a4a', shirt: '#cdbb92', trim: '#8a6236', trousers: '#8a6a44', sash: '#b02a24', cuff: '#b39760', shoe: '#4a3420', sole: '#8a6236', capeFur: '#b39760', antenna: '#3a2a1a',
+  },
+};
+// bots wear varied colours (photo 2: pink, blue, orange lions in one troupe)
+const LDTINT = {
+  pink: { paint: { shell: '#e0267a', shellHi: '#ff5aa2', shellLo: '#a3124e', shell2: '#ffd0e4', cape: '#d81e72', cape2: '#ff6aa8', lid: '#e0267a', jaw: '#ffe8d8', jawLine: '#ff7a1a', jaw2: '#e0267a' },
+    fur: '#ff3a96', brow: '#ff4aa0', lip: '#ff3a96', rim: '#f8348e', crest: '#ff4aa0', beard: '#c81e64', capeFur: '#ff3a96', cuff: '#ff3a96', trousers: '#c01a5a', shirt: '#a8144a', ear: '#e0267a' },
+  blue: { paint: { shell: '#2456d6', shellHi: '#4a7cf0', shellLo: '#14348c', shell2: '#ffd23a', cape: '#2050cc', cape2: '#4a7cf0', lid: '#2456d6', jaw2: '#2456d6' },
+    fur: '#2f64ec', brow: '#3c72f4', lip: '#2f64ec', rim: '#2c5ee0', crest: '#3c72f4', beard: '#1a3ea8', capeFur: '#2f64ec', cuff: '#2f64ec', trousers: '#1c3eb0', shirt: '#14308a', ear: '#2456d6' },
+  orange: { paint: { shell: '#f06a14', shellHi: '#ff9a3c', shellLo: '#b04608', shell2: '#ffe08a', cape: '#ec6612', cape2: '#ff9a3c', lid: '#f06a14', jaw2: '#f06a14' },
+    fur: '#ff7a1c', brow: '#ff8a2a', lip: '#ff7a1c', rim: '#f87418', crest: '#ff8a2a', beard: '#d85a10', capeFur: '#ff7a1c', cuff: '#ff7a1c', trousers: '#d05210', shirt: '#a83e0a', ear: '#f06a14' },
+  green: { paint: { shell: '#22a04a', shellHi: '#4ccc6c', shellLo: '#126a2e', shell2: '#ffd23a', cape: '#1e9a46', cape2: '#4ccc6c', lid: '#22a04a', jaw2: '#22a04a' },
+    fur: '#2cb854', brow: '#38c45e', lip: '#2cb854', rim: '#28ac4e', crest: '#38c45e', beard: '#18803a', capeFur: '#2cb854', cuff: '#2cb854', trousers: '#1a7a38', shirt: '#126a2e', ear: '#22a04a' },
+  purple: { paint: { shell: '#7a34cc', shellHi: '#a462ec', shellLo: '#4c1c88', shell2: '#ffd23a', cape: '#7430c4', cape2: '#a462ec', lid: '#7a34cc', jaw2: '#7a34cc' },
+    fur: '#8a44dc', brow: '#9a54e8', lip: '#8a44dc', rim: '#843ed4', crest: '#9a54e8', beard: '#5c24a0', capeFur: '#8a44dc', cuff: '#8a44dc', trousers: '#5a24a0', shirt: '#46188a', ear: '#7a34cc' },
+};
+const TINT_KEYS = Object.keys(LDTINT);
+function ldPalette(key, tint) {
+  const base = LDPAL[key] || LDPAL.lion, t = tint && own(LDTINT, tint) ? LDTINT[tint] : null;
+  const pal = Object.assign({}, base, t || {}, { paint: Object.assign({}, base.paint, t ? t.paint : {}) });
+  pal.key = key + (t ? '-' + tint : '');
+  return pal;
 }
-
-// ---- 阿娟: gilded guardian-lion general ----
-// A red-lacquer lamellar coat with two heart-guard mirrors, a gold guardian-lion helm with a shaggy mane, a
-// lip that flaps open on big hits (jaw) and the long war-cloth trailing from the helm (cape).
-function buildLion(B) {
-  const RL = SURF.lamel('#7a1517'), RC = SURF.cloth('#861a1b'), RD = SURF.cloth('#3e0d10'), G = SURF.gold(), GN = NEON(SURF.gold('#c99a3c'));
-  const K = SURF.leather('#1c1411'), JD = SURF.jade(), FUR = SURF.fur('#b97a30'), SK = SURF.skin('#b57c58'), WH = SURF.bone('#eadfc4');
-  const rig = mythBody(B, { skin: SK, pants: RD, shin: SURF.cloth('#2c0a0c'), boots: K, chest: RL, sleeve: RC, hands: K, face: 'determined',
-    torso: [[0.29, -0.02], [0.31, 0.1], [0.27, 0.3], [0.32, 0.48], [0.41, 0.62], [0.45, 0.7], [0.4, 0.78], [0.14, 0.86], [0, 0.87]] });
-  const T = rig.torso;
-  // chest: gold placket, two heart-guard mirrors with jade hearts, a gold collar
-  for (let i = 0; i < 6; i++) { const y = 0.12 + i * 0.09; P(T, gPlate(0.07, 0.1, 0.022, 0.2), GN, 0, y + 0.05, rig.tz(y + 0.05) + 0.004); }
-  for (const s of [1, -1]) {   // heart-guard mirrors, tilted to follow the chest
-    const y = 0.5, z = rig.tz(y, 0.15) + 0.03;
-    P(T, gCyl(0.1, 0.1, 0.03, 24), G, s * 0.15, y, z, { r: [PI / 2 - 0.2, s * 0.3, 0], ord: 'YXZ' });
-    P(T, gTor(0.1, 0.014, 6, 24), GN, s * 0.155, y + 0.003, z + 0.014, { r: [-0.2, s * 0.3, 0], ord: 'YXZ' });
-    P(T, gSph(0.045, 12, 8), JD, s * 0.155, y + 0.003, z + 0.016, { s: [1, 1, 0.45], r: [-0.2, s * 0.3, 0], ord: 'YXZ' });
-    // a long general's moustache and a forked beard
-    const H = rig.head, my = HEAD.y - 0.085, mz = HEAD.r(-0.085) * HEAD.sz;
-    P(H, gTube('lionstache' + s, [[s * 0.01, my, mz + 0.01], [s * 0.06, my - 0.005, mz - 0.005], [s * 0.11, my - 0.06, mz - 0.04], [s * 0.12, my - 0.16, mz - 0.06]], 0.016, 0.004, 12, 5), SURF.fur('#1a110c'));
-    P(H, gCone(0.03, 0.14, 6), SURF.fur('#1a110c'), s * 0.03, HEAD.y - 0.27, HEAD.r(-0.2) * HEAD.sz - 0.035, { r: [PI + 0.25, 0, -s * 0.12] });
-    if (s > 0) {
-      P(H, gSph(1, 20, 14), SURF.fur('#1a110c'), 0, HEAD.y + 0.035, -0.04, { s: [0.247, 0.262, 0.238] });
-      P(H, gSph(0.07, 12, 10), SURF.fur('#1a110c'), 0, HEAD.y + 0.27, -0.06); P(H, gTor(0.05, 0.014, 5, 12), G, 0, HEAD.y + 0.25, -0.06, { r: [PI / 2, 0, 0], d: 1 });
-    }
-  }
-  P(T, gTor(0.15, 0.035, 6, 22), G, 0, 0.79, 0.005, { r: [PI / 2, 0, 0], s: [1, 0.75, 1] });
-  // belt with a lion-mask buckle, a red sash knotted at the hip, lamellar skirt
-  P(T, gCyl(0.3, 0.31, 0.11, 26), G, 0, 0.17, 0, { s: [1, 1, 0.68] });
-  P(T, gCyl(0.09, 0.09, 0.05, 18), GN, 0, 0.17, 0.215, { r: [PI / 2, 0, 0] });
-  P(T, gSph(0.045, 12, 8), RL, 0, 0.165, 0.245, { s: [1.2, 0.8, 0.6] });
-  P2(T, gSph(0.016, 8, 6), JD, 0.035, 0.195, 0.242, { d: 1 });
-  P(T, gSph(0.06, 12, 8), RC, -0.25, 0.2, 0.13, { s: [1, 0.8, 0.8] });
-  const sash = clothPiv(T, -0.25, 0.17, 0.14, { amt: 1.1, k: 90, sway: 0.08 });
-  P(sash, gPlate(0.07, 0.5, 0.018, 0.4, 0.6, true), RC, 0.02, 0, 0, { r: [0, 0, 0.08] });
-  P(sash, gPlate(0.06, 0.38, 0.018, 0.4, 0.6, true), RC, -0.05, -0.02, -0.01, { r: [0, 0, -0.12] });
-  P(sash, gCone(0.03, 0.07, 8), G, 0.06, -0.52, 0, { r: [PI, 0, 0], d: 1 });
-  skirt(T, RL, G, { y: 0.14, len: 0.44, w: 0.38, bands: 3, bandS: SURF.gold('#9c7025') });
-  // back: a lamellar back plate edge so the silhouette stays armoured
-  P(T, gPlate(0.56, 0.42, 0.03, 1.5, 0.8), G, 0, 0.5, -rig.tz(0.5) - 0.012, { r: [-0.2, PI, 0] });
-  P(T, gPlate(0.48, 0.36, 0.034, 1.5, 0.8), RL, 0, 0.49, -rig.tz(0.5) - 0.02, { r: [-0.2, PI, 0] });
-  for (const [A, s] of [[rig.armL, 1], [rig.armR, -1]]) {
-    pauldron(A, s, G, [sp('#3a0c0e', 0.3, 0, 4), G], { n: 3, r: 0.2 });
-    P(A, gSph(0.045, 10, 8), JD, s * 0.17, 0.05, 0, { d: 1 });
-    P(A, gLathe([[0.112, -0.62], [0.124, -0.58], [0.128, -0.44], [0.12, -0.38]], 16), G);   // bracer
-    P(A, gTor(0.125, 0.012, 5, 18), GN, 0, -0.42, 0, { r: [PI / 2, 0, 0] });
-  }
+// ---- the block body ----
+// o: pal (palette), skin / shirt / trousers / sash / shoe (surfaces), cuffs: fur cuff colour, face (decal key)
+function dancerBody(B, pal, o = {}) {
+  const rig = { cloth: [], fur: [], mythic: true, pal, paint: LDPAINT.tex(pal) }; MYTH = rig;
+  const SK = SURF.skin(pal.skin), TR = SEQ(pal.trousers, 0.5), SH = o.shirt || sp(pal.shirt, 0.55, 0, 2), GT = SURF.gold(pal.trim), GN = NEON(SURF.gold(pal.trim));
+  const SHOE = sp(pal.shoe, 0.5, 0, 2), SOLE = sp(pal.sole, 0.6, 0, 0);
+  rig.legL = piv(B, 0.2, 0.8, 0); rig.legR = piv(B, -0.2, 0.8, 0);
   for (const [L, s] of [[rig.legL, 1], [rig.legR, -1]]) {
-    P(L, gSph(0.1, 12, 8, 0, TAU, 0, 1.3), G, 0, -0.44, 0.075, { r: [PI / 2 - 0.2, 0, 0], s: [1, 0.7, 1] });   // knee guard
-    P(L, gSph(0.06, 10, 8), G, 0, -0.74, 0.19, { s: [1.1, 0.8, 1.2] });   // gilded toe cap
-    P(L, gTor(0.13, 0.015, 5, 18), G, 0, -0.6, 0, { r: [PI / 2, 0, 0], d: 1 });
+    P(L, gRBox(0.38, 0.46, 0.38, 0.07), TR, 0, -0.2, 0);                      // upper leg (thigh)
+    P(L, gRBox(0.37, 0.28, 0.37, 0.065), TR, 0, -0.52, 0);                    // lower leg
+    furPart(L, 'cuff' + pal.key, gTor(0.17, 0.065, 8, 22), SURF.fur(pal.cuff), 0, -0.665, 0, { r: [PI / 2, 0, 0], s: [1.08, 1.08, 1] }, 0.055, { droop: 0.7 });
+    if (o.foot) o.foot(L, s);
+    else {   // kung-fu shoe: cloth upper, pale sole
+      P(L, gRBox(0.3, 0.13, 0.44, 0.055), SHOE, 0, -0.73, 0.05);
+      P(L, gRBox(0.32, 0.045, 0.46, 0.018), SOLE, 0, -0.787, 0.05);
+      P(L, gRBox(0.1, 0.02, 0.12, 0.008), GT, 0, -0.665, 0.2, { r: [0.5, 0, 0], d: 1 });   // instep strap
+    }
   }
-  // ---- guardian-lion helm (rig.hood) ----
-  // a gold lion mask riding high on the head: brow ridges over bulging eyes, a broad lacquered nose, ears and a
-  // horn, with a mane of carved curls (and soft fur shells) framing the warrior's face below the lion's lip
-  const D = rig.hood, HY = 0.34;
-  const top = gSph(0.31, 28, 12, 0, TAU, 0, 1.2), side = gSph(0.31, 28, 8, PI / 2 + 0.95, TAU - 1.9, 1.2, 0.8);
-  for (const g of [top, side]) { P(D, g, G, 0, HY, -0.03, { s: [1, 1, 1.05] }); P(D, gFlip(g), RL, 0, HY, -0.03, { s: [0.97, 0.97, 1.02] }); }
-  arcRing(D, 0.29, 0.035, 2.2, G, 0.455, -0.03);
-  P(D, gSph(0.09, 16, 12), RL, 0, 0.49, 0.27, { s: [1.5, 0.8, 0.85] });   // broad lacquered nose
-  P(D, gSph(0.05, 12, 8), G, 0, 0.535, 0.29, { s: [0.7, 1.2, 0.8] });
-  P2(D, gTor(0.03, 0.011, 5, 12), G, 0.06, 0.485, 0.335, { r: [0, 0.3, 0], d: 1 });
+  const T = rig.torso = piv(B, 0, 0.8, 0);
+  P(T, gRBox(0.76, 0.26, 0.4, 0.08), TR, 0, 0.12, 0);                         // lower torso (waist of the trousers)
+  P(T, gRBox(0.8, 0.58, 0.42, 0.1), SH, 0, 0.5, 0);                           // upper torso: the jacket
+  if (o.chest) o.chest(T);
+  // kung-fu jacket: mandarin collar, gold piping down the front, frog buttons
+  P(T, gCyl(0.15, 0.17, 0.07, 18), sp(pal.trim, 0.45, 0, 2), 0, 0.81, 0);
+  P(T, gRBox(0.035, 0.5, 0.02, 0.008), GN, 0.0, 0.52, 0.212);
+  for (let i = 0; i < 3; i++) P(T, gCyl(0.018, 0.018, 0.13, 8), GT, 0, 0.66 - i * 0.14, 0.222, { r: [0, 0, PI / 2], d: i === 1 ? 0 : 1 });
+  // sash knotted in a bow at the front, the tails swinging
+  const SA = sp(pal.sash, 0.42, 0, 2);
+  P(T, gRBox(0.82, 0.12, 0.44, 0.05), SA, 0, 0.255, 0);
+  P(T, gSph(0.05, 12, 8), SA, 0.17, 0.255, 0.235, { s: [1, 1, 0.8] });   // knot
+  for (const s of [1, -1]) P(T, gTor(0.07, 0.03, 8, 16), SA, 0.17 + s * 0.085, 0.265, 0.23, { s: [1.15, 0.75, 0.6], r: [0, 0, s * 0.25] });   // loops
+  const tails = clothPiv(T, 0.17, 0.23, 0.24, { amt: 1, k: 95, sway: 0.08 });
+  P(tails, gPlate(0.07, 0.3, 0.016, 0.3, 1.3, true), SA, -0.035, 0, 0, { r: [0, 0, -0.18] });
+  P(tails, gPlate(0.065, 0.24, 0.016, 0.3, 1.3, true), SA, 0.04, 0, -0.006, { r: [0, 0, 0.22] });
+  // torso surface helpers for the kill trophies: front z at height y (x across), half-size at y, paths over it
+  rig.tz = (y, x = 0) => (y > 0.21 ? 0.21 : 0.2) * (Math.abs(x) > 0.34 ? Math.max(0, 1 - (Math.abs(x) - 0.34) / 0.12) * 0.6 + 0.4 : 1);
+  rig.trad = (y) => [y > 0.21 ? 0.4 : 0.38, y > 0.21 ? 0.21 : 0.2];
+  P(T, gCyl(0.1, 0.11, 0.14, 12), SK, 0, 0.85, 0);   // neck
+  rig.armL = piv(T, 0.6, 0.72, 0); rig.armR = piv(T, -0.6, 0.72, 0);
+  for (const A of [rig.armL, rig.armR]) {
+    P(A, gRBox(0.34, 0.4, 0.34, 0.075), SH, 0, -0.14, 0);    // upper arm
+    P(A, gRBox(0.32, 0.24, 0.32, 0.07), SH, 0, -0.45, 0);    // lower arm
+    P(A, gRBox(0.345, 0.05, 0.345, 0.02), GN, 0, -0.555, 0, { d: 1 });   // gold cuff band
+    P(A, gRBox(0.27, 0.19, 0.29, 0.075), SK, 0, -0.665, 0.0);   // hand
+  }
+  const H = rig.head = piv(T, 0, 0.8, 0);
+  P(H, gLathe(HEAD.prof, 24), SK, 0, HEAD.y, 0);
+  rig.face = new THREE.Mesh(FACE.geo[o.face || 'smile'], FACE.mat); rig.face.position.set(0, HEAD.y, 0); rig.face.userData.noShadow = true; H.add(rig.face);
+  rig.faceKey = rig.baseFace = o.face || 'smile';
+  return rig;
+}
+// =====================================================================================================
+// lionHead: the hero asset, one module. It hangs everything off ONE attachment pivot (rig.hood, a child of
+// the head pivot at the neck: head-pivot space, y up, +z forward, the shell's centre at LDH.c) so an
+// artist-made GLB could replace it wholesale: load the model, scale it to LDH (shell half-width LDH.r[0],
+// crown at LDH.c[1] + LDH.r[1]), parent it to rig.hood and point the hooks below at its nodes:
+//   rig.mouth       lower jaw pivot (hinge at LDH.hinge): rotation.x > 0 opens (render-side; the lion's and
+//                   the shark's networked rig.jaw drives it too)
+//   rig.lids[i]     eyelid pivots at each eye centre: rotation.x from LDH.lid.open (up, tucked under the
+//                   brow) to LDH.lid.shut (down over the eye)
+//   rig.antennae[i] { a: base pivot, b: tip pivot } springs on the crown (rotation x / z)
+//   rig.hood        the attachment pivot itself, also bobbed and tilted render-side (rigSync)
+//   rig.hat         avatar headgear mount on the crown (scaled to LDH)
+//   rig.capeRoot    the cape's mount at the nape
+// Eyes, jaw plate, nose, cheeks, ears, lids and cape are painted from the fighter's atlas (LDPAINT).
+const LDH = {
+  k: 1.16,                                                // the whole head's scale (shell space -> head-pivot space)
+  c: [0, 0.6, -0.02], r: [0.6, 0.55, 0.54], th1: 2.55,   // shell ellipsoid; it runs from the crown down to th1
+  mouth: [1.86, 1.0],                                      // the mouth opening: below this polar angle, within this front angle
+  hinge: [0, 0.37, -0.1],
+  eye: { th: 0.97, ph: 0.47, r: 0.205, yaw: 0.42, pitch: -0.08, sink: 0.05 },
+  lid: { open: -1.05, shut: 0.5 },
+  cape: [0, 0.3, -0.42],
+};
+// the shell surface: the ellipsoid with a swelling forehead, a snout and puffed cheeks; s(th, ph) -> point
+function ldShellPt(th, ph, out = new V3()) {
+  const [cx, cy, cz] = LDH.c, [rx, ry, rz] = LDH.r, st = Math.sin(th);
+  let x = st * Math.sin(ph) * rx, y = Math.cos(th) * ry, z = st * Math.cos(ph) * rz;
+  const front = Math.max(0, Math.cos(ph)), side = Math.abs(Math.sin(ph));
+  const g = (v, m, w) => Math.exp(-(((v - m) / w) ** 2));
+  z += front * front * (g(th, 0.75, 0.32) * 0.07 + front * front * g(th, 1.6, 0.25) * 0.09);   // forehead, snout
+  const puff = 1 + g(th, 1.6, 0.4) * g(Math.abs(ph), 1.15, 0.5) * 0.11;                         // cheeks
+  x *= puff; if (Math.cos(ph) < 0) z *= 0.94;                                                  // the back a little flatter
+  y += -g(th, 0.0, 0.5) * 0.03;                                                                   // a rounder crown
+  return out.set(cx + x, cy + y, cz + z);
+}
+function ldShellN(th, ph, out = new V3()) {   // outward normal by finite differences
+  const e = 1e-3, a = ldShellPt(th, ph, new V3()), b = ldShellPt(th + e, ph, new V3()), c = ldShellPt(th, ph + e, new V3());
+  if (th < 1e-2) return out.set(0, 1, 0);
+  return out.crossVectors(b.sub(a), c.sub(a)).normalize();
+}
+// the shell mesh: (th, ph) grid with the atlas DOME uv (front at u = 0.5), the mouth left open
+function gLionShell(inner) {
+  const nt = sg(26), np = sg(48);
+  return gk('ldshell|' + nt + '|' + np + (inner ? 'in' : ''), () => {
+    const pos = [], uv = [], idx = [], v = new V3();
+    for (let i = 0; i <= nt; i++) for (let j = 0; j <= np; j++) {
+      const th = i / nt * LDH.th1, ph = -PI + j / np * TAU;
+      ldShellPt(th, ph, v);
+      if (inner) { v.x = LDH.c[0] + (v.x - LDH.c[0]) * 0.96; v.y = LDH.c[1] + (v.y - LDH.c[1]) * 0.96; v.z = LDH.c[2] + (v.z - LDH.c[2]) * 0.96; }
+      pos.push(v.x, v.y, v.z); uv.push(j / np, 1 - i / nt);
+    }
+    for (let i = 0; i < nt; i++) for (let j = 0; j < np; j++) {
+      const th = (i + 0.5) / nt * LDH.th1, ph = -PI + (j + 0.5) / np * TAU;
+      if (th > LDH.mouth[0] && Math.abs(ph) < LDH.mouth[1]) continue;   // the mouth
+      const a = i * (np + 1) + j, b = a + np + 1;
+      if (inner) idx.push(a, a + 1, b, a + 1, b + 1, b); else idx.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+    g.computeVertexNormals();
+    // weld the normals across the seam at the back and over the crown
+    const N = g.attributes.normal, t = new V3(), u = new V3();
+    for (let i = 0; i <= nt; i++) { const a = i * (np + 1), b = a + np; t.fromBufferAttribute(N, a).add(u.fromBufferAttribute(N, b)).normalize(); N.setXYZ(a, t.x, t.y, t.z); N.setXYZ(b, t.x, t.y, t.z); }
+    for (let j = 0; j <= np; j++) N.setXYZ(j, 0, inner ? -1 : 1, 0);
+    return g;
+  });
+}
+// an eyeball: a sphere looking down +z with the EYE disc projected flat onto its front
+function gEyeBall() {
+  return gk('ldeye|' + sg(28), () => {
+    const g = new THREE.SphereGeometry(1, sg(28), sg(20)); g.rotateX(PI / 2);
+    const P0 = g.attributes.position, U = g.attributes.uv;
+    for (let i = 0; i < P0.count; i++) U.setXY(i, 0.5 + P0.getX(i) * 0.5, 0.5 + P0.getY(i) * 0.5);
+    return g;
+  });
+}
+// a disc roundel facing +z (ears, cheeks): a flattened dome with planar uv
+function gRoundel() {
+  return gk('ldround|' + sg(24), () => {
+    const g = new THREE.SphereGeometry(1, sg(24), sg(10), 0, TAU, 0, PI / 2); g.rotateX(PI / 2);
+    const P0 = g.attributes.position, U = g.attributes.uv;
+    for (let i = 0; i < P0.count; i++) U.setXY(i, 0.5 + P0.getX(i) * 0.5, 0.5 + P0.getY(i) * 0.5);
+    return g;
+  });
+}
+// the lower jaw plate: a scoop round the front, u across, v from the mouth edge (top) to the chin
+function gJawPlate(inner) {
+  const nu = sg(22), nv = sg(8);
+  return gk('ldjaw|' + nu + '|' + nv + (inner ? 'in' : ''), () => {
+    const pos = [], uv = [], idx = [];
+    for (let i = 0; i <= nv; i++) for (let j = 0; j <= nu; j++) {
+      const t = i / nv, s = j / nu * 2 - 1, a = s * 1.18;
+      const rad = lerp(0.47, 0.54, t) * (inner ? 0.94 : 1), y = lerp(0.0, -0.2, t) + (1 - Math.cos(a)) * 0.06 * (1 - t), fwd = Math.sin(t * PI) * 0.05 + t * 0.14;
+      pos.push(Math.sin(a) * rad * 1.08, y + (inner ? 0.02 : 0), Math.cos(a) * (rad + fwd)); uv.push(j / nu, 1 - t);
+    }
+    for (let i = 0; i < nv; i++) for (let j = 0; j < nu; j++) { const a = i * (nu + 1) + j, b = a + nu + 1; if (inner) idx.push(a, a + 1, b, a + 1, b + 1, b); else idx.push(a, b, a + 1, a + 1, b, b + 1); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+    g.computeVertexNormals(); return g;
+  });
+}
+// a smooth tube through points on the shell surface (th, ph, lift)
+const ldPath = (list) => list.map(([th, ph, lift]) => { const p = ldShellPt(th, ph), n = ldShellN(th, ph); return [p.x + n.x * lift, p.y + n.y * lift, p.z + n.z * lift]; });
+// place a part on the shell at (th, ph), its +z along the shell normal
+function ldOn(parent, geo, spec, th, ph, lift, o = {}) {
+  const p = ldShellPt(th, ph), n = ldShellN(th, ph), m = P(parent, geo, spec, p.x + n.x * lift, p.y + n.y * lift, p.z + n.z * lift, o);
+  m.quaternion.setFromUnitVectors(new V3(0, 0, 1), n); if (o.spin) m.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new V3(0, 0, 1), o.spin));
+  if (o.s !== undefined) { if (typeof o.s === 'number') m.scale.setScalar(o.s); else m.scale.set(o.s[0], o.s[1], o.s[2]); }
+  return m;
+}
+// a fluffy pompom
+function ldPom(parent, key, col, x, y, z, r) { return furPart(parent, 'pom' + key, gSph(r, 14, 10), SURF.fur(col), x, y, z, null, r * 0.75, { droop: 0.15, fluff: r * 0.35, freq: 14 }); }
+// rig: the dancer's rig (head pivot rig.head); pal: palette; o.jaw: a networked jaw pivot to mount the jaw on
+// (lion / shark); o.crest: false for no fur crest; o.teeth: { n, len } sharper teeth; o.eyes: false = no
+// painted pupil (the shark has burning eyes of its own)
+function lionHead(rig, pal, o = {}) {
+  const A = rig.hood = piv(rig.head, 0, 0, 0); A.userData.anim = true;   // the attachment point: bobbed render-side
+  const D = rig.headS = piv(A); D.scale.setScalar(LDH.k);                // everything below is in shell space (x LDH.k)
+  const SHELL = spP('DOME', 0.62), INNER = sp(pal.mouth, 0.85, 0, 0), GT = SURF.gold(pal.gold), GN = NEON(SURF.gold(pal.gold));
+  const FU = (c) => SURF.fur(c);
+  P(D, gLionShell(false), SHELL);
+  P(D, gLionShell(true), INNER);
+  // ---- eyes: painted spiral eyeballs with a gold rim, fluffy brows, blinking lids with a fur fringe ----
+  const E = LDH.eye; rig.lids = []; rig.eyeAt = [];
   for (const s of [1, -1]) {
-    P(D, gSph(0.07, 16, 12), sp('#e0a83c', 0.22, 0, 0, 0.55), s * 0.135, 0.575, 0.2, { s: [1, 0.8, 0.75] });   // bulging amber eyes
-    P(D, gSph(1, 8, 8), SURF.glow('#140802', 0), s * 0.135, 0.575, 0.252, { s: [0.012, 0.04, 0.012] });   // slit pupils
-    P(D, gSph(0.01, 6, 5), SURF.glow('#fff0c0', 2.5), s * 0.122, 0.592, 0.252, { d: 1 });
-    P(D, gTor(0.075, 0.017, 6, 18), GN, s * 0.135, 0.575, 0.205, { r: [-0.4, s * 0.3, 0] });
-    P(D, gTube('lionbrow' + s, [[s * 0.05, 0.62, 0.27], [s * 0.13, 0.665, 0.24], [s * 0.22, 0.65, 0.17], [s * 0.27, 0.6, 0.08]], 0.03, 0.012, 10, 6), G);   // brow ridge
-    P(D, gCone(0.08, 0.18, 10), G, s * 0.25, 0.66, -0.08, { r: [0, 0, -s * 0.55] });   // ears
-    P(D, gSph(0.045, 8, 6), RL, s * 0.265, 0.67, -0.065, { s: [0.5, 1, 1], d: 1 });
+    const p = ldShellPt(E.th, s * E.ph), n = ldShellN(E.th, s * E.ph);
+    const ep = piv(D, p.x - n.x * E.sink, p.y - n.y * E.sink, p.z - n.z * E.sink); ep.rotation.set(E.pitch, s * E.yaw, 0, 'YXZ');
+    rig.eyeAt.push(ep);
+    P(ep, gEyeBall(), spP('EYE', 0.18), 0, 0, 0, { s: [E.r, E.r, E.r * 0.9] });
+    P(ep, gTor(E.r * 0.97, 0.02, 8, 32), GN, 0, 0, E.r * 0.22);
+    // the lid: the top of a sphere a little bigger than the eye, hinged at the eye's centre
+    const lid = piv(ep); lid.rotation.x = LDH.lid.open; lid.userData.anim = true; rig.lids.push(lid);
+    P(lid, gSph(1, 22, 10, 0, TAU, 0, 1.62), spP('LID', 0.4), 0, 0, 0, { s: [E.r * 1.07, E.r * 1.07, E.r * 0.95] });
+    furPart(lid, 'lash' + pal.key, gTor(E.r * 1.06, 0.022, 6, 24, PI), FU(pal.lash), 0, 0, 0, { r: [-PI / 2 + 0.05, 0, 0], s: [1, 1, 0.9] }, 0.035, { droop: 0.2, fluff: 0.01 });
+    // brow: a thick fur arch over the eye, and a softer ring under it
+    furPart(ep, 'brow' + pal.key + s, gTor(E.r * 1.18, 0.075, 10, 30, PI * 1.25), FU(pal.brow), 0, 0.01, -0.02, { r: [0, 0, -PI * 0.125 + s * 0.06], s: [1.1, 1, 1] }, 0.1, { droop: 0.25 });
+    furPart(ep, 'ering' + pal.key + s, gTor(E.r * 1.12, 0.032, 6, 26, PI * 0.9), FU(pal.rim), 0, -0.01, -0.01, { r: [0, 0, PI + PI * 0.05], s: [1, 1, 1] }, 0.045, { droop: 0.3 });
   }
-  P(D, gCone(0.04, 0.2, 10), G, 0, 0.73, 0.1, { r: [0.45, 0, 0] });   // horn
-  P(D, gCyl(0.04, 0.04, 0.02, 16), JD, 0, 0.665, 0.215, { r: [PI / 2 - 0.7, 0, 0] });   // the old mirror, now a jade boss
-  // mane: soft base ring with fur shells, then two rows of carved curls round it
-  const MC = [SURF.gold('#a87830'), SURF.gold('#8c6024'), SURF.gold('#b88a38')];
-  furPart(D, 'lionmane', gTor(0.27, 0.1, 10, 32), FUR, 0, 0.33, -0.08, { s: [1.05, 1.1, 0.7] }, 0.07);
-  for (let i = 0; i < 18; i++) {   // carved curls set into the mane
-    const a = i / 18 * TAU; if (Math.abs(angDiff(a, PI / 2)) < 0.6) continue;   // the helm covers the top
-    P(D, gSph(0.055, 10, 8), MC[i % 3], Math.cos(a) * 0.3, 0.33 + Math.sin(a) * 0.32, -0.04, { s: [1, 1, 0.55], d: 1 });
+  // ---- nose roll, nose, upper lip ----
+  {
+    const path = [];
+    for (let k = 0; k <= 8; k++) { const ph = -0.78 + k * 0.195; const p = ldShellPt(1.5, ph), n = ldShellN(1.5, ph); path.push([p.x + n.x * 0.05, p.y + n.y * 0.05 - 0.01, p.z + n.z * 0.05]); }
+    P(D, gTube('ldnose', path, 0.11, 0.11, 28, 12), spP('NOSE', 0.5));
+    const nz = ldShellPt(1.5, 0), nn = ldShellN(1.5, 0);
+    P(D, gSph(0.095, 16, 12), sp(pal.nose, 0.35, 0, 0), nz.x, nz.y + 0.1, nz.z + nn.z * 0.15, { s: [1.35, 0.85, 0.95] });
+    for (const s of [1, -1]) P(D, gSph(0.034, 10, 8), sp('#120c0e', 0.5, 0, 0), s * 0.055, nz.y + 0.075, nz.z + 0.225, { s: [1, 0.75, 0.7] });
   }
-  rig.jaw = piv(D, 0, 0.5, 0.3);   // the helm's upper lip flaps open on big hits
-  arcRing(rig.jaw, 0.21, 0.028, 1.6, G, -0.07, -0.23);
-  P2(rig.jaw, gCone(0.022, 0.1, 6), WH, 0.1, -0.12, -0.04, { r: [PI, 0, 0.1] });
-  for (let k = -2; k <= 2; k++) P(rig.jaw, gCone(0.014, 0.04, 5), WH, k * 0.035, -0.095, -0.025 + Math.abs(k) * -0.01, { r: [PI, 0, 0], d: 1 });
-  // war-cloth from the helm down the back; its lower half swings on its own
-  // (the cape's rest pose tilts it back 0.22; an inner pivot takes that out so the cloth hangs close to the back)
-  rig.cape = piv(D, 0, 0.42, -0.34);
-  const cw = piv(rig.cape); cw.rotation.x = -0.2;
-  P(cw, gPlate(0.5, 0.52, 0.03, 1.5, 1.3, true, 10, 4), RC, 0, 0, 0, { r: [0, PI, 0] });
-  P(cw, gPlate(0.14, 0.5, 0.034, 1.5, 1.2, true, 4, 2), SURF.cloth('#c9a24a'), 0, -0.02, -0.004, { r: [0, PI, 0], d: 1 });
-  const tail = clothPiv(cw, 0, -0.5, 0, { amt: 1.1, k: 85, sway: 0.05, ry: PI });
-  P(tail, gPlate(0.66, 0.52, 0.03, 1.5, 1.12, true, 10, 4), RC);
-  P(tail, gPlate(0.74, 0.06, 0.04, 1.5, 1), GN, 0, -0.51, -0.003);
-  P(tail, gPlate(0.16, 0.46, 0.034, 1.5, 1.1, true, 4, 2), SURF.cloth('#c9a24a'), 0, 0, -0.004, { d: 1 });
-  for (let k = -3; k <= 3; k++) P(tail, gCone(0.022, 0.09, 6), G, k * 0.1, -0.58, 0.01 + Math.abs(k) * 0.012, { r: [PI, 0, 0], d: 1 });
+  // upper teeth under the lip
+  const TE = SURF.bone(pal.teeth), tn = o.teeth ? o.teeth.n : 9, tl = o.teeth ? o.teeth.len : 0.07;
+  for (let k = 0; k < tn; k++) { const a = (k / (tn - 1) * 2 - 1) * 0.95; P(D, gCone(o.teeth ? 0.03 : 0.024, tl, 6), TE, Math.sin(a) * 0.5, 0.29, LDH.c[2] + Math.cos(a) * 0.53, { r: [PI, 0, 0], d: Math.abs(a) > 0.6 ? 1 : 0 }); }
+  // ---- fur: the huge upper lip, cheek rims, crest, nape fringe ----
+  furGroup(D, 'ldfur' + pal.key, [
+    [gTor(0.52, 0.12, 12, 40, 2.75), FU(pal.lip), 0, 0.395, LDH.c[2] + 0.06, { r: [PI / 2, 0, PI / 2 - 1.375], s: [1.15, 1.22, 1.0] }, 0.1, { droop: 0.3 }],
+    [gTube('ldcheekL', ldPath([[2.05, 1.08, 0.02], [1.75, 1.2, 0.04], [1.4, 1.28, 0.05], [1.1, 1.3, 0.04], [0.8, 1.25, 0.03]]), 0.075, 0.05, 20, 8), FU(pal.rim), 0, 0, 0, null, 0.09, { droop: 0.3 }],
+    [gTube('ldcheekR', ldPath([[2.05, -1.08, 0.02], [1.75, -1.2, 0.04], [1.4, -1.28, 0.05], [1.1, -1.3, 0.04], [0.8, -1.25, 0.03]]), 0.075, 0.05, 20, 8), FU(pal.rim), 0, 0, 0, null, 0.09, { droop: 0.3 }],
+    [gTube('ldnape', [...Array(13)].map((_, i) => { const ph = 1.0 + (TAU - 2.0) * i / 12, p = ldShellPt(LDH.th1 - 0.06, ph), n = ldShellN(LDH.th1 - 0.06, ph); return [p.x + n.x * 0.02, p.y - 0.01, p.z + n.z * 0.02]; }), 0.06, 0.06, 40, 8), FU(pal.rim), 0, 0, 0, null, 0.09, { droop: 0.7 }],
+    [gSph(0.12, 14, 10), FU(pal.lip), 0.6, 0.42, 0.2, { s: [0.8, 1, 1.1] }, 0.1],
+    [gSph(0.12, 14, 10), FU(pal.lip), -0.6, 0.42, 0.2, { s: [0.8, 1, 1.1] }, 0.1],
+  ]);
+  if (o.crest !== false) furPart(D, 'ldcrest' + pal.key, gTube('ldcrest', ldPath([[0.42, 0, 0.0], [0.15, 0, 0.01], [0.15, PI, 0.01], [0.6, PI, 0.01], [1.1, PI, 0.0], [1.6, PI, 0.0]]), 0.07, 0.05, 28, 8), FU(pal.crest), 0, 0, 0, null, 0.1, { droop: 0.35 });
+  // ---- forehead mirror, cheek roundels, ears with roundels and pompoms ----
+  const MIR = sp('#e4eaee', 0.08, 1, 0);
+  ldOn(D, gCyl(0.075, 0.075, 0.02, 24), MIR, 0.56, 0, 0.012).rotateX(PI / 2);
+  ldOn(D, gTor(0.08, 0.016, 6, 26), GN, 0.56, 0, 0.018);
+  for (const s of [1, -1]) {
+    ldOn(D, gRoundel(), spP('CHEEK', 0.35), 1.52, s * 0.88, -0.01, { s: [0.11, 0.11, 0.035] });
+    const ear = piv(D); const ep = ldShellPt(0.78, s * 1.28), en = ldShellN(0.78, s * 1.28);
+    ear.position.set(ep.x + en.x * 0.04, ep.y + en.y * 0.04, ep.z + en.z * 0.04); ear.quaternion.setFromUnitVectors(new V3(0, 0, 1), en.clone().add(new V3(0, 0.25, 0.35)).normalize());
+    P(ear, gRoundel(), spP('EAR', 0.35), 0, 0, 0, { s: [0.15, 0.15, 0.06] });
+    furPart(ear, 'earfur' + pal.key, gTor(0.155, 0.035, 6, 28), FU(pal.ear), 0, 0, -0.005, null, 0.05, { droop: 0.3 });
+    ldPom(ear, pal.key + 'e' + s, pal.pom[1], 0, 0.18, -0.02, 0.06);
+  }
+  // ---- the character's topper (horn and pompom; hidden under avatar headgear) and the two antennae ----
+  rig.topper = piv(D);
+  if (o.topper) o.topper(rig.topper); else {
+    const hp = ldShellPt(0.3, 0);
+    P(rig.topper, gCone(0.05, 0.17, 10), GT, hp.x, hp.y + 0.06, hp.z + 0.02, { r: [0.35, 0, 0] });
+    for (let k = 0; k < 3; k++) P(rig.topper, gTor(0.042 - k * 0.009, 0.01, 5, 12), sp(pal.pom[k % 3], 0.4, 0, 0), hp.x, hp.y + 0.03 + k * 0.045, hp.z + 0.01 + k * 0.016, { r: [PI / 2 + 0.35, 0, 0], d: 1 });
+    ldPom(rig.topper, pal.key + 'top', pal.pom[0], hp.x, hp.y + 0.2, hp.z + 0.075, 0.075);
+  }
+  rig.antennae = [];
+  for (const s of [1, -1]) {
+    const bp = ldShellPt(0.36, s * 0.62);
+    const a = piv(D, bp.x, bp.y - 0.01, bp.z); a.userData.anim = true; a.rotation.set(-0.12, 0, -s * 0.38);
+    P(a, gCyl(0.012, 0.014, 0.24, 6), sp(pal.antenna, 0.4, 0, 0), 0, 0.12, 0);
+    ldPom(a, pal.key + 'ab' + s, pal.pom[2], 0, 0.015, 0, 0.04);
+    const b = piv(a, 0, 0.24, 0); b.userData.anim = true;
+    P(b, gCyl(0.009, 0.012, 0.22, 6), sp(pal.antenna, 0.4, 0, 0), 0, 0.11, 0);
+    P(b, gSph(0.058, 16, 12), NEON(SURF.gold(pal.gold)), 0, 0.25, 0);
+    P(b, gTor(0.03, 0.008, 5, 12), GT, 0, 0.2, 0, { r: [PI / 2, 0, 0], d: 1 });
+    rig.antennae.push({ a, b, s, x: 0, z: 0, vx: 0, vz: 0, x2: 0, z2: 0, vx2: 0, vz2: 0, rx: -0.12, rz: -s * 0.38 });
+  }
+  // ---- the lower jaw: painted plate, dark mouth, tongue, teeth, and a long swinging beard ----
+  const JP = o.jaw || D, J = piv(JP, o.jaw ? 0 : LDH.hinge[0], o.jaw ? 0 : LDH.hinge[1], o.jaw ? 0 : LDH.hinge[2]);
+  J.userData.anim = true; rig.mouth = J; rig.mouthA = 0; rig.mouthV = 0; rig.mouthPh = Math.random() * TAU;
+  const jo = [0 - LDH.hinge[0], 0.25 - LDH.hinge[1], LDH.c[2] - LDH.hinge[2]];   // the plate's origin in hinge space
+  P(J, gJawPlate(false), spP('JAW', 0.4), jo[0], jo[1], jo[2]);
+  P(J, gJawPlate(true), INNER, jo[0], jo[1], jo[2]);
+  P(J, gSph(1, 14, 8), sp('#c8303a', 0.35, 0, 0), 0, jo[1] - 0.08, jo[2] + 0.22, { s: [0.17, 0.045, 0.15] });   // tongue
+  for (let k = 0; k < tn - 1; k++) { const a = ((k + 0.5) / (tn - 1) * 2 - 1) * 0.9; P(J, gCone(o.teeth ? 0.028 : 0.022, tl * 0.85, 6), TE, Math.sin(a) * 0.46, jo[1] + 0.02, jo[2] + Math.cos(a) * 0.45, { d: Math.abs(a) > 0.6 ? 1 : 0 }); }
+  P(J, gTor(1, 0.03, 6, 30, 2.36), GN, 0, jo[1] - 0.198, jo[2], { r: [PI / 2, 0, PI / 2 - 1.18], s: [0.54 * 1.08, 0.68, 1] });   // gold chin rim
+  const beard = clothPiv(J, 0, jo[1] - 0.2, jo[2] + 0.56, { amt: 0.9, k: 70, sway: 0.07 });
+  const BD = FU(pal.beard), locks = [];
+  for (let k = -3; k <= 3; k++) {
+    const len = 0.5 + (3 - Math.abs(k)) * 0.06, x = k * 0.075;
+    locks.push([gLimb(0.05, 0.02, len, 8), BD, x, 0, -Math.abs(k) * 0.035, { r: [0.06, 0, k * 0.07] }, 0.07, { droop: 0.05 }]);
+  }
+  furGroup(beard, 'ldbeard' + pal.key, locks);
+  // ---- headgear mount: avatar hats were made for a head of radius 0.25 centred at HATY ----
+  const HS = 2.15;
+  rig.hat = piv(D, 0, LDH.c[1] + 0.06 - HATY * HS, LDH.c[2] + 0.02); rig.hat.scale.setScalar(HS);
+  // ---- the cape mount at the nape ----
+  rig.capeRoot = piv(A, LDH.cape[0] * LDH.k, LDH.cape[1] * LDH.k, LDH.cape[2] * LDH.k);
+  return A;
+}
+// the cape: painted scales and gold chevrons, gold edge stripes, a fur fringe; it hangs from the nape and its
+// lower half swings on its own (o.short: one panel only). Returns the upper panel's pivot.
+function lionCape(rig, pal, o = {}) {
+  const C = o.pivot || piv(rig.capeRoot); C.userData.anim = true;
+  if (!o.pivot) { C.rotation.x = 0.22; }
+  const PA = spP('CAPE', 0.62), GN = NEON(SURF.gold(pal.gold)), FU = SURF.fur(pal.capeFur);
+  const W = 0.92, L1 = o.short ? 0.5 : 0.6;
+  P(C, gPlate(W, L1, 0.03, 1.1, 1.12, true, 10, 3), PA, 0, 0, 0, { r: [0, PI, 0] });
+  rig.capeTop = C;
+  // a fur edge along the hem: the plates bend round a circle of radius R (their edges curl towards the body, +z)
+  const furEdge = (parent, key, w, y, R) => furPart(parent, key, gTube(key, [...Array(11)].map((_, i) => { const a = (i / 10 - 0.5) * w / R; return [Math.sin(a) * R, y, R * (1 - Math.cos(a)) - 0.01]; }), 0.05, 0.05, 28, 8), FU, 0, 0, 0, null, 0.08, { droop: 0.8 });
+  if (o.short) { furEdge(C, 'capehemS' + pal.key, W * 1.12, -L1, W / 1.1); rig.capeLow = C; return C; }
+  const low = clothPiv(C, 0, -L1, -0.005, { amt: 0.9, k: 80, sway: 0.05, leg: 'B', ry: 0 });
+  const L2 = 0.55, W2 = W * 1.12;
+  P(low, gPlate(W2, L2, 0.03, 1.1, 1.15, true, 10, 3), PA, 0, 0, 0, { r: [0, PI, 0] });
+  const R2 = W2 / 1.1, sideAt = (y, k) => { const a = (W2 * lerp(1, 1.15, k) / 2) / R2; return [Math.sin(a) * R2, y, R2 * (1 - Math.cos(a)) + 0.005]; };
+  P(low, gPlate(W2 * 1.15, 0.05, 0.04, 1.1 * 1.15, 1), GN, 0, -L2 + 0.07, -0.006, { r: [0, PI, 0] });
+  for (const s of [1, -1]) furPart(low, 'capeside' + pal.key + s, gTube('capeside' + s, [0, 0.5, 1].map((k) => { const p = sideAt(-L2 * k, k); return [s * p[0], p[1], p[2]]; }), 0.04, 0.045, 10, 6), FU, 0, 0, 0, null, 0.07, { droop: 0.6 });
+  furEdge(low, 'capehem' + pal.key, W2 * 1.15, -L2, R2);
+  rig.capeLow = low;
+  return C;
+}
+// ---- 阿娟: the red-and-gold lion dancer (the main character) ----
+function buildLion(B, f) {
+  const pal = ldPalette('lion', f && f.tint), rig = dancerBody(B, pal, { face: 'determined' });
+  rig.jaw = piv(rig.head, LDH.hinge[0], LDH.hinge[1], LDH.hinge[2]);   // networked jaw: the head's lower jaw
+  lionHead(rig, pal, { jaw: rig.jaw });
+  rig.headS.add(rig.jaw);
+  rig.cape = piv(rig.capeRoot); lionCape(rig, pal, { pivot: rig.cape });
+  rig.back = piv(rig.capeTop, 0, -0.32, -0.04);
   // silk streamers for the cyclone
-  rig.ribbons = piv(T, 0, 0.5, 0); rig.ribbons.visible = false;
+  rig.ribbons = piv(rig.torso, 0, 0.5, 0); rig.ribbons.visible = false;
   for (let k = 0; k < 4; k++) {
     const a = k * PI / 2;
     P(rig.ribbons, gPlate(1.6, 0.11, 0.012, 0, 0.5), SURF.glow(k % 2 ? '#c2202a' : '#e0b040', 0.35), Math.cos(a) * 1.0, 0, -Math.sin(a) * 1.0, { r: [0, a, -0.25] });
   }
   return rig;
 }
-
-// ---- Penguin: frost monk lion dancer ----
-// Ink-black robes over a cream under-robe (the belly), a saffron sash, ice-jade prayer beads, bell sleeves,
-// an ink-blue lion-dance head with ice-blue fur; the counter swings a carved ice-jade koi.
+// ---- Penguin: black and white with orange accents ----
 const fishIceMat = shared(new THREE.MeshStandardMaterial({ color: '#cdf3ff', emissive: '#2a6c88', roughness: 0.15, metalness: 0, transparent: true, opacity: 0.32, depthWrite: false }));
-function buildPenguin(B) {
-  const K = SURF.cloth('#1a1e29'), KL = SURF.leather('#0f1118'), W = SURF.cloth('#d9cfb6'), A = SURF.cloth('#b5601b');
-  const ICE = NEON(SURF.glow('#79cdf2', 0.45)), O = SURF.leather('#c0661c'), OL = SURF.lacq('#d2741c'), SK = SURF.skin('#d9b28a'), BN = SURF.bone(), JI = SURF.jade('#5fbcd6');
-  const rig = mythBody(B, { skin: SK, pants: K, shin: SURF.cloth('#cfc4a8'), boots: O, chest: K, sleeve: K, hands: SURF.cloth('#cfc4a8'), face: 'smile', arms: false, td: 0.74,
-    torso: [[0.31, -0.02], [0.34, 0.12], [0.355, 0.32], [0.36, 0.52], [0.41, 0.64], [0.44, 0.71], [0.38, 0.79], [0.13, 0.87], [0, 0.88]] });
-  const T = rig.torso;
-  P(T, gPlate(0.42, 0.5, 0.035, 1.3, 0.85), W, 0, 0.43, rig.tz(0.43) + 0.01, { r: [-0.08, 0, 0] });   // cream under-robe, the penguin's white front
-  for (const s of [1, -1]) { const [pp, nn] = rig.tpath([[s * 0.12, 0.86, 0, -0.02], [s * 0.13, 0.78, 1], [s * 0.07, 0.66, 1], [0, 0.56, 1]], 0.01); P(T, gRibbon('pcollar' + s, pp, nn, 0.075, 0.03, 14), W); }
-  P(T, gCyl(0.335, 0.345, 0.13, 26), A, 0, 0.2, 0, { s: [1, 1, 0.77] });   // saffron sash
-  P(T, gSph(0.06, 12, 8), A, 0.12, 0.2, 0.27, { s: [1.2, 0.9, 0.7] });
-  const tails = clothPiv(T, 0.12, 0.16, 0.27, { amt: 1, k: 95, sway: 0.07 });
-  P(tails, gPlate(0.075, 0.42, 0.016, 0.3, 0.7, true), A, -0.025, 0, 0, { r: [0, 0, -0.1] });
-  P(tails, gPlate(0.065, 0.34, 0.016, 0.3, 0.7, true), A, 0.03, 0, -0.008, { r: [0, 0, 0.14] });
-  P(tails, gCone(0.025, 0.08, 6), ICE, -0.05, -0.44, 0, { r: [PI, 0, 0], d: 1 });
-  // prayer beads: bone beads with one big ice-jade bead and a tassel
-  for (let i = 0; i < 20; i++) {
-    const a = (i / 20) * TAU, fz = Math.sin(a);
-    P(T, gIco(0.026), BN, Math.cos(a) * 0.22, 0.75 - Math.max(0, fz) * 0.22, fz * 0.2 + 0.02 + Math.max(0, fz) * 0.06, { d: 1 });
-  }
-  P(T, gIco(0.045, 1), JI, 0, 0.5, 0.3); P(T, gCone(0.022, 0.1, 6), ICE, 0, 0.42, 0.3, { r: [PI, 0, 0], d: 1 });
-  // saffron kasaya draped from the left shoulder across to the right hip, front and back
-  {
-    const path = [[-0.3, 0.12, 1], [-0.2, 0.27, 1], [-0.05, 0.45, 1], [0.1, 0.62, 1], [0.21, 0.76, 1], [0.27, 0.86, 0, 0], [0.21, 0.76, -1], [0.1, 0.62, -1], [-0.05, 0.45, -1], [-0.2, 0.27, -1], [-0.3, 0.12, -1]];
-    const [pp, nn] = rig.tpath(path, 0.02); P(T, gRibbon('kasaya', pp, nn, 0.24, 0.03, 40), A);
-    const [p2, n2] = rig.tpath(path, 0.036); P(T, gRibbon('kasayab', p2, n2, 0.05, 0.012, 40), sp('#7a2e10', 0.9, 0, 2), 0, 0, 0, { d: 1 });
-  }
-  P(rig.head, gSph(1, 8, 6), SURF.glow('#b01c1c', 0.2), 0, HEAD.y + 0.135, HEAD.r(0.135) * HEAD.sz - 0.004, { s: [0.012, 0.016, 0.006], d: 1 });
-  skirt(T, SURF.cloth('#232838'), ICE, { y: 0.12, len: 0.5, w: 0.44, zf: 0.265, zb: 0.26, xs: 0.34, taper: 1.15 });
-  // bell sleeves with ice cuffs, cloth-wrapped shoulder pads
-  const sleeve = gLathe([[0.2, -0.56], [0.19, -0.5], [0.15, -0.26], [0.14, -0.02], [0.13, 0.06], [0.0, 0.14]], 18);
-  for (const [A2, s] of [[rig.armL, 1], [rig.armR, -1]]) {
-    P(A2, sleeve, K); P(A2, gFlip(sleeve), KL, 0, 0, 0, { s: [0.95, 1, 0.95] });
-    P(A2, gTor(0.195, 0.022, 6, 22), ICE, 0, -0.555, 0, { r: [PI / 2, 0, 0] });
-    P(A2, gLimb(0.09, 0.08, 0.18), KL, 0, -0.42, 0);
-    pauldron(A2, s, K, [A], { n: 1, r: 0.18, w: 0.44 });
-  }
-  // a frost lion-dance head: ink-blue lacquer, ice-blue fur, white brows and beard, silver trim, a beak-orange nose
-  lionDanceHead(rig, { key: 'penguin', shell: '#1d2a48', paint: '#e6ddc8', fur: '#4f86c8', brow: '#eef2f7', trimS: SURF.iron('#aeb8c6'), beard: '#eef2f6', iris: '#5fc4e0', lining: '#0c0e14', noseS: OL, body: '#8fa3c0' });
+function buildPenguin(B, f) {
+  const pal = ldPalette('penguin', f && f.tint);
+  const rig = dancerBody(B, pal, { face: 'smile', chest: (T) => {   // the white belly front of the jacket
+    P(T, gRBox(0.5, 0.5, 0.03, 0.012), sp(pal.belly || '#f6f6f2', 0.5, 0, 2), 0, 0.5, 0.217);
+  } });
+  lionHead(rig, pal, {});
+  lionCape(rig, pal);
+  rig.back = piv(rig.capeTop, 0, -0.32, -0.04);
   // Fish Slap Counter: a carved ice-jade koi in a cold glow
   const F = rig.fish = piv(rig.armR, 0, -0.72, 0.1); F.visible = false;
   const KOI = SURF.scale('#8cc8e2'), KOIB = SURF.glow('#d8f4ff', 0.25);
@@ -2728,67 +3186,24 @@ function buildPenguin(B) {
   const ice = new THREE.Mesh(gSph(1, 16, 12), fishIceMat); ice.position.set(0, 0, 0.6); ice.scale.set(0.24, 0.27, 0.8); ice.userData.noShadow = true; F.add(ice);
   return rig;
 }
-
-// ---- Steve: wandering pilgrim ----
-// A faded jade travelling robe with a crossed collar and rope belt, a wine gourd at the hip, a ringed pilgrim's
-// staff across the back, a jade-green lion-dance head over a topknot. His tools: a jian, a bronze spirit hammer, a bamboo
-// rod and a horn bow; awakened, dark-iron spirit armour with violet runes closes over him.
+// ---- Steve: the teal-and-blue dancer with a toolkit ----
 const bladeMat = shared(new THREE.MeshStandardMaterial({ color: '#9fe8d8', emissive: '#1d7a6a', emissiveIntensity: 1, roughness: 0.18, metalness: 0.85 }));
 const bladeNeth = shared(new THREE.MeshStandardMaterial({ color: '#4a3f5a', emissive: '#6a20b0', emissiveIntensity: 1.2, roughness: 0.25, metalness: 0.8 }));
-function buildSteve(B) {
-  const R = SURF.cloth('#2b6a64'), RD = SURF.cloth('#1c4743'), CR = SURF.cloth('#d6c8a8'), PN = SURF.cloth('#283062'), WR = SURF.cloth('#cbbf9f');
-  const RO = SURF.cloth('#8c6c3c'), LE = SURF.leather('#5a3b22'), SK = SURF.skin('#bf8d64'), HR = SURF.fur('#1c140e'), BZ = SURF.bronze(), WD = SURF.wood(), ST = SURF.straw();
-  const rig = mythBody(B, { skin: SK, pants: PN, shin: WR, boots: LE, chest: R, sleeve: R, fore: SK, hands: SK, face: 'smug',
-    torso: [[0.29, -0.02], [0.3, 0.12], [0.28, 0.3], [0.32, 0.5], [0.4, 0.63], [0.44, 0.7], [0.39, 0.78], [0.13, 0.86], [0, 0.87]],
-    foot: (L) => {   // straw sandals over dark socks
-      P(L, gSph(1, 12, 8), SURF.cloth('#2a2724'), 0, -0.735, 0.04, { s: [0.11, 0.07, 0.18] });
-      P(L, gBox(0.2, 0.035, 0.38, 0.012), ST, 0, -0.78, 0.04);
-      P(L, gTor(0.1, 0.012, 5, 14), RO, 0, -0.74, 0.08, { r: [0.4, 0, 0], s: [1, 0.6, 1], d: 1 });
-    } });
+const nethG = (rig, parent) => { const g = piv(parent); g.visible = false; rig.neth.push(g); return g; };
+function buildSteve(B, f) {
+  const pal = ldPalette('steve', f && f.tint);
+  const rig = dancerBody(B, pal, { face: 'smug' });
   rig.neth = [];
-  const T = rig.torso;
-  // crossed collar (right over left), rope belt, gourd, patched robe skirt
-  for (const [s, lift] of [[-1, 0.008], [1, 0.02]]) {   // right side under, left side over
-    const [pp, nn] = rig.tpath([[s * 0.12, 0.86, 0, -0.03], [s * 0.13, 0.78, 1], [s * 0.06, 0.62, 1], [-s * 0.06, 0.44, 1], [-s * 0.16, 0.26, 1]], lift);
-    P(T, gRibbon('scollar' + s, pp, nn, 0.085, 0.022, 18), CR);
-  }
-  P(T, gTor(0.3, 0.024, 6, 26), RO, 0, 0.21, 0, { r: [PI / 2, 0, 0], s: [1, 0.68, 1] });
-  P(T, gTor(0.305, 0.024, 6, 26), RO, 0, 0.17, 0, { r: [PI / 2, 0, 0], s: [1, 0.68, 1] });
-  P(T, gSph(0.04, 10, 8), RO, -0.1, 0.19, 0.205);
-  const ends = clothPiv(T, -0.1, 0.17, 0.21, { amt: 1, k: 100, sway: 0.06 });
-  P(ends, gCyl(0.014, 0.012, 0.3, 6), RO, -0.015, -0.15, 0, { r: [0, 0, 0.06] }); P(ends, gCyl(0.014, 0.012, 0.24, 6), RO, 0.02, -0.12, 0, { r: [0, 0, -0.1] });
-  const gourd = clothPiv(T, 0.3, 0.19, 0.05, { amt: 0.8, leg: 'L', k: 110 });
-  P(gourd, gLathe([[0, -0.3], [0.07, -0.28], [0.09, -0.22], [0.06, -0.14], [0.045, -0.11], [0.055, -0.07], [0.04, -0.03], [0.015, -0.01], [0.02, 0.02], [0, 0.03]], 14), SURF.lacq('#b98636'));
-  P(gourd, gTor(0.047, 0.01, 5, 12), SURF.cloth('#9a1d1d'), 0, -0.11, 0, { r: [PI / 2, 0, 0], d: 1 });
-  skirt(T, R, RD, { y: 0.13, len: 0.5, w: 0.4, xs: 0.3, taper: 1.1 });
-  P(T, gPlate(0.12, 0.12, 0.02, 0.3, 1), SURF.cloth('#6b5a3a'), 0.13, 0.34, rig.tz(0.34, 0.13) + 0.004, { r: [0, 0.45, 0.1], d: 1 });   // a patch
-  // straw rain cape: three overlapping rows of woven straw round the shoulders and back, swinging as one
-  const cape = clothPiv(T, 0, 0.82, -0.02, { amt: 0.45, k: 120, sway: 0.03 });
-  for (let i = 0; i < 3; i++) {
-    const w = 0.84 + i * 0.12, bend = 2.5, R = w / bend;
-    P(cape, gPlate(w, 0.26, 0.035, bend, 1.12, true, 12, 2), SURF.straw(i % 2 ? '#9a7d44' : '#ad8f52'), 0, -i * 0.15, -R + 0.03 - i * 0.012, { r: [0.12, PI, 0] });
-  }
-  P(cape, gTor(0.16, 0.025, 6, 20), RO, 0, 0.0, 0.02, { r: [PI / 2 - 0.2, 0, 0] });
-  // pilgrim's staff across the back, ringed at the top
-  const dir = new V3(-Math.sin(0.55), Math.cos(0.55), 0), c0 = new V3(0, 0.45, -0.4), tip = c0.clone().addScaledVector(dir, 0.95);
-  P(T, gCyl(0.03, 0.03, 1.9, 8), WD, c0.x, c0.y, c0.z, { r: [0, 0, 0.55] });
-  P(T, gLathe([[0.032, -0.06], [0.05, 0], [0.03, 0.08], [0.0, 0.12]], 10), BZ, tip.x, tip.y, tip.z, { r: [0, 0, 0.55] });
-  for (let i = 0; i < 3; i++) P(T, gTor(0.05, 0.009, 5, 12), BZ, tip.x + 0.05 * (i - 1), tip.y + 0.02, tip.z, { r: [0, PI / 2, 0.55], d: 1 });
-  for (const s of [1, -1]) P(T, gCyl(0.034, 0.034, 0.08, 8), BZ, c0.x - dir.x * 0.95 * s * -1, c0.y - dir.y * 0.95 * s * -1, c0.z, { r: [0, 0, 0.55], d: 1 });
-  // short robe sleeves, leather wrist wraps
-  for (const A of [rig.armL, rig.armR]) {
-    P(A, gLathe([[0.16, -0.32], [0.15, -0.2], [0.14, 0], [0.0, 0.13]], 16), R);
-    P(A, gLathe([[0.108, -0.6], [0.112, -0.52], [0.108, -0.46]], 12), LE);
-  }
-  for (const L of [rig.legL, rig.legR]) for (let i = 0; i < 3; i++) P(L, gTor(0.118 - i * 0.008, 0.012, 5, 14), CR, 0, -0.47 - i * 0.07, 0, { r: [PI / 2 + 0.15, 0, 0], d: 1 });
-  // hair (always), topknot with a bronze pin, a short beard
-  const H = rig.head;
-  P(H, gSph(1, 20, 14), HR, 0, HEAD.y + 0.035, -0.04, { s: [0.247, 0.262, 0.238] });
-  P(H, gSph(0.075, 12, 10), HR, 0, HEAD.y + 0.28, -0.07);
-  P(H, gCyl(0.01, 0.01, 0.24, 6), BZ, 0, HEAD.y + 0.3, -0.07, { r: [0, 0, PI / 2], d: 1 });
-  P(H, gCone(0.04, 0.09, 8), HR, 0, 0.04, 0.19, { r: [PI - 0.35, 0, 0] });
-  // a jade-green lion-dance head (the bamboo rain hat is still there as a custom hat)
-  lionDanceHead(rig, { key: 'steve', shell: '#1e5e48', paint: '#d9b25a', fur: '#3b9460', brow: '#f2ead2', trim: '#b8862e', beard: '#1c140e', iris: '#c8302a', lining: '#13261f', body: '#c9a24a' });
+  // a little grass block for a topper: Steve's touch
+  lionHead(rig, pal, { topper: (Tp) => {
+    const hp = ldShellPt(0.3, 0);
+    P(Tp, gCyl(0.018, 0.022, 0.12, 6), sp(pal.antenna, 0.4, 0, 0), hp.x, hp.y + 0.05, hp.z + 0.02, { r: [0.25, 0, 0] });
+    P(Tp, gRBox(0.13, 0.09, 0.13, 0.01), sp('#7a5232', 0.7, 0, 2), hp.x, hp.y + 0.16, hp.z + 0.05, { r: [0.25, 0.6, 0] });
+    P(Tp, gRBox(0.135, 0.04, 0.135, 0.01), sp('#5cae3c', 0.7, 0, 2), hp.x, hp.y + 0.215, hp.z + 0.064, { r: [0.25, 0.6, 0] });
+  } });
+  lionCape(rig, pal);
+  rig.back = piv(rig.capeTop, 0, -0.32, -0.04);
+  const LE = SURF.leather('#5a3b22'), BZ = SURF.bronze(), WD = SURF.wood();
   // ---- tools (hand pivots and their weapons) ----
   rig.hand = piv(rig.armR, 0, -0.66, 0.04);
   rig.sword = piv(rig.hand); rig.sword.visible = false;
@@ -2815,111 +3230,81 @@ function buildSteve(B) {
   P(rig.bow, gTube('hornbow', [[0, 0.06, -0.66], [0, 0.02, -0.58], [0, 0.13, -0.44], [0, 0.19, -0.2], [0, 0.17, 0], [0, 0.19, 0.2], [0, 0.13, 0.44], [0, 0.02, 0.58], [0, 0.06, 0.66]], 0.032, 0.032, 28, 6), SURF.leather('#3b2616'));
   P(rig.bow, gCyl(0.042, 0.042, 0.16, 8), LE, 0, 0.17, 0, { r: [PI / 2, 0, 0] });
   P(rig.bow, gCyl(0.005, 0.005, 1.3, 4), SURF.cloth('#e8e0cc'), 0, 0.03, 0, { r: [PI / 2, 0, 0] });
-  // ---- awakened: dark-iron spirit armour with violet runes ----
+  // ---- awakened: dark-iron spirit armour with violet runes, plated over the blocks ----
   const IR = SURF.iron('#2c2a33'), VI = SURF.glow('#b06aff', 1.4);
-  for (const [L, s] of [[rig.legL, 1], [rig.legR, -1]]) {
+  for (const L of [rig.legL, rig.legR]) {
     const n = nethG(rig, L);
-    P(n, gPlate(0.24, 0.28, 0.03, 1.8, 0.85), IR, 0, -0.56, 0.1); P(n, gPlate(0.03, 0.22, 0.034, 0, 1), VI, 0, -0.56, 0.12);
-    P(n, gPlate(0.3, 0.3, 0.03, 2.2, 0.9), IR, 0, -0.18, 0.13); P(n, gSph(0.09, 10, 8, 0, TAU, 0, 1.2), IR, 0, -0.43, 0.1, { r: [PI / 2, 0, 0] });
+    P(n, gRBox(0.42, 0.3, 0.42, 0.05), IR, 0, -0.5, 0); P(n, gRBox(0.04, 0.24, 0.02, 0.01), VI, 0, -0.5, 0.215);
+    P(n, gRBox(0.42, 0.22, 0.42, 0.05), IR, 0, -0.12, 0);
   }
-  const nt = nethG(rig, T);
-  P(nt, gPlate(0.52, 0.42, 0.045, 1.5, 0.82), IR, 0, 0.52, 0.235); P(nt, gPlate(0.5, 0.4, 0.04, 1.5, 0.82), IR, 0, 0.5, -0.24, { r: [0, PI, 0] });
-  P(nt, gPlate(0.035, 0.32, 0.05, 0, 1), VI, 0, 0.52, 0.258); P(nt, gTor(0.07, 0.012, 5, 16), VI, 0, 0.6, 0.26);
-  for (const [A, s] of [[rig.armL, 1], [rig.armR, -1]]) {
+  const nt = nethG(rig, rig.torso);
+  P(nt, gRBox(0.86, 0.5, 0.48, 0.08), IR, 0, 0.55, 0);
+  P(nt, gRBox(0.05, 0.36, 0.02, 0.01), VI, 0, 0.55, 0.245); P(nt, gTor(0.07, 0.012, 5, 16), VI, 0, 0.62, 0.25);
+  for (const A of [rig.armL, rig.armR]) {
     const n = nethG(rig, A);
-    pauldron(n, s, IR, [IR, VI], { n: 2, r: 0.2 });
-    P(n, gLathe([[0.12, -0.62], [0.132, -0.56], [0.136, -0.42], [0.125, -0.36]], 14), IR);
+    P(n, gRBox(0.4, 0.2, 0.4, 0.06), IR, 0, -0.02, 0); P(n, gRBox(0.36, 0.2, 0.36, 0.05), IR, 0, -0.46, 0);
+    P(n, gRBox(0.41, 0.025, 0.41, 0.01), VI, 0, -0.1, 0, { d: 1 });
   }
-  const nh = nethG(rig, H);
-  arcRing(nh, 0.255, 0.035, TAU, IR, 0.42, 0);
-  P(nh, gCone(0.05, 0.22, 8), IR, 0, 0.62, 0.14, { r: [0.7, 0, 0] }); P(nh, gSph(0.03, 8, 6), VI, 0, 0.5, 0.25);
+  const nh = nethG(rig, rig.headS);
+  P(nh, gTor(0.4, 0.04, 6, 40), IR, 0, 1.06, LDH.c[2], { r: [PI / 2, 0, 0], s: [1, 0.92, 1] });
+  P(nh, gCone(0.07, 0.3, 8), IR, 0, 1.2, 0.18, { r: [0.5, 0, 0] }); P(nh, gSph(0.04, 8, 6), VI, 0, 1.0, 0.5);
   return rig;
 }
-
-// ---- Shark: river-demon brute ----
-// Slate scales and a pale ridged belly, a rusted bronze pauldron and chain, rope belt with bone charms and a
-// tattered loincloth, a dorsal fin; the head is a black lion-dance head with burning eyes, bone fangs and horns,
-// its lower jaw (jaw) snaps open for bites, and the finned tail (tail) swings behind.
+// ---- Shark: the slate-blue dancer with a dorsal-fin crest, rows of sharp teeth and a finned tail ----
 const EYE = { c: '#ffc070', e: '#ff8a1a' };
-function buildShark(B) {
-  const S = sp('#4b6273', 0.42, 0, 3), SD = sp('#34444f', 0.4, 0, 3), BL = SURF.lamel('#b4ad95'), BZ = SURF.bronze('#6e4c25'), BN = SURF.bone('#d4c6a2');
-  const RO = SURF.cloth('#3c2c1c'), RC = SURF.cloth('#5a1515'), CL = SURF.bone('#2a2420'), FL = SURF.skin('#4a1c1c');
-  const rig = mythBody(B, { skin: SURF.skin('#5d7584'), pants: S, boots: S, chest: S, sleeve: S, hands: S, face: 'grin', leg: 0.175, arm: 0.155, tw: 1.1, td: 0.66, backZ: 0.25,
-    torso: [[0.31, -0.02], [0.33, 0.12], [0.32, 0.3], [0.38, 0.5], [0.45, 0.64], [0.48, 0.72], [0.42, 0.8], [0.15, 0.88], [0, 0.9]],
-    foot: (L) => {   // clawed feet
-      P(L, gSph(1, 14, 10), S, 0, -0.73, 0.06, { s: [0.15, 0.085, 0.22] });
-      for (const x of [-0.07, 0, 0.07]) P(L, gCone(0.025, 0.09, 6), BN, x, -0.76, 0.27, { r: [PI / 2 + 0.3, 0, 0] });
-    } });
-  const T = rig.torso;
-  for (let i = 0; i < 5; i++) { const y = 0.64 - i * 0.1; P(T, gPlate(0.42 - i * 0.03, 0.095, 0.03, 1.3, 0.92), BL, 0, y, rig.tz(y) + 0.008, { r: [-0.15, 0, 0] }); }   // ridged belly
-  // rusted bronze pauldron on the left, a chain across the chest
-  pauldron(rig.armL, 1, BZ, [BZ, SURF.bronze('#5a3c1c')], { n: 3, r: 0.22, w: 0.52 });
-  P(rig.armL, gCone(0.04, 0.14, 8), BN, 0.12, 0.13, 0, { r: [0, 0, -0.6], d: 1 });
-  for (let i = 0; i < 13; i++) {
-    const t = i / 12, x = lerp(0.38, -0.3, t), y = lerp(0.74, 0.2, t);
-    P(T, gTor(0.04, 0.013, 5, 10), SURF.iron('#5a524a'), x, y, rig.tz(y, x) + 0.03, { r: [0, i % 2 ? PI / 2 : 0, -0.68], ord: 'ZYX', d: 1 });
-  }
-  // rope belt with bone charms, a tattered loincloth
-  P(T, gTor(0.31, 0.03, 6, 26), RO, 0, 0.2, 0, { r: [PI / 2, 0, 0], s: [1.1, 0.68, 1] });
-  for (let i = 0; i < 4; i++) { const a = -0.9 + i * 0.6; P(T, gCone(0.022, 0.1, 6), BN, Math.sin(a) * 0.34, 0.12, Math.cos(a) * 0.22, { r: [PI, 0, 0], d: 1 }); }
-  const lf = clothPiv(T, 0, 0.17, 0.23, { leg: 'F', amt: 0.7, k: 110 });
-  P(lf, gPlate(0.16, 0.44, 0.02, 0.6, 0.8, true), RC, -0.07, 0, 0); P(lf, gPlate(0.14, 0.36, 0.02, 0.6, 0.7, true), RC, 0.08, 0, -0.004, { r: [0, 0, 0.08] });
-  const lb = clothPiv(T, 0, 0.17, -0.23, { leg: 'B', ry: PI, amt: 0.9, k: 100 });
-  P(lb, gPlate(0.3, 0.4, 0.02, 0.6, 0.75, true), RC);
-  // dorsal fin
-  P(T, gExt('dorsal', [[0, -0.18], [0.12, -0.1, 0.36, 0.34], [0.2, 0.2, 0.05, 0.22], [0, 0.22]], 0.05, 0.015), SD, 0, 0.5, -0.24, { r: [0, PI / 2, 0] });
-  for (const [A, s] of [[rig.armL, 1], [rig.armR, -1]]) {
-    for (let i = 0; i < 2; i++) P(A, gTor(0.135, 0.018, 5, 16), BN, 0, -0.46 - i * 0.08, 0, { r: [PI / 2, 0, 0] });
-    for (const x of [-0.05, 0, 0.05]) P(A, gCone(0.018, 0.08, 5), BN, x, -0.72, 0.1, { r: [PI / 2 + 0.6, 0, 0], d: 1 });
-  }
+function buildShark(B, f) {
+  const pal = ldPalette('shark', f && f.tint);
+  const S = sp(pal.paint.shell, 0.42, 0, 3), SD = sp(pal.paint.shellLo, 0.4, 0, 3);
+  const rig = dancerBody(B, pal, { face: 'grin' });
+  rig.jaw = piv(rig.head, LDH.hinge[0], LDH.hinge[1], LDH.hinge[2]);
+  lionHead(rig, pal, { jaw: rig.jaw, crest: false, teeth: { n: 13, len: 0.11 }, topper: (Tp) => {
+    // the dorsal-fin crest
+    const p = ldShellPt(0.5, 0);
+    P(Tp, gExt('ldfin', [[-0.06, -0.32], [0.1, -0.2, 0.42, 0.34], [0.2, 0.12, 0.06, 0.26], [0, 0.3, -0.12, 0.3], [-0.06, -0.32]], 0.05, 0.016), SD, 0, p.y + 0.12, -0.12, { r: [0, PI / 2, 0], s: [1, 1, 1] });
+  } });
+  rig.headS.add(rig.jaw);
+  lionCape(rig, pal, { short: true });
+  rig.back = piv(rig.capeTop, 0, -0.32, -0.04);
   // finned tail: the base follows the tail pose, the tip swings on its own
-  rig.tail = piv(T, 0, 0.12, -0.2);
+  rig.tail = piv(rig.torso, 0, 0.12, -0.2);
   P(rig.tail, gLathe([[0, -0.02], [0.15, 0.03], [0.16, 0.16], [0.12, 0.42], [0.09, 0.55], [0, 0.6]], 14), S, 0, 0, 0, { r: [-PI / 2, 0, 0], s: [1, 1, 0.85] });
   const tip = clothPiv(rig.tail, 0, 0, -0.5, { amt: 0.8, k: 70, sway: 0.15, yaw: true });
   P(tip, gLathe([[0, -0.02], [0.095, 0.04], [0.07, 0.3], [0.04, 0.4], [0, 0.42]], 12), S, 0, 0, 0, { r: [-PI / 2, 0, 0], s: [1, 1, 0.85] });
   P(tip, gExt('caudal', [[0, 0], [0.12, 0.12, 0.3, 0.36], [0.12, 0.04], [0.28, -0.2, 0.22, -0.24], [0, 0]], 0.03, 0.01), SD, 0, 0.02, -0.36, { r: [0, PI / 2, 0] });
-  P(tip, gExt('tailfin', [[0, 0], [0.2, 0], [0.04, 0.14], [0, 0]], 0.02), SD, 0, 0.07, -0.05, { r: [0, PI / 2, 0], d: 1 });
-  // ---- a black river-demon lion-dance head (rig.hood): slate lacquer, ink fur, white brows, blood-red paint,
-  // bone shark's teeth and two bone horns; its lower jaw is the bite jaw (rig.jaw) and its eyes burn ----
-  rig.jaw = piv(rig.hood, 0, 0.2, -0.05);
-  lionDanceHead(rig, { key: 'shark', shell: '#2b3a46', paint: '#8e1a1c', fur: '#1c2128', brow: '#e8e2d2', trimS: BZ, beard: '#121014', iris: EYE.c, lining: '#3a1214', teeth: '#e2d6b4' }, { jaw: rig.jaw, eyes: true, body: false });
-  const D = rig.hood;
-  for (const s of [1, -1]) P(D, gTube('ldhorn' + s, [[s * 0.2, 0.8, -0.02], [s * 0.27, 0.92, -0.1], [s * 0.34, 1.0, -0.24], [s * 0.37, 1.01, -0.36]], 0.04, 0.007, 10, 6), BN);
-  for (let i = -2; i <= 2; i++) { const a = i * 0.32; P(D, gCone(0.028, 0.11, 5), BN, Math.sin(a) * 0.32, 0.365, 0.05 + Math.cos(a) * 0.32, { r: [PI, 0, 0] }); }   // shark's fangs
-  // burning eyes (own material: the ult turns them blood red), set into the lion's eye rings
+  // burning eyes (own material: the ult turns them blood red), set into the painted eyeballs
   const em = new THREE.MeshStandardMaterial({ color: EYE.c, emissive: EYE.e, emissiveIntensity: 1.6, roughness: 0.3 });
-  const eg = gSph(1, 12, 8), eye = (s) => { const [x, y, z] = rig.ldEye(s, 0, 0, 0.046); return new THREE.Matrix4().makeRotationY(s * 0.32).scale(new V3(0.05, 0.05, 0.03)).setPosition(x, y, z); };
-  const eyes = new THREE.Mesh(concatGeo('ldsharkeyes', [[eg, eye(1)], [eg, eye(-1)]]), em);
-  eyes.userData.noShadow = true; D.add(eyes); rig.eyes = [eyes];
+  for (const ep of rig.eyeAt) {
+    const eyes = new THREE.Mesh(gSph(1, 12, 8), em); eyes.position.set(0, 0, LDH.eye.r * 0.78); eyes.scale.set(0.05, 0.05, 0.02);
+    eyes.userData.noShadow = true; ep.add(eyes); (rig.eyes || (rig.eyes = [])).push(eyes);
+  }
   return rig;
 }
-
-// ---- training dummy: a wooden practice man ----
-function buildDummy(B) {
-  const WD = SURF.wood('#8a6236'), WK = SURF.wood('#5d3f22'), RP = SURF.straw('#a88a52'), PA = SURF.cloth('#d8c79c'), RD = SURF.lacq('#9a1a1a');
-  const rig = mythBody(B, { skin: WD, pants: WD, boots: WK, chest: WD, sleeve: WD, hands: WK, face: 'dummy', arm: 0.11, leg: 0.13, td: 0.9,
-    torso: [[0.25, -0.02], [0.26, 0.2], [0.27, 0.6], [0.24, 0.8], [0.1, 0.86], [0, 0.87]] });
-  const T = rig.torso;
-  for (const y of [0.14, 0.4, 0.7]) P(T, gTor(0.272, 0.022, 5, 22), RP, 0, y, 0, { r: [PI / 2, 0, 0], s: [1, 0.9, 1] });
-  P(T, gSph(1, 14, 10), RP, 0, 0.5, 0.11, { s: [0.24, 0.22, 0.14] });
-  P(T, gPlate(0.2, 0.26, 0.012, 0.6, 1), PA, 0, 0.5, 0.26); P(T, gCyl(0.06, 0.06, 0.012, 16), RD, 0, 0.52, 0.268, { r: [PI / 2, 0, 0] });
-  for (const L of [rig.legL, rig.legR]) P(L, gTor(0.12, 0.018, 5, 14), RP, 0, -0.4, 0, { r: [PI / 2, 0, 0] });
-  // an unpainted practice lion head: raw paper over a bamboo frame, raffia fur, a red-lacquer nose
-  lionDanceHead(rig, { key: 'dummy', shell: '#d8c79c', paint: '#c9b483', fur: '#a88a52', brow: '#c8ae74', trimS: SURF.wood('#5d3f22'), beard: '#a88a52', iris: '#3a2a1a', lining: '#5d3f22', noseS: RD });
+// ---- training dummy: a practice dancer under an unpainted paper head ----
+function buildDummy(B, f) {
+  const pal = ldPalette('dummy');
+  const rig = dancerBody(B, pal, { face: 'dummy', shirt: SURF.cloth(pal.shirt) });
+  lionHead(rig, pal, {});
+  lionCape(rig, pal, { short: true });
+  rig.back = piv(rig.capeTop, 0, -0.32, -0.04);
+  for (const L of [rig.legL, rig.legR]) P(L, gTor(0.2, 0.02, 5, 14), SURF.straw('#a88a52'), 0, -0.4, 0, { r: [PI / 2, 0, 0] });
   return rig;
 }
 
 // ---- headgear and back gear (customisable; built into rig.hat / rig.back) ----
 // Keys are the old ones (older peers in a room send and expect them); new keys are ignored by older builds.
+// Headgear sits on the lion head's crown (rig.hat, scaled to it); the character's own topper (its horn and
+// pompom, Steve's block, the shark's fin) comes off under it. Back gear rides on the cape.
+const HATY = 0.28;   // hats were made for a head of radius 0.25 centred this high; rig.hat maps that onto the crown
 const HATS = {
-  auto: 'Character headgear', none: 'Bare head', valk: 'Pheasant-plume helm', ninja: 'Red war-band', crown: 'Golden circlet',
+  auto: 'Character topper', none: 'Plain lion head', valk: 'Pheasant-plume helm', ninja: 'Red war-band', crown: 'Golden circlet',
   cap: 'Bamboo rain hat', tophat: "Scholar's winged cap", horns: 'Demon-bone horns',
 };
 const BACKS = { none: 'Nothing', katana: 'Sheathed dao', wings: 'Crane-feather mantle', flags: "General's back flags", gourd: 'Wine gourd' };
-const FACES_UI = { auto: 'Character face', smile: 'Serene', smug: 'Smug', determined: 'Fierce', grin: 'Grin', cool: 'Ink mask' };
+// the dancer's own face (seen through the lion's mouth); it also sets the lion's eyelids (LID_MOOD)
+const FACES_UI = { auto: 'Character face', smile: 'Happy', smug: 'Smug', determined: 'Fierce', grin: 'Grin', cool: 'Shades' };
 const own = (o, k) => typeof k === 'string' && Object.prototype.hasOwnProperty.call(o, k);
 function buildHat(H, kind) {
-  const G = SURF.gold(), GN = NEON(SURF.gold('#c99a3c')), Y = HEAD.y;
+  const G = SURF.gold(), GN = NEON(SURF.gold('#c99a3c')), Y = HATY;
   if (kind === 'valk') {   // bronze helm with a spiked finial, cheek guards and two long pheasant plumes
     const dome = gSph(0.275, 22, 10, 0, TAU, 0, 1.35);
     P(H, dome, SURF.bronze('#8a6230'), 0, Y + 0.02, -0.01, { s: [1, 1.02, 1.06] }); P(H, gFlip(dome), SURF.leather('#2a1c12'), 0, Y + 0.02, -0.01, { s: [0.97, 1, 1.03] });
@@ -3004,16 +3389,20 @@ function buildBack(Bk, kind) {
     P(Bk, gCyl(0.012, 0.012, 0.75, 5), SURF.cloth('#9a1d1d'), 0, 0.15, 0.0, { r: [0, 0, 0.9], d: 1 });
   }
 }
-// avatar string: "hat|back|face" (sent to other players with each snapshot); unknown or inherited keys
+// avatar string: "hat|back|face" (sent to other players with each snapshot), plus "|tint" for bots (a colour
+// from LDTINT; older builds ignore the extra field); unknown or inherited keys
 // ("toString", "__proto__" ...) fall back to the defaults, so a bad peer cannot break anyone's renderer
 function avatarParts(av) {
   const [h, b, fc] = String(av || '').split('|');
   return [own(HATS, h) ? h : 'auto', own(BACKS, b) ? b : 'none', own(FACES_UI, fc) ? fc : 'auto'];
 }
 function avatarOf() { const a = SETTINGS.avatar || {}; return [own(HATS, a.hat) ? a.hat : 'auto', own(BACKS, a.back) ? a.back : 'none', own(FACES_UI, a.face) ? a.face : 'auto'].join('|'); }
-const BOT_HATS = ['auto'];   // bots always wear their own headgear: the lion helm or their lion-dance head
+const BOT_HATS = ['auto'];   // bots always wear their own topper
 const BOT_BACKS = ['none', 'none', 'none', 'katana', 'flags', 'gourd', 'wings'];
-function botAvatar() { return BOT_HATS[(Math.random() * BOT_HATS.length) | 0] + '|' + BOT_BACKS[(Math.random() * BOT_BACKS.length) | 0] + '|auto'; }
+const BOT_TINTS = ['pink', 'blue', 'orange', 'green', 'purple', 'pink', 'blue', 'orange', ''];   // a troupe in mixed colours (photo 2)
+function botAvatar() { return BOT_HATS[(Math.random() * BOT_HATS.length) | 0] + '|' + BOT_BACKS[(Math.random() * BOT_BACKS.length) | 0] + '|auto|' + BOT_TINTS[(Math.random() * BOT_TINTS.length) | 0]; }
+// the tint field of an avatar string (own keys of LDTINT only)
+function tintOf(av) { const t = String(av || '').split('|')[3]; return own(LDTINT, t) ? t : ''; }
 const under = (o, top) => { for (; o; o = o.parent) if (o === top) return true; return false; };
 function applyAvatar(f, av) {
   if (!f.rig.hood || f.av === av) return;
@@ -3023,35 +3412,35 @@ function applyAvatar(f, av) {
   rig.hatKey = hat; rig.backKey = back;
   if (rig.parts) rig.parts = rig.parts.filter((m) => !under(m.userData.holder, rig.hat) && !under(m.userData.holder, rig.back));
   for (const G of [rig.hat, rig.back]) for (const c of G.children.slice()) { if (c.isBone) continue; disposeTree(c); G.remove(c); }
-  rig.hood.visible = hat === 'auto';
+  if (rig.topper) rig.topper.visible = hat === 'auto';
   const prevLow = LOWB, prevF = LODF, prevCtx = MYTH; LOWB = !!f.lowb; LODF = f.lodf || 1; MYTH = { cloth: [], fur: [] };
   if (hat !== 'auto' && hat !== 'none') buildHat(rig.hat, hat);
   if (back !== 'none') buildBack(rig.back, back);
   rig.clothAv = MYTH.cloth; LOWB = prevLow; LODF = prevF; MYTH = prevCtx;
   rig.faceKey = face !== 'auto' ? face : rig.baseFace;
-  f.lookKey = f.key + '|' + hat + '|' + back;
+  f.lookKey = f.key + (f.tint ? '-' + f.tint : '') + '|' + hat + '|' + back;
   if (f.skin) skinBake(f);
 }
 
 // =====================================================================
 // kill trophies: carved skulls that pile up with every K.O. (cosmetic only)
 // =====================================================================
-// 1-12 a prayer-bead necklace, 13-24 skulls hung round the belt, 25-36 gilded skulls on the shoulders,
-// 37-49 a gold aureole of skulls behind the head. 50 K.O.s unlock the Black form (obsidian lacquer, molten
-// gold, ember veins), 1000 transcend. Every skull of a fighter is ONE skinned mesh on the fighter's own
-// skeleton (the same bones as its body), so ragdolls and every animation carry them for one draw call.
-// The full set is baked once per character / detail level into plain arrays (never drawn itself); each
-// fighter draws a copy of the first n skulls (plus the Black form's horns and spikes when it wears it).
+// 1-12 skulls tied along the sash, 13-24 a string of skulls across the chest (left shoulder to right hip),
+// 25-36 skulls stitched along the cape's hem, 37-49 a gold aureole of skulls standing behind the lion head.
+// 50 K.O.s unlock the Black form (black fur, gold rings and lines, ember eyes), 1000 transcend. Every skull of
+// a fighter is ONE skinned mesh on the fighter's own skeleton (the same bones as its body), so ragdolls and
+// every animation carry them for one draw call. The full set is baked once per character / detail level into
+// plain arrays (never drawn itself); each fighter draws a copy of the first n skulls (plus the Black form's
+// horns and spikes when it wears it).
 const KILL = { black: 50, trans: 1000, max: 100000, skulls: 49 };
 const kcOf = (v) => (typeof v === 'number' && Number.isInteger(v) && v > 0 ? Math.min(v, KILL.max) : 0);
-// where the trophies sit on each warrior (torso / arm / head pivot space): belt height, shoulder-guard radii
-// (left, right) and their height squash, the necklace's lowest point, the aureole (centre y, z, radius) and
-// the Black form's horns (a path for the left one; null: the character has its own)
+// where the trophies sit on each dancer: sash height (torso space), the chest string's ends, the aureole (centre
+// y, z and radius in lion-head space) and the cape hem's width / depth (cape space); short: the cape is short
 const TFIT = {
-  lion: { belt: 0.17, sh: [0.205, 0.205], shy: 0.72, drop: 0.5, halo: [0.37, -0.5, 0.45], horns: [[0.17, 0.69, -0.17], [0.27, 0.88, -0.3], [0.31, 1.0, -0.5]] },
-  penguin: { belt: 0.2, sh: [0.19, 0.19], shy: 0.72, drop: 0.48, halo: [0.36, -0.52, 0.45], horns: [[0.22, 0.78, -0.05], [0.33, 0.95, -0.15], [0.38, 1.08, -0.35]] },
-  steve: { belt: 0.19, sh: [0.165, 0.165], shy: 0.85, drop: 0.5, halo: [0.38, -0.58, 0.46], horns: [[0.22, 0.78, -0.05], [0.33, 0.95, -0.15], [0.38, 1.08, -0.35]] },
-  shark: { belt: 0.2, sh: [0.235, 0.18], shy: 0.75, drop: 0.52, halo: [0.4, -0.5, 0.47], horns: null },
+  lion: { belt: 0.255, halo: [0.6, -0.64, 0.66] },
+  penguin: { belt: 0.255, halo: [0.6, -0.64, 0.66] },
+  steve: { belt: 0.255, halo: [0.6, -0.64, 0.66] },
+  shark: { belt: 0.255, halo: [0.6, -0.66, 0.66], short: true },
 };
 const TRO_CACHE = new Map();
 // one carved skull, unit size, facing +z: [geometry, surface key, matrix]
@@ -3084,76 +3473,78 @@ function buildTrophies(rig, fit, list, ck) {
   const BONE = { b: SURF.bone('#d9ccab'), d: sp('#160c08', 0.9, 0, 0, 0, 1), t: SURF.bone('#efe6cf') };
   const OLD = { b: SURF.bone('#c4b28c'), d: BONE.d, t: BONE.t };
   const GILT = { b: SURF.gold('#b08434'), d: BONE.d, t: SURF.gold('#d0a850') };   // the crowning skull of the aureole
-  const T = rig.torso, H = rig.head, UP = new V3(0, 1, 0);
+  const T = rig.torso, H = rig.headS, UP = new V3(0, 1, 0), CORD = SURF.leather('#2a1810');
   let slot = 0;
-  // ---- 1-12: prayer-bead necklace (the cord and its red beads come with the first skull) ----
-  const [pp, nn] = rig.tpath([[0.17, 0.86, 0, -0.04], [0.21, 0.76, 1], [0.15, 0.62, 1], [0, fit.drop, 1], [-0.15, 0.62, 1], [-0.21, 0.76, 1], [-0.17, 0.86, 0, -0.04]], 0.014);
-  const cv = new THREE.CatmullRomCurve3(pp.map((p) => new V3(p[0], p[1], p[2]))), cn = new THREE.CatmullRomCurve3(nn.map((p) => new V3(p[0], p[1], p[2])));
-  tPart(T, list, 0, gTube('tronecklace' + ck, pp, 0.007, 0.007, 30, 4), SURF.leather('#2a1810'));
-  if (!LOWB) for (let i = 0; i <= 14; i++) { const p = cv.getPoint(0.12 + i * 0.054); tPart(T, list, 0, gIco(0.014), SURF.lacq(i % 3 ? '#8a1a14' : '#b8862e'), p.x, p.y, p.z); }
+  // ---- 1-12: skulls tied along the sash, front first, alternating left / right, round to the sides ----
+  // (the bow sits at x 0.17 on the front, so the first pair flanks it)
+  const by = fit.belt, BX = 0.415, BZ = 0.225;
+  const beltPt = (u) => {   // u: 0 = front centre, running round the waist's rounded-box outline to the back (u = 1)
+    const per = [[0, BZ], [BX - 0.06, BZ], [BX, BZ - 0.06], [BX, -BZ + 0.06], [BX - 0.06, -BZ], [0, -BZ]];
+    const seg = u * (per.length - 1), i = Math.min(per.length - 2, Math.floor(seg)), k = seg - i;
+    return [lerp(per[i][0], per[i + 1][0], k), lerp(per[i][1], per[i + 1][1], k)];
+  };
+  const BELT = [0.3, 0.42, 0.52, 0.62, 0.72, 0.82];
   for (let k = 0; k < 12; k++) {
-    const t = 0.5 + (k % 2 ? -1 : 1) * (Math.floor(k / 2) * 2 + 1) * 0.031, p = cv.getPoint(t), n = cn.getPoint(t).normalize(), s = 0.078 - Math.floor(k / 2) * 0.0025;
-    skullAt(T, list, slot++, p.addScaledVector(n, s * 0.35), n, UP, s, BONE);
+    const side = k % 2 ? -1 : 1, u = BELT[k >> 1], [x, z] = beltPt(u), s = 0.075;
+    const nx = Math.abs(x) >= BX - 0.001 ? 1 : 0, nz = nx ? 0 : Math.sign(z);
+    const n = new V3(side * nx, -0.15, nz).normalize(), p = new V3(side * x, by - 0.075, z).addScaledVector(n, s * 0.42);
+    skullAt(T, list, slot++, p, n, UP, s, OLD);
+    if (k < 2) tPart(T, list, 0, gCyl(0.006, 0.006, 0.05, 4), CORD, p.x - n.x * s * 0.3, by - 0.02, p.z - n.z * s * 0.3);
   }
-  // ---- 13-24: skulls hung round the belt, front to back ----
-  const [bx, bz] = rig.trad(fit.belt);
+  // ---- 13-24: a cord of skulls across the chest, left shoulder down to the right hip ----
+  const a0 = new V3(0.36, 0.78, 0), a1 = new V3(-0.33, 0.3, 0), fz = 0.212;
+  const cp = []; for (let i = 0; i <= 10; i++) { const p = a0.clone().lerp(a1, i / 10); cp.push([p.x, p.y, fz + 0.012]); }
+  // over the shoulder and round the back
+  tPart(T, list, 12, gTube('trocord' + ck, [[0.3, 0.8, -0.18], [0.38, 0.84, 0], ...cp.slice(0, 3)], 0.008, 0.008, 12, 4), CORD);
+  tPart(T, list, 12, gTube('trocord2' + ck, cp, 0.008, 0.008, 24, 4), CORD);
   for (let k = 0; k < 12; k++) {
-    const a = (k % 2 ? -1 : 1) * (0.55 + Math.floor(k / 2) * 0.4), s = 0.078;
-    const p = new V3(Math.sin(a) * (bx + 0.03 + s * 0.4), fit.belt - 0.06, Math.cos(a) * (bz + 0.03 + s * 0.4));
-    skullAt(T, list, slot++, p, new V3(Math.sin(a) / bx, -0.25 / bz, Math.cos(a) / bz), UP, s, OLD);
+    const t = 0.05 + k * 0.08, p = a0.clone().lerp(a1, t); p.z = fz + 0.035;
+    skullAt(T, list, slot++, p, new V3(0, -0.08, 1), new V3(-0.15, 1, 0).normalize(), 0.07 - (k % 2) * 0.006, BONE);
   }
-  // ---- 25-36: a row of skulls over each shoulder guard, left and right in turn ----
-  const SH = [[0.62, 0.3], [0.62, -0.3], [0.72, 0.9], [0.72, -0.9], [0.85, 1.45], [0.85, -1.45]];   // a crest along the top of the guard, front to back
+  // ---- 25-36: skulls along the cape's hem, centre first ----
+  const capeH = rig.capeLow, hemY = fit.short ? -0.5 : -0.55, W = fit.short ? 0.92 * 1.12 : 0.92 * 1.12 * 1.15, R = fit.short ? 0.92 / 1.1 : 0.92 * 1.12 / 1.1;
   for (let k = 0; k < 12; k++) {
-    const side = k % 2 ? -1 : 1, A = side > 0 ? rig.armL : rig.armR, R = fit.sh[side > 0 ? 0 : 1], [th, ph] = SH[k >> 1], s = 0.08;
-    const d = new V3(side * Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph));
-    const e = [R * 1.08, R * fit.shy, R * 1.1], n = new V3(d.x / e[0], d.y / e[1], d.z / e[2]).normalize();
-    const p = new V3(side * 0.02 + d.x * e[0], d.y * e[1], d.z * e[2]).addScaledVector(n, s * 0.38);
-    skullAt(A, list, slot++, p, new V3(n.x, n.y * 0.25, n.z), UP, s, OLD);
+    const side = k % 2 ? -1 : 1, x = side * (Math.floor(k / 2) * 2 + 1) * 0.04 * (W / 0.96), a = x / R, s = 0.068;
+    const p = new V3(Math.sin(a) * R, hemY + 0.1, R * (1 - Math.cos(a)) - 0.04 - s * 0.35);
+    skullAt(capeH, list, slot++, p, new V3(-Math.sin(a), 0, -Math.cos(a)), UP, s, OLD);
   }
-  // ---- 37-49: an aureole behind the head; its gold ring and ember flames arrive with the crowning skull ----
-  const [cy, cz, R] = fit.halo, GN = NEON(SURF.gold('#c99a3c'));
-  tPart(H, list, slot, gTor(R, 0.017, 6, 44), GN, 0, cy, cz);
-  tPart(H, list, slot, gTor(R - 0.05, 0.008, 4, 40), SURF.gold('#8c6024'), 0, cy, cz + 0.005);
-  if (!LOWB) for (let i = 0; i < 14; i++) {
-    const a = (i + 0.5) / 14 * TAU;
-    tPart(H, list, slot, gCone(0.022, 0.1, 5), GN, Math.sin(a) * (R + 0.04), cy + Math.cos(a) * (R + 0.04), cz, { r: [0, 0, -a] });
+  // ---- 37-49: an aureole behind the lion head; its gold ring and flames arrive with the crowning skull ----
+  const [cy, cz, HR] = fit.halo, GN = NEON(SURF.gold('#c99a3c'));
+  tPart(H, list, slot, gTor(HR, 0.02, 6, 48), GN, 0, cy, cz);
+  tPart(H, list, slot, gTor(HR - 0.06, 0.01, 4, 44), SURF.gold('#8c6024'), 0, cy, cz + 0.005);
+  if (!LOWB) for (let i = 0; i < 16; i++) {
+    const a = (i + 0.5) / 16 * TAU; if (Math.cos(a) < -0.55) continue;   // not down behind the shoulders
+    tPart(H, list, slot, gCone(0.026, 0.12, 5), GN, Math.sin(a) * (HR + 0.05), cy + Math.cos(a) * (HR + 0.05), cz, { r: [0, 0, -a] });
   }
   for (let k = 0; k < 13; k++) {
-    const a = k ? (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.4 : 0, s = k ? 0.085 : 0.12;
+    const a = k ? (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.33 : 0, s = k ? 0.1 : 0.14;
     const rad = new V3(Math.sin(a), Math.cos(a), 0);
-    skullAt(H, list, slot++, new V3(rad.x * R, cy + rad.y * R, cz - 0.012), new V3(0, 0, -1), rad, s, k ? BONE : GILT);
+    skullAt(H, list, slot++, new V3(rad.x * HR, cy + rad.y * HR, cz - 0.015), new V3(0, 0, -1), rad, s, k ? BONE : GILT);
   }
-  // ---- the Black form's own pieces: swept obsidian horns, shoulder spikes, a spine ridge (slot 49) ----
+  // ---- the Black form's own pieces (slot 49): obsidian horns swept back from the temples, gold-ringed, and
+  // ember-tipped spikes on the shoulders ----
   const OB = sp('#0b0a0c', 0.25, 0, 3), EM = SURF.glow('#ff6a1a', 1.2);
-  if (fit.horns) for (const s of [1, -1]) {
-    const hp = fit.horns.map((p) => [s * p[0], p[1], p[2]]);
-    tPart(H, list, slot, gTube('trohorn' + ck + s, hp, 0.05, 0.006, 12, 6), OB);
-    tPart(H, list, slot, gTor(0.045, 0.012, 5, 12), GN, hp[0][0], hp[0][1], hp[0][2], { r: [PI / 2 - 0.5, 0, -s * 0.5] });
+  for (const s of [1, -1]) {
+    const b = ldShellPt(0.62, s * 0.95), hp = [[b.x, b.y, b.z], [s * 0.62, b.y + 0.2, b.z - 0.18], [s * 0.74, b.y + 0.36, b.z - 0.46]];
+    tPart(H, list, slot, gTube('trohorn' + s, hp, 0.07, 0.008, 12, 7), OB);
+    tPart(H, list, slot, gTor(0.065, 0.016, 5, 14), GN, hp[0][0], hp[0][1], hp[0][2], { r: [PI / 2 - 0.4, 0, -s * 0.7] });
   }
   for (const [A, s] of [[rig.armL, 1], [rig.armR, -1]]) {
-    const R = fit.sh[s > 0 ? 0 : 1];
     for (let i = 0; i < 3; i++) {
-      const ph = (i - 1) * 0.6, th = 0.35, d = new V3(s * Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph) * 0.8).normalize();
-      const p = new V3(s * 0.02 + d.x * R, d.y * R * fit.shy, d.z * R), len = i === 1 ? 0.3 : 0.2;
-      const m = tPart(A, list, slot, gCone(0.04, len, 6), OB, p.x + d.x * len * 0.45, p.y + d.y * len * 0.45, p.z + d.z * len * 0.45);
+      const x = s * 0.05 + (i - 1) * 0.0, z = (i - 1) * 0.1, len = i === 1 ? 0.24 : 0.17, d = new V3(s * 0.45, 1, 0).normalize();
+      const m = tPart(A, list, slot, gCone(0.04, len, 6), OB, x + d.x * len * 0.45, 0.05 + d.y * len * 0.45, z);
       m.quaternion.setFromUnitVectors(UP, d); m.updateMatrix();
-      const tip = tPart(A, list, slot, gCone(0.016, 0.07, 5), EM, p.x + d.x * len * 0.92, p.y + d.y * len * 0.92, p.z + d.z * len * 0.92);
+      const tip = tPart(A, list, slot, gCone(0.016, 0.07, 5), EM, x + d.x * len * 0.92, 0.05 + d.y * len * 0.92, z);
       tip.quaternion.copy(m.quaternion);
     }
-  }
-  for (let i = 0; i < 5; i++) {
-    const y = 0.32 + i * 0.1, z = -rig.tz(y) - 0.02, d = new V3(0, 0.55, -1).normalize();
-    const m = tPart(T, list, slot, gCone(0.035, 0.13 + (i === 3 ? 0.05 : 0), 5), OB, 0, y + d.y * 0.05, z + d.z * 0.05);
-    m.quaternion.setFromUnitVectors(UP, d);
   }
   return slot;
 }
 // the full trophy set of this fighter's character and detail level, in its skeleton's bone numbering
 function trophyFull(f) {
-  const rig = f.rig; if (!rig.bones || !rig.trad) return null;
+  const rig = f.rig; if (!rig.bones || !rig.trad || !rig.headS || !rig.capeLow) return null;
   const bi = (h) => rig.bones.findIndex((b) => b.holder === h);
-  const idx = [rig.torso, rig.head, rig.armL, rig.armR].map(bi);
+  const idx = [rig.torso, rig.headS, rig.armL, rig.armR, rig.capeLow].map(bi);
   if (idx.some((i) => i < 0)) return null;
   const key = f.key + '|' + (f.lodf || 1) + '|' + idx.join(',');
   let g = TRO_CACHE.get(key);
@@ -3228,7 +3619,7 @@ function trophySet(f, kills, normal) {
 // ---- the Black form at runtime (all render-side: nothing here touches the simulation) ----
 let _furBlack = null, _faceBlack = null;
 function blackFurMat() {   // the same fur shader, its strands burnt dark with an ember undertone
-  if (!_furBlack) { _furBlack = shared(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0, envMap: null, color: '#221a18', emissive: '#1c0500' })); _furBlack.extensions = furMat.extensions; _furBlack.onBeforeCompile = furMat.onBeforeCompile; }
+  if (!_furBlack) _furBlack = makeFurMat({ roughness: 0.6, color: '#1e1816', emissive: '#160400' });
   return _furBlack;
 }
 function blackFaceMat() {   // painted face on a dark skin: the eyes burn
@@ -3517,12 +3908,14 @@ class Fighter {
     this.visual = piv(this.root, 0, 1, 0);
     this.body = piv(this.visual, 0, -1, 0);
     BEVEL = !this.lantern; LOWB = this.lowb = GFX.level === 'low'; LODF = this.lodf = LOD_F[GFX.level]; MYTH = null;
+    const av = o.av || (this.localKey === 'P' ? avatarOf() : this.ai ? botAvatar() : 'auto|none|auto');
+    this.tint = tintOf(av);   // a bot's colours (fixed at build)
     this.rig = this.def.build(this.body, this);
     BEVEL = false; MYTH = null;
     for (const k of PARTS) if (this.rig[k]) this.rig[k].userData.anim = true;
     if (this.rig.ribbons) this.rig.ribbons.userData.anim = true;
-    if (this.rig.hood) applyAvatar(this, o.av || (this.localKey === 'P' ? avatarOf() : this.ai ? botAvatar() : 'auto|none|auto'));
-    if (this.rig.mythic) { if (!this.lookKey) this.lookKey = key + '|auto|none'; skinBake(this); if (GFX.level === 'low') for (const m of this.rig.fur) m.visible = false; }
+    if (this.rig.hood) applyAvatar(this, av);
+    if (this.rig.mythic) { if (!this.lookKey) this.lookKey = key + (this.tint ? '-' + this.tint : '') + '|auto|none'; skinBake(this); if (GFX.level === 'low') for (const m of this.rig.fur) m.visible = false; }
     else mergeMeshes(this.body);
     LOWB = false; LODF = 1; this.merged = true;
     this.pose = {}; this.tgt = {};
@@ -6374,7 +6767,7 @@ function updateTags() {
   const W = innerWidth, H = innerHeight;
   for (const f of fighters) {
     const el = f.tagEl; if (!el) continue;
-    projV.set(f.pos.x, f.pos.y + 2.75, f.pos.z).project(camera);
+    projV.set(f.pos.x, f.pos.y + (f.rig && f.rig.antennae ? 3.3 : 2.75), f.pos.z).project(camera);   // above the lion head's antennae
     const dist = camera.position.distanceTo(f.pos);
     if (projV.z > 1 || dist > 75 || Math.abs(projV.x) > 1.2 || Math.abs(projV.y) > 1.2) { el.style.display = 'none'; continue; }
     el.style.display = '';
