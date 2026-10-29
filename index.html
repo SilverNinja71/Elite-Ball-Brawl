@@ -8754,6 +8754,35 @@ function switchCharacter(key) {
 // camera + main loop
 // =====================================================================
 const FPV = { eye: 1.72, fov: 80 };
+// Arena props marked cam (the Pillar, decks, platforms) never come between the camera and the player: the boom
+// is cut short in front of the first one it crosses (at once), and lets out again smoothly. Thin props (poles)
+// only push the lens out of themselves. Nothing marked: nothing changes (the park and the realm).
+let camPull = 1;
+function camClip(fdt) {
+  const ax = camT.x, ay = camT.y, az = camT.z, P = camera.position, dx = P.x - ax, dy = P.y - ay, dz = P.z - az;
+  let t = 1;
+  for (const b of blocks) {
+    if (!b.cam || !b.alive) continue;
+    let t0 = 0, t1 = t;
+    for (let a = 0; a < 3 && t0 <= t1; a++) {   // slab test of the boom against the box grown by 0.3
+      const o = a === 0 ? ax : a === 1 ? ay : az, d = a === 0 ? dx : a === 1 ? dy : dz;
+      const lo = (a === 0 ? b.min.x : a === 1 ? b.min.y : b.min.z) - 0.3, hi = (a === 0 ? b.max.x : a === 1 ? b.max.y : b.max.z) + 0.3;
+      if (Math.abs(d) < 1e-6) { if (o < lo || o > hi) t1 = -1; continue; }
+      let u = (lo - o) / d, v = (hi - o) / d; if (u > v) { const w = u; u = v; v = w; }
+      if (u > t0) t0 = u; if (v < t1) t1 = v;
+    }
+    if (t0 <= t1 && t0 > 0.02) t = Math.min(t, t0);
+  }
+  const k = Math.max(0.15, t - 0.03);
+  camPull = k < camPull ? k : damp(camPull, k, 3, fdt);
+  if (camPull < 0.999) P.set(ax + dx * camPull, ay + dy * camPull, az + dz * camPull);
+  for (const b of blocks) {
+    if (!b.thin || !b.alive || P.y > b.max.y + 0.3) continue;
+    const cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2, hw = (b.max.x - b.min.x) / 2 + 0.35, hd = (b.max.z - b.min.z) / 2 + 0.35;
+    const ox = P.x - cx, oz = P.z - cz;
+    if (Math.abs(ox) < hw && Math.abs(oz) < hd) { if (hw - Math.abs(ox) < hd - Math.abs(oz)) P.x = cx + Math.sign(ox || 1) * hw; else P.z = cz + Math.sign(oz || 1) * hd; }
+  }
+}
 function updateCamera(fdt) {
   const p = player, rp = p.root.position;
   if (duelCamera(fdt)) { /* watching a duel */ }
@@ -8772,6 +8801,7 @@ function updateCamera(fdt) {
     camT.x = damp(camT.x, rp.x + ox, 24, fdt); camT.y = damp(camT.y, rp.y + 1.7, 14, fdt); camT.z = damp(camT.z, rp.z + oz, 24, fdt);
     const cp = Math.cos(camPitch), sp = Math.sin(camPitch);
     camera.position.set(camT.x - Math.sin(camYaw) * cp * camDist, Math.max(0.5, camT.y + sp * camDist), camT.z - Math.cos(camYaw) * cp * camDist);
+    camClip(fdt);
     if (shakeAmt > 0.001) { camera.position.add(tA.set(rand(-1, 1), rand(-1, 1), rand(-1, 1)).multiplyScalar(shakeAmt * 0.6)); shakeAmt = Math.max(0, shakeAmt - fdt * 2.4); }
     camera.lookAt(camT);
   }
