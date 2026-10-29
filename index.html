@@ -9015,6 +9015,9 @@ function netTick(rdt) {
   NET.tick -= rdt; if (NET.tick > 0) return; NET.tick += NETI.rate; if (NET.tick < 0) NET.tick = NETI.rate;   // 30 Hz
   broadcast({ t: 'st', ts: r3(netNow() - acc), e: fighters.filter((f) => !f.remote).map(packF) });   // stamped with the moment of the last simulation step
   if (NET.fx.length) { broadcast({ t: 'fx', l: NET.fx }); NET.fx = []; }
+  // the host repeats its arena every 2 s: a guest whose first 'ar' was lost (it can race the channel opening)
+  // still lands in the right arena instead of the 3 s park fallback (repeats are no-ops for everyone else)
+  if (NET.mode === 'host' && ARENA && (NET.arT = (NET.arT || 0) - NETI.rate) <= 0) { NET.arT = 2; broadcast({ t: 'ar', a: ARENA }); }
 }
 let peerLoading = null;
 function loadPeer() {
