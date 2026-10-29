@@ -6654,6 +6654,7 @@ function duelEnter(ph) {
       if (los && !los.remote && !los.dead) duelKnock(los);
     } else if (w && !w.remote) { w.hp = Math.min(100, w.hp + 35); }
     if (w && w.ai && !w.remote && Math.random() < 0.8) setTimeout(() => playEmote(w, 'cheer'), 2600);
+    for (const f of [a, b]) if (f && f.ai && !f.remote) f.ai.cqRest = gameTime + 25;
     if (near && w) DRUMS.win(); else DRUMS.stop();
     if (!w) addFeed(null, 'The cabbage duel ended in a draw', '');
     else addFeed(DUEL.fin.wn, DUEL.k === 'grab' ? 'the greens' : 'the cabbage duel', DUEL.k === 'grab' ? 'picked' : 'won');
@@ -6712,7 +6713,9 @@ function duelAuthStep(dt) {
     const el = []; let crowd = 0;
     for (const f of fighters) { if (f.dead || f.isDummy || f.lantern || !inRing(f)) continue; crowd++; if (duelEligible(f)) el.push(f); }
     D.crowd = crowd; D.ready = el.length;
-    const key = el.length === 2 ? el[0].id + '|' + el[1].id : '';
+    // two bots that have just duelled do not go again at once (a human can always ask them for a rematch)
+    const rest = el.length === 2 && el.every((f) => f.ai && !f.remote) && el.some((f) => f.ai.cqRest > gameTime);
+    const key = el.length === 2 && !rest ? el[0].id + '|' + el[1].id : '';
     if (key !== D.pair) { D.pair = key; D.pairT = 0; }
     if (key) { D.pairT += dt; if (D.pairT >= CQ.wait) { duelStart(el[0], el[1]); return; } }
     duelCallBots(el, dt);
