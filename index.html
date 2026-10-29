@@ -8794,7 +8794,8 @@ function updatePuppet(f, rdt) {
   f.V.y = lerp(va[3], vb[3], k); f.V.sy = lerp(va[4], vb[4], k); f.V.sxz = lerp(va[5], vb[5], k);
   const fl = n.fl, wasDead = f.dead;
   f.hp = n.h; f.dead = !!(fl & 512);
-  if (wasDead && !f.dead) blackEnter(f);   // a peer's Black-form fighter respawned f.netInv = !!(fl & 256); f.blocking = !!(fl & 1); f.frozen = fl & 2048 ? 1 : 0;
+  if (wasDead && !f.dead) blackEnter(f);   // a peer's Black-form fighter respawned
+  f.netInv = !!(fl & 256); f.blocking = !!(fl & 1); f.frozen = fl & 2048 ? 1 : 0;
   f.stun = fl & 1024 ? 1 : 0; f.ragdoll = 0; f.flatten = 0; f.held = false; f.action = null;
   if (f.rig.sword) f.rig.sword.visible = !!(fl & 4);
   if (f.rig.mace) f.rig.mace.visible = !!(fl & 8);
