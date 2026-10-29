@@ -7361,9 +7361,10 @@ function updateTrans(fdt) {
 // Switching frees everything the old arena built (geometries, materials, textures, colliders).
 const ARENAS = { park: { name: 'Park', build: buildPark }, transcended: { name: 'Transcended realm', build: buildTranscended } };
 let ARENA = null, ARENA_SET = null;   // the arena now standing, and what its build made
-// o.host: the room's host chose it, so the K.O. requirement does not apply
+let ARENA_PASS = null;                // an arena gameplay sent this player to (ascendTo), whatever their count
+// o.host: the room's host chose it; o.pass: gameplay granted it (ascendTo). Either lifts the K.O. requirement.
 function selectArena(key, o) {
-  if (!ARENA_IDS.includes(key) || !own(ARENAS, key) || (key === 'transcended' && KILLS.n < KILL.trans && !(o && o.host))) key = 'park';
+  if (!ARENA_IDS.includes(key) || !own(ARENAS, key) || (key === 'transcended' && KILLS.n < KILL.trans && !(o && (o.host || o.pass)))) key = 'park';
   if (key === ARENA) { showArena(); return ARENA; }
   const first = !ARENA;
   if (ARENA_SET) { if (ARENA_SET.out.cleanup) ARENA_SET.out.cleanup(); arenaFree(ARENA_SET.objs); dropColliders(ARENA_SET.cols); ARENA_SET = null; }
@@ -7376,9 +7377,20 @@ function selectArena(key, o) {
 // the arena this player should be in now: the host's in a room, else their own choice once transcended
 function wantArena() {
   if (NET.mode === 'client') return NET.arena || ARENA || 'park';
+  if (ARENA_PASS) return ARENA_PASS;
   return KILLS.n >= KILL.trans && SETTINGS.arena !== 'park' ? 'transcended' : 'park';
 }
-function syncArena() { return selectArena(wantArena(), { host: NET.mode === 'client' }); }
+function syncArena() { return selectArena(wantArena(), { host: NET.mode === 'client', pass: NET.mode !== 'client' && !!ARENA_PASS }); }
+// For gameplay (e.g. a pillar-climb ascension): ascendTo('transcended') sends this player there whatever their
+// K.O. count, offline or in a room they host (guests then follow, as with any host arena); ascendTo('park') or
+// descend() ends it. A guest keeps the host's arena, but the pass waits for when they leave. It lasts for this
+// visit only and does not change who gets the realm by default. Returns the arena now standing.
+function ascendTo(id) {
+  if (typeof id !== 'string' || !ARENA_IDS.includes(id) || !own(ARENAS, id)) return ARENA;
+  ARENA_PASS = id === 'park' ? null : id;
+  return NET.mode === 'client' ? (showArena(), ARENA) : syncArena();
+}
+function descend() { return ascendTo('park'); }
 function arenaFrame(fdt) { if (ARENA_SET && ARENA_SET.out.tick) ARENA_SET.out.tick(fdt); }
 function arenaGfx() { if (ARENA_SET && ARENA_SET.out.gfx) ARENA_SET.out.gfx(); }
 // a level picked in Settings rebuilds the standing arena at that level's detail (the Auto watchdog only trims
@@ -7389,18 +7401,20 @@ function rebuildArena() {
   ARENA_SET = arenaCapture(ARENAS[ARENA].build);
 }
 // the count can also fall (the dev hook): a player below 1000 goes back to the park
-function arenaKills() { if (KILLS.n < KILL.trans && ARENA === 'transcended' && NET.mode !== 'client') selectArena('park'); else showArena(); }
+function arenaKills() { if (KILLS.n < KILL.trans && ARENA === 'transcended' && NET.mode !== 'client' && !ARENA_PASS) selectArena('park'); else showArena(); }
 function showArena() {
-  const sel = $('#optArena'), n = KILLS.n, guest = NET.mode === 'client';
+  const sel = $('#optArena'), n = KILLS.n, guest = NET.mode === 'client', pass = !guest && ARENA_PASS;
   if (!sel) return;
-  sel.value = guest ? ARENA || 'park' : n >= KILL.trans && SETTINGS.arena !== 'park' ? 'transcended' : 'park';
-  sel.disabled = guest || n < KILL.trans;
+  sel.value = guest ? ARENA || 'park' : pass || (n >= KILL.trans && SETTINGS.arena !== 'park' ? 'transcended' : 'park');
+  sel.disabled = guest || (n < KILL.trans && !pass);
   $('#arenaNote').textContent = guest ? 'In a room you fight in the host’s arena.'
+    : pass ? 'You ascended here. Pick the park to go back down.'
     : n < KILL.trans ? 'The transcended realm opens at ' + KILL.trans + ' K.O.s (' + (KILL.trans - n) + ' to go).'
       : 'Where you fight offline and in rooms you host; guests see it too.';
 }
 $('#optArena').addEventListener('change', (e) => {
-  SETTINGS.arena = e.target.value === 'park' ? 'park' : 'transcended'; store.set('settings', SETTINGS);
+  if (e.target.value === 'park') ARENA_PASS = null;   // going back down also ends an ascension
+  if (KILLS.n >= KILL.trans) { SETTINGS.arena = e.target.value === 'park' ? 'park' : 'transcended'; store.set('settings', SETTINGS); }
   syncArena(); e.target.blur();
 });
 // mute is remembered between visits; a #mute hash in the URL always starts muted (handy for testing)
@@ -7702,7 +7716,7 @@ requestAnimationFrame(frame);
 if (/[?&]dev=1/.test(location.search)) window.__scbg = { SFX, fighters, get player() { return player; }, get gameTime() { return gameTime; }, CHARS, hit, press, held, BUF, SETTINGS, BIND, KOTH, NET, addBot, removeBot, useAbility, doM1, cycleLock, lock, toggleFpv, get fpv() { return fpv; }, renderer, M1, GUARD, PARRY, COMBO, scene, camera, updateTags, updateHUD, animateFighter, updateParts, updateRings, updateTemps, updateDebris, updateAuras, updateLock, updateCamera, updateNums, updateEventChip, drawProjs, simStep, fitShadow, GFX, applyGfx,
   applyAvatar, avatarOf, avatarParts, HATS, BACKS, FACES_UI, FACE, EMOTES, playEmote, SKIN_CACHE, rigSync, mythGfx, own,
   applyState, packF, netNow, PORTRAITS,
-  KILLS, KILL, setKills, creditKill, trophySet, trophyFull, TRO_CACHE, blackEnter, blackFlourish, transcend, TRANS, selectArena, syncArena, wantArena, ARENAS, ARENA_IDS, get ARENA() { return ARENA; }, get ARENA_SET() { return ARENA_SET; }, blocks, cans, DUEL, arenaFromHost, hostArena, joinArena, leaveRoom, sky, sun, hemi,
+  KILLS, KILL, setKills, creditKill, trophySet, trophyFull, TRO_CACHE, blackEnter, blackFlourish, transcend, TRANS, selectArena, syncArena, wantArena, ascendTo, descend, get ARENA_PASS() { return ARENA_PASS; }, ARENAS, ARENA_IDS, get ARENA() { return ARENA; }, get ARENA_SET() { return ARENA_SET; }, blocks, cans, DUEL, arenaFromHost, hostArena, joinArena, leaveRoom, sky, sun, hemi,
   koSeen, kCredit, kHit, TRAIL, applyNetHit, applyHitReply, applyFx, onData, pendingHits, botKills, souls, KO, respawn, switchCharacter };
 })();
 </script>
