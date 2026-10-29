@@ -7901,9 +7901,10 @@ function botSteer(b, I) {
   // a target up on a deck or platform out of jumping reach: walk round to the foot of a ramp or stairs (on the
   // level the bot stands on) that leads up there, then straight up it
   const nav = ARENA_SET && ARENA_SET.out.nav, nv = ai.navP;
-  if (nav && nv && ai.navUp > gameTime && T && !T.dead && Math.hypot(nv.fx - x0, nv.fz - z0) > 0.9 && b.pos.y > nv.base - 0.3 && b.pos.y < nv.top - 0.2) {   // on the way up
-    const gx = nv.tx - x0, gz = nv.tz - z0, gl = Math.hypot(gx, gz) || 1;
-    m.x = (gx / gl) * len; m.z = (gz / gl) * len; if (ai.navT > 0) ai.navT -= SIM_DT; return I;
+  if (nav && nv && ai.navUp > gameTime && T && !T.dead) {   // on the way up
+    const dF = Math.hypot(nv.fx - x0, nv.fz - z0), onIt = b.pos.y > nv.base + 0.15 && b.pos.y < nv.top - 0.2;
+    if (!onIt && dF > 1.6) ai.navUp = 0;   // knocked away from it (or off it): choose again
+    else if (onIt || dF > 0.9) { const gx = nv.tx - x0, gz = nv.tz - z0, gl = Math.hypot(gx, gz) || 1; m.x = (gx / gl) * len; m.z = (gz / gl) * len; if (ai.navT > 0) ai.navT -= SIM_DT; return I; }
   }
   if (nav && T && !T.dead && T.onGround && b.onGround && tg < 26 && T.pos.y > b.pos.y + 1.2 && !(tg < 3.4 && T.pos.y < b.pos.y + 2.6)) {
     if (!(ai.navUp > gameTime && ai.navP)) {
