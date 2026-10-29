@@ -8210,6 +8210,8 @@ const store = {
 };
 { const saved = store.get('binds'); if (saved) for (const k in saved) if (k in BIND && typeof saved[k] === 'string') BIND[k] = saved[k]; }
 const SETTINGS = Object.assign({ autoLock: true, bots: 'normal', studs: true, avatar: {} }, store.get('settings') || {});
+if (!['easy', 'normal', 'hard'].includes(SETTINGS.bots)) SETTINGS.bots = 'normal';   // a hand-edited or corrupt save
+if (!SETTINGS.avatar || typeof SETTINGS.avatar !== 'object') SETTINGS.avatar = {};
 RIG_U.uStuds.value = 0;   // studs belonged to the blocky look; only the lantern still uses that material
 // kill progression (scbg.kills): every K.O. the player lands, on bots and players, in every mode. n: the count,
 // cel: the 1000 celebration has been shown. SETTINGS.form: 'black' (default once unlocked) or 'normal'.
@@ -9192,7 +9194,7 @@ function buildHelp() {
     ['t', 'BLOCK', 'Hold to guard · press just before a hit to parry'],
     ['t', 'LOCK', 'Lock on · tap again for the next target'],
     ['', 'Finisher', 'A K.O. blow plays your character\'s final move · any key or a tap skips it after a second · Settings: On / Only mine / Off'],
-    ['', 'Wall splat', 'Ragdoll into a tree, post or bench: +4, extra stun'],
+    ['', 'Wall splat', 'Ragdoll into a wall, post or prop: +4, extra stun'],
     ['', 'Lantern', 'Every 60 s · first to 20 damage wins'],
   ];
   K.innerHTML = '';
