@@ -6422,7 +6422,13 @@ const wallMat = shared(new THREE.MeshBasicMaterial({ color: '#ffb84a', transpare
 const CQS = { grp: null, level: '', cols: [] };
 function buildDuelRing() {
   const first = !CQS.grp;
-  if (CQS.grp) { scene.remove(CQS.grp); CQS.grp.traverse((m) => { if (m.geometry && !SHARED.has(m.geometry)) m.geometry.dispose(); if (m.material && !SHARED.has(m.material)) { if (m.material.map) m.material.map.dispose(); m.material.dispose(); } }); }
+  if (CQS.grp) {   // a rebuild (another graphics level): free the old meshes, their materials and textures
+    scene.remove(CQS.grp);
+    CQS.grp.traverse((m) => {
+      if (m.geometry && !SHARED.has(m.geometry)) m.geometry.dispose();
+      for (const x of [].concat(m.material || [])) if (!SHARED.has(x)) { if (x.map) x.map.dispose(); x.dispose(); }
+    });
+  }
   const lo = GFX.level === 'low', seg = lo ? 10 : 18;
   CQS.level = GFX.level;
   const G = new THREE.Group(); G.name = 'cabbageStage'; scene.add(G); CQS.grp = G;
