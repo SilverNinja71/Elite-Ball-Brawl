@@ -2670,7 +2670,7 @@ function lionLife(f, fdt) {
   // ---- lids ----
   if (rig.lids) {
     if (!rig.blinkT) rig.blinkT = t + 1 + Math.random() * 3;
-    let shut = LID_MOOD[rig.faceNow] || 0;
+    let shut = own(LID_MOOD, rig.faceNow) ? LID_MOOD[rig.faceNow] : 0;
     if (t > rig.blinkT) { const b = (t - rig.blinkT) / 0.16; if (b >= 1) { rig.blinkT = t + 1.8 + Math.random() * 3.5; if (Math.random() < 0.2) rig.blinkT = t + 0.25; } else shut = Math.max(shut, Math.sin(b * PI)); }
     if (f.dead) shut = 1;
     const L = LDH.lid, tgt = lerp(L.open, L.shut, shut);
