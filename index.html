@@ -2476,7 +2476,7 @@ function buildTranscended() {
 
   let last = realClock;
   return {
-    gfx,
+    gfx, detail: GFX.level,
     tick(fdt) {
       const t = realClock, fx = GFX.fx, dt = Math.min(0.1, Math.max(0, t - last)); last = t;
       seaTex.offset.set((t * 0.0022) % 1, (t * 0.0013) % 1);
@@ -7184,7 +7184,7 @@ function showGfx() {
 showGfx();
 $('#optGfx').addEventListener('change', (e) => {
   const v = e.target.value; GFX.pick = v; SETTINGS.gfx = v; store.set('settings', SETTINGS);
-  GFX.prScale = 1; GFXW.warm = 5; applyGfx(v === 'auto' ? autoGfxLevel() : v); e.target.blur();
+  GFX.prScale = 1; GFXW.warm = 5; applyGfx(v === 'auto' ? autoGfxLevel() : v); rebuildArena(); e.target.blur();
 });
 $('#optBots').addEventListener('change', (e) => { SETTINGS.bots = e.target.value; store.set('settings', SETTINGS); updateBotUI(); e.target.blur(); });
 $('#keysReset').addEventListener('click', () => { for (const [k, , d] of BIND_DEFS) BIND[k] = d; reindexBinds(); store.set('binds', BIND); refreshKeyLabels(); buildHelp(); buildKeyList(); });
@@ -7381,6 +7381,13 @@ function wantArena() {
 function syncArena() { return selectArena(wantArena(), { host: NET.mode === 'client' }); }
 function arenaFrame(fdt) { if (ARENA_SET && ARENA_SET.out.tick) ARENA_SET.out.tick(fdt); }
 function arenaGfx() { if (ARENA_SET && ARENA_SET.out.gfx) ARENA_SET.out.gfx(); }
+// a level picked in Settings rebuilds the standing arena at that level's detail (the Auto watchdog only trims
+// its effects through arenaGfx, so a slow device never hitches mid-fight on a rebuild)
+function rebuildArena() {
+  if (!ARENA_SET || !ARENA_SET.out.detail || ARENA_SET.out.detail === GFX.level) return;
+  if (ARENA_SET.out.cleanup) ARENA_SET.out.cleanup(); arenaFree(ARENA_SET.objs); dropColliders(ARENA_SET.cols);
+  ARENA_SET = arenaCapture(ARENAS[ARENA].build);
+}
 // the count can also fall (the dev hook): a player below 1000 goes back to the park
 function arenaKills() { if (KILLS.n < KILL.trans && ARENA === 'transcended' && NET.mode !== 'client') selectArena('park'); else showArena(); }
 function showArena() {
